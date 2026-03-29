@@ -1,0 +1,18 @@
+# West workspace metadata and fetched dependencies live beside the app when the
+# repository is used as a manifest root.
+.west/
+zephyr/
+modules/
+
+# Standard build outputs.
+build/
+compile_commands.json
+
+# Local Python tooling.
+.venv/
+__pycache__/
+
+# Editor and user-local build cache files.
+CMakeUserPresets.json
+*.swp
+*.swo

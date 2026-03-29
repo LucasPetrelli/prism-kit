@@ -1,0 +1,19 @@
+manifest:
+	version: "0.13"
+
+	remotes:
+		# Pull Zephyr and imported modules from the canonical upstream source so
+		# the workspace can be recreated deterministically on a fresh machine.
+		- name: zephyrproject-rtos
+			url-base: https://github.com/zephyrproject-rtos
+
+	projects:
+		# Pin Zephyr to a real release tag so the repo evolves against a known API
+		# surface instead of tracking upstream main implicitly.
+		- name: zephyr
+			remote: zephyrproject-rtos
+			revision: v4.3.0
+			# Import the upstream Zephyr manifest as-is for compatibility first. The
+			# repository's own source layout stays minimal even if the workspace pulls
+			# in the broader Zephyr project set.
+			import: true
