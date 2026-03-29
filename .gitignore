@@ -14,6 +14,7 @@ __cmake_systeminformation/
 __pycache__/
 
 # Editor and user-local build cache files.
+.vscode/
 CMakeUserPresets.json
 *.swp
 *.swo

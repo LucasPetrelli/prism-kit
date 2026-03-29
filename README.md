@@ -194,16 +194,16 @@ On Windows with the GNU Arm Embedded Toolchain installed under `Program Files
 (x86)`, use the provided helper script instead. It resolves the toolchain to a
 short path so the linker does not break on spaces in the install directory.
 
-From `cmd.exe` or PowerShell:
-
-```bat
-scripts\build-local.cmd
-```
-
 From Git Bash:
 
 ```bash
-cmd.exe /c scripts\\build-local.cmd
+bash scripts/build-local.sh
+```
+
+From PowerShell:
+
+```powershell
+bash scripts/build-local.sh
 ```
 
 The resulting ELF is expected at `build/zephyr/zephyr.elf`.
