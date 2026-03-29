@@ -7,6 +7,7 @@ modules/
 # Standard build outputs.
 build/
 compile_commands.json
+__cmake_systeminformation/
 
 # Local Python tooling.
 .venv/

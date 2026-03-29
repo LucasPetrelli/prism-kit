@@ -154,8 +154,11 @@ source .venv/Scripts/activate
 ### 2. Install west
 
 ```bash
-pip install --upgrade pip west
+pip install --upgrade pip west jsonschema pyelftools
 ```
+
+The extra Python packages are required by Zephyr's board discovery and ELF
+introspection scripts during configuration and build.
 
 ### 3. Initialize the workspace from this repository's manifest
 
@@ -185,6 +188,22 @@ Build the current blink smoke test for the XIAO SAMD21 with a pristine build.
 
 ```bash
 west build -b seeeduino_xiao --pristine always .
+```
+
+On Windows with the GNU Arm Embedded Toolchain installed under `Program Files
+(x86)`, use the provided helper script instead. It resolves the toolchain to a
+short path so the linker does not break on spaces in the install directory.
+
+From `cmd.exe` or PowerShell:
+
+```bat
+scripts\build-local.cmd
+```
+
+From Git Bash:
+
+```bash
+cmd.exe /c scripts\\build-local.cmd
 ```
 
 The resulting ELF is expected at `build/zephyr/zephyr.elf`.
