@@ -1,10 +1,10 @@
-#include <errno.h>
 #include <stddef.h>
 
 #include <zephyr/devicetree.h>
 #include <zephyr/drivers/gpio.h>
 
 #include "hal/gpio.h"
+#include "status/status.h"
 
 #define STATUS_LED_NODE DT_ALIAS(led0)
 
@@ -38,6 +38,15 @@ static const struct hal_gpio_binding *hal_gpio_lookup(hal_gpio_signal_id_t signa
 	return &hal_gpio_bindings[signal_id];
 }
 
+static int hal_status_from_backend_result(int backend_result)
+{
+	if (backend_result < 0) {
+		return STATUS_ERR_BACKEND;
+	}
+
+	return STATUS_OK;
+}
+
 bool hal_gpio_is_ready(hal_gpio_signal_id_t signal_id)
 {
 	const struct hal_gpio_binding *binding = hal_gpio_lookup(signal_id);
@@ -54,14 +63,15 @@ int hal_gpio_configure_output(hal_gpio_signal_id_t signal_id, bool active)
 	const struct hal_gpio_binding *binding = hal_gpio_lookup(signal_id);
 
 	if (binding == NULL) {
-		return -EINVAL;
+		return STATUS_ERR_INVALID_ARGUMENT;
 	}
 
 	if (!gpio_is_ready_dt(&binding->spec)) {
-		return -ENODEV;
+		return STATUS_ERR_DEVICE_UNAVAILABLE;
 	}
 
-	return gpio_pin_configure_dt(&binding->spec, active ? GPIO_OUTPUT_ACTIVE : GPIO_OUTPUT_INACTIVE);
+	return hal_status_from_backend_result(
+		gpio_pin_configure_dt(&binding->spec, active ? GPIO_OUTPUT_ACTIVE : GPIO_OUTPUT_INACTIVE));
 }
 
 int hal_gpio_set_active(hal_gpio_signal_id_t signal_id, bool active)
@@ -69,14 +79,14 @@ int hal_gpio_set_active(hal_gpio_signal_id_t signal_id, bool active)
 	const struct hal_gpio_binding *binding = hal_gpio_lookup(signal_id);
 
 	if (binding == NULL) {
-		return -EINVAL;
+		return STATUS_ERR_INVALID_ARGUMENT;
 	}
 
 	if (!gpio_is_ready_dt(&binding->spec)) {
-		return -ENODEV;
+		return STATUS_ERR_DEVICE_UNAVAILABLE;
 	}
 
-	return gpio_pin_set_dt(&binding->spec, active);
+	return hal_status_from_backend_result(gpio_pin_set_dt(&binding->spec, active));
 }
 
 int hal_gpio_toggle(hal_gpio_signal_id_t signal_id)
@@ -84,14 +94,14 @@ int hal_gpio_toggle(hal_gpio_signal_id_t signal_id)
 	const struct hal_gpio_binding *binding = hal_gpio_lookup(signal_id);
 
 	if (binding == NULL) {
-		return -EINVAL;
+		return STATUS_ERR_INVALID_ARGUMENT;
 	}
 
 	if (!gpio_is_ready_dt(&binding->spec)) {
-		return -ENODEV;
+		return STATUS_ERR_DEVICE_UNAVAILABLE;
 	}
 
-	return gpio_pin_toggle_dt(&binding->spec);
+	return hal_status_from_backend_result(gpio_pin_toggle_dt(&binding->spec));
 }
 
 const char *hal_gpio_signal_name(hal_gpio_signal_id_t signal_id)

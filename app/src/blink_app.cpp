@@ -1,8 +1,7 @@
-#include <cerrno>
-
 #include "app/app.h"
 #include "bal/led.hpp"
 #include "osal/time.hpp"
+#include "status/status.h"
 
 namespace {
 
@@ -21,7 +20,7 @@ int app_run(void)
 	 */
 	status_led = bal::status_led();
 	if (status_led == nullptr) {
-		return -ENODEV;
+		return STATUS_ERR_DEVICE_UNAVAILABLE;
 	}
 
 	while (true) {

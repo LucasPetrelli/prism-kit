@@ -3,6 +3,8 @@
 
 #include <stdbool.h>
 
+#include "status/status.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -16,8 +18,8 @@ typedef struct bal_led {
 } bal_led_t;
 
 /// @brief Prepare all board-owned LED objects exposed by BAL.
-/// @return 0 on success, or a negative errno-style code if initialization
-///     fails.
+/// @return STATUS_OK on success, or a negative project-defined status code if
+///     initialization fails.
 /// @post LED operations may be used after a successful return.
 int bal_leds_init(void);
 
@@ -28,13 +30,15 @@ const bal_led_t *bal_status_led(void);
 /// @brief Drive a BAL LED object using logical on or off semantics.
 /// @param led Pointer to a BAL-owned LED handle.
 /// @param on True drives the logical LED state on, false drives it off.
-/// @return 0 on success, or a negative errno-style code on failure.
+/// @return STATUS_OK on success, or a negative project-defined status code on
+///     failure.
 /// @pre bal_leds_init() completed successfully.
 int bal_led_set(const bal_led_t *led, bool on);
 
 /// @brief Toggle a BAL LED object using logical LED semantics.
 /// @param led Pointer to a BAL-owned LED handle.
-/// @return 0 on success, or a negative errno-style code on failure.
+/// @return STATUS_OK on success, or a negative project-defined status code on
+///     failure.
 /// @pre bal_leds_init() completed successfully.
 int bal_led_toggle(const bal_led_t *led);
 

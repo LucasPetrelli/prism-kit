@@ -6,8 +6,8 @@
 namespace app {
 
 /// @brief Run the application through the stable C ABI entry point.
-/// @return 0 on success, or a negative errno-style code if startup fails
-///     before the steady-state loop begins.
+/// @return STATUS_OK on success, or a negative project-defined status code if
+///     startup fails before the steady-state loop begins.
 inline int run()
 {
 	return app_run();

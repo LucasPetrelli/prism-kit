@@ -8,6 +8,8 @@ project(ws2812_samd21_led_driver)
 
 # Keep the top-level entry point thin and compose the firmware from explicit
 # layers so the dependency direction stays visible from the root build file.
+target_include_directories(app PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+
 target_sources(app PRIVATE src/main.c)
 
 add_subdirectory(hal)

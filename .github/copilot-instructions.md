@@ -65,7 +65,7 @@
 /// @brief Set the logical state of a board-owned LED.
 /// @param led LED instance previously initialized by the board layer.
 /// @param on True turns the LED on, false turns it off.
-/// @return 0 on success, or a negative errno-style code on failure.
+/// @return STATUS_OK on success, or a negative project-defined status code on failure.
 int bal_led_set(const Led& led, bool on);
 ```
 

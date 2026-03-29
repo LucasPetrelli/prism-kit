@@ -3,6 +3,8 @@
 
 #include <stdbool.h>
 
+#include "status/status.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -27,19 +29,22 @@ bool hal_gpio_is_ready(hal_gpio_signal_id_t signal_id);
 /// @param signal_id Logical signal identifier to configure.
 /// @param active True requests an initially active state, false requests an
 ///     initially inactive state.
-/// @return 0 on success, or a negative errno-style code on failure.
+/// @return STATUS_OK on success, or a negative project-defined status code on
+///     failure.
 int hal_gpio_configure_output(hal_gpio_signal_id_t signal_id, bool active);
 
 /// @brief Drive a logical HAL GPIO signal to the requested active state.
 /// @param signal_id Logical signal identifier to drive.
 /// @param active True drives the logical signal active, false drives it
 ///     inactive.
-/// @return 0 on success, or a negative errno-style code on failure.
+/// @return STATUS_OK on success, or a negative project-defined status code on
+///     failure.
 int hal_gpio_set_active(hal_gpio_signal_id_t signal_id, bool active);
 
 /// @brief Toggle a logical HAL GPIO signal.
 /// @param signal_id Logical signal identifier to toggle.
-/// @return 0 on success, or a negative errno-style code on failure.
+/// @return STATUS_OK on success, or a negative project-defined status code on
+///     failure.
 int hal_gpio_toggle(hal_gpio_signal_id_t signal_id);
 
 /// @brief Return a human-readable name for a logical HAL GPIO signal.

@@ -1,8 +1,8 @@
 #include <array>
-#include <cerrno>
 
 #include "bal/led.h"
 #include "hal/gpio.h"
+#include "status/status.h"
 
 namespace {
 
@@ -40,7 +40,7 @@ int bal_leds_init(void)
 
 	const auto &status_led = kLedBindings[kStatusLedIndex];
 	if (!hal_gpio_is_ready(status_led.signal_id)) {
-		return -ENODEV;
+		return STATUS_ERR_DEVICE_UNAVAILABLE;
 	}
 
 	/* Configure the board-owned status LED once before APP starts using it. */
@@ -61,12 +61,12 @@ const bal_led_t *bal_status_led(void)
 int bal_led_set(const bal_led_t *led, bool on)
 {
 	if (!g_leds_are_initialized) {
-		return -EAGAIN;
+		return STATUS_ERR_NOT_READY;
 	}
 
 	const auto *binding = lookup_led(led);
 	if (binding == nullptr) {
-		return -EINVAL;
+		return STATUS_ERR_INVALID_ARGUMENT;
 	}
 
 	return hal_gpio_set_active(binding->signal_id, on);
@@ -75,12 +75,12 @@ int bal_led_set(const bal_led_t *led, bool on)
 int bal_led_toggle(const bal_led_t *led)
 {
 	if (!g_leds_are_initialized) {
-		return -EAGAIN;
+		return STATUS_ERR_NOT_READY;
 	}
 
 	const auto *binding = lookup_led(led);
 	if (binding == nullptr) {
-		return -EINVAL;
+		return STATUS_ERR_INVALID_ARGUMENT;
 	}
 
 	return hal_gpio_toggle(binding->signal_id);

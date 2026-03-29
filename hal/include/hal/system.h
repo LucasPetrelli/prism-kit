@@ -3,6 +3,8 @@
 
 #include <stdbool.h>
 
+#include "status/status.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -13,8 +15,8 @@ extern "C" {
 bool hal_system_ready(void);
 
 /// @brief Return the status code produced by the HAL startup stage.
-/// @return 0 when HAL startup succeeded, or a negative errno-style code that
-///     explains the failure.
+/// @return STATUS_OK when HAL startup succeeded, or a negative project-defined
+///     status code that explains the failure.
 int hal_system_status(void);
 
 #ifdef __cplusplus

@@ -207,6 +207,11 @@ bash scripts/build-local.sh
 ```
 
 The resulting ELF is expected at `build/zephyr/zephyr.elf`.
+ 
+For clangd-based editor indexing, the build helper also refreshes
+`compile_commands.json` at the repository root from the Zephyr build directory.
+The tracked `.clangd` file points clangd at `build/` as the compilation
+database location.
 
 ## Flash
 

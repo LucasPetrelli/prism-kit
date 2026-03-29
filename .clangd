@@ -1,0 +1,21 @@
+CompileFlags:
+  CompilationDatabase: .
+  Add:
+    - --target=arm-none-eabi
+    - -isystem
+    - C:/PROGRA~2/ARMGNU~1/14EFD8~1.2RE/arm-none-eabi/include/c++/14.2.1
+    - -isystem
+    - C:/PROGRA~2/ARMGNU~1/14EFD8~1.2RE/arm-none-eabi/include/c++/14.2.1/arm-none-eabi
+    - -isystem
+    - C:/PROGRA~2/ARMGNU~1/14EFD8~1.2RE/arm-none-eabi/include/c++/14.2.1/backward
+    - -isystem
+    - C:/PROGRA~2/ARMGNU~1/14EFD8~1.2RE/lib/gcc/arm-none-eabi/14.2.1/include
+    - -isystem
+    - C:/PROGRA~2/ARMGNU~1/14EFD8~1.2RE/lib/gcc/arm-none-eabi/14.2.1/include-fixed
+    - -isystem
+    - C:/PROGRA~2/ARMGNU~1/14EFD8~1.2RE/arm-none-eabi/include
+  Remove:
+    - -mfp16-format=*
+    - -fno-reorder-functions
+    - --param=*
+    - -fno-defer-pop
