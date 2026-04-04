@@ -5,7 +5,7 @@
 
 namespace {
 
-constexpr auto kBlinkPeriodMs = 250U;
+constexpr auto kBlinkPeriodMs = 1000U;
 
 } // namespace
 

@@ -33,6 +33,8 @@
   already enabled.
 - Prefer incremental migration: keep existing stable C boundaries in place when
   needed, but place new logic behind a C++ interface where practical.
+- For repo-local tooling and automation, prefer Python scripts over PowerShell
+  or shell wrappers unless the task genuinely requires a platform-native shell.
 
 ## Layering Expectations
 

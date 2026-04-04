@@ -192,16 +192,16 @@ On Windows with the GNU Arm Embedded Toolchain installed under `Program Files
 (x86)`, use the provided helper script instead. It resolves the toolchain to a
 short path so the linker does not break on spaces in the install directory.
 
-From Git Bash:
+With the repository virtual environment activated:
 
 ```bash
-bash scripts/build-local.sh
+python scripts/build-local.py
 ```
 
-From PowerShell:
+Without activating the virtual environment first:
 
-```powershell
-bash scripts/build-local.sh
+```text
+.venv\Scripts\python.exe scripts\build-local.py
 ```
 
 The resulting ELF is expected at `build/zephyr/zephyr.elf`.
@@ -230,10 +230,44 @@ If you want to use J-Link immediately, use the SWD pads on the XIAO and drive
 the session manually. The current repo does not yet add a local Zephyr board
 override for a `jlink` runner.
 
-Start the GDB server:
+Flash the newest supported build artifact in one line from the repository root.
+
+With the virtual environment activated:
+
+```text
+python scripts/flash_jlink.py
+```
+
+Without activating the virtual environment first:
+
+```text
+.venv\Scripts\python.exe scripts\flash_jlink.py
+```
+
+The helper prefers the newest `.elf`, then `.hex`, then `.bin` under
+`build/zephyr`. If it has to flash a raw `.bin`, it reads the flash base and
+load offset from `build/zephyr/.config` so the write address stays aligned with
+the Zephyr build. It also searches versioned SEGGER install directories such as
+`C:\Program Files\SEGGER\JLink_V*\JLink.exe`, which was the missing case in
+the earlier helper. You can also pass an explicit artifact path as the first
+argument.
+
+Explicit artifact example:
+
+```text
+python scripts/flash_jlink.py build/zephyr/zephyr.elf
+```
+
+Dry-run example to verify tool and artifact discovery without touching hardware:
+
+```text
+python scripts/flash_jlink.py --dry-run
+```
+
+If you want to debug instead of doing a one-shot flash, start the GDB server:
 
 ```bash
-JLinkGDBServerCLExe -device ATSAMD21G18A -if SWD -speed 4000 -singlerun
+JLinkGDBServerCL.exe -device ATSAMD21G18A -if SWD -speed 4000 -singlerun
 ```
 
 Then load the firmware with GDB:
@@ -265,7 +299,6 @@ without touching APP, BAL, or OSHAL interfaces.
 ### OSHAL
 
 OSHAL currently exposes three small contracts.
-
 
 - `oshal/system.h`: reports whether early OSHAL startup succeeded.
 - `oshal/gpio.h`: exposes abstract GPIO signals rather than raw Zephyr GPIO

@@ -1,0 +1,197 @@
+#!/usr/bin/env python3
+
+from __future__ import annotations
+
+import ctypes
+import json
+import os
+from pathlib import Path, PureWindowsPath
+import re
+import shutil
+import subprocess
+import sys
+
+
+DEFAULT_TOOLCHAIN_ROOT = Path(
+    r"C:\Program Files (x86)\Arm GNU Toolchain arm-none-eabi\14.2 rel1"
+)
+GCC_ONLY_PATTERNS = (
+    r"\s+-mfp16-format=\S+",
+    r"\s+-fno-reorder-functions",
+    r"\s+--param=\S+",
+    r"\s+-fno-defer-pop",
+)
+
+
+def repo_root() -> Path:
+    return Path(__file__).resolve().parent.parent
+
+
+def repo_python_executable(root: Path) -> Path:
+    return root / ".venv" / "Scripts" / "python.exe"
+
+
+def ensure_repo_python(root: Path) -> Path:
+    repo_python = repo_python_executable(root)
+    if not repo_python.is_file():
+        raise SystemExit(f"Missing Python environment at '{repo_python}'.")
+
+    current_python = Path(sys.executable).resolve()
+    if current_python != repo_python.resolve():
+        completed = subprocess.run(
+            [str(repo_python), __file__, *sys.argv[1:]], check=False
+        )
+        raise SystemExit(completed.returncode)
+
+    return repo_python
+
+
+def get_short_path(path: Path) -> Path:
+    if os.name != "nt":
+        return path
+
+    get_short_path_name = ctypes.windll.kernel32.GetShortPathNameW
+    get_short_path_name.argtypes = [ctypes.c_wchar_p, ctypes.c_wchar_p, ctypes.c_uint]
+    get_short_path_name.restype = ctypes.c_uint
+
+    buffer_size = 260
+    while True:
+        buffer = ctypes.create_unicode_buffer(buffer_size)
+        result = get_short_path_name(str(path), buffer, buffer_size)
+        if result == 0:
+            raise OSError(
+                ctypes.get_last_error(), f"Failed to resolve short path for '{path}'."
+            )
+        if result < buffer_size:
+            return Path(buffer.value)
+        buffer_size = result + 1
+
+
+def resolve_toolchain_root() -> Path:
+    configured_root = os.environ.get("GNUARMEMB_TOOLCHAIN_PATH")
+    candidate = Path(configured_root) if configured_root else DEFAULT_TOOLCHAIN_ROOT
+
+    if not candidate.exists() and candidate == DEFAULT_TOOLCHAIN_ROOT:
+        raise SystemExit(
+            "GNU Arm Embedded Toolchain 14.2 rel1 was not found at the expected install path.\n"
+            "Install it first, then rerun this script."
+        )
+
+    toolchain_root = get_short_path(candidate)
+    compiler = toolchain_root / "bin" / "arm-none-eabi-gcc.exe"
+    if not compiler.is_file():
+        raise SystemExit(
+            f"GNU Arm Embedded Toolchain was not found at '{toolchain_root}'.\n"
+            "Set GNUARMEMB_TOOLCHAIN_PATH to a valid install root, then rerun this script."
+        )
+
+    return toolchain_root
+
+
+def remove_build_directory(root: Path) -> None:
+    shutil.rmtree(root / "build", ignore_errors=True)
+
+
+def run_west_build(root: Path, python_exe: Path, toolchain_root: Path) -> None:
+    env = os.environ.copy()
+    env["ZEPHYR_TOOLCHAIN_VARIANT"] = "gnuarmemb"
+    env["GNUARMEMB_TOOLCHAIN_PATH"] = str(toolchain_root)
+
+    subprocess.run(
+        [
+            str(python_exe),
+            "-m",
+            "west",
+            "build",
+            "-b",
+            "seeeduino_xiao",
+            "--pristine",
+            "always",
+            ".",
+            "--",
+            "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON",
+        ],
+        cwd=root,
+        env=env,
+        check=True,
+    )
+
+
+def append_cpp_include_flags(command: str, compiler: str) -> str:
+    compiler_path = PureWindowsPath(compiler)
+    toolchain_root = Path(compiler_path.parent.parent)
+    cpp_include_root = toolchain_root / "arm-none-eabi" / "include" / "c++"
+    if not cpp_include_root.is_dir():
+        return command
+
+    cpp_versions = sorted(
+        path.name for path in cpp_include_root.iterdir() if path.is_dir()
+    )
+    if not cpp_versions:
+        return command
+
+    cpp_version = cpp_versions[-1]
+    cpp_include_flags = (
+        f" -isystem {toolchain_root / 'arm-none-eabi' / 'include' / 'c++' / cpp_version}"
+        f" -isystem {toolchain_root / 'arm-none-eabi' / 'include' / 'c++' / cpp_version / 'arm-none-eabi'}"
+        f" -isystem {toolchain_root / 'arm-none-eabi' / 'include' / 'c++' / cpp_version / 'backward'}"
+        f" -isystem {toolchain_root / 'lib' / 'gcc' / 'arm-none-eabi' / cpp_version / 'include'}"
+        f" -isystem {toolchain_root / 'lib' / 'gcc' / 'arm-none-eabi' / cpp_version / 'include-fixed'}"
+        f" -isystem {toolchain_root / 'arm-none-eabi' / 'include'}"
+    )
+    if compiler.endswith("g++.exe") and cpp_include_flags not in command:
+        return command.replace(
+            "--target=arm-none-eabi", f"--target=arm-none-eabi{cpp_include_flags}", 1
+        )
+    return command
+
+
+def sanitize_compile_database(root: Path) -> None:
+    build_db = root / "build" / "compile_commands.json"
+    root_db = root / "compile_commands.json"
+    entries = json.loads(build_db.read_text(encoding="utf-8"))
+    sanitized_entries = []
+
+    for entry in entries:
+        command = entry.get("command")
+        if command is None:
+            raise RuntimeError(
+                "Expected Zephyr compile_commands.json entries to contain 'command'."
+            )
+
+        compiler, _, remainder = command.partition(" ")
+        if not remainder:
+            raise RuntimeError("Expected compiler command followed by arguments.")
+
+        for pattern in GCC_ONLY_PATTERNS:
+            command = re.sub(pattern, "", command)
+
+        command = command.replace(".exe ", ".exe --target=arm-none-eabi ", 1)
+        command = append_cpp_include_flags(command, compiler)
+
+        sanitized_entry = {
+            "directory": entry["directory"],
+            "file": entry["file"],
+            "command": command,
+        }
+        if "output" in entry:
+            sanitized_entry["output"] = entry["output"]
+        sanitized_entries.append(sanitized_entry)
+
+    root_db.write_text(json.dumps(sanitized_entries, indent=2) + "\n", encoding="utf-8")
+
+
+def main() -> int:
+    root = repo_root()
+    python_exe = ensure_repo_python(root)
+    toolchain_root = resolve_toolchain_root()
+
+    os.chdir(root)
+    remove_build_directory(root)
+    run_west_build(root, python_exe, toolchain_root)
+    sanitize_compile_database(root)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
