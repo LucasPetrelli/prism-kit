@@ -38,10 +38,10 @@
 
 - Keep application logic unaware of Zephyr APIs, devicetree details, and raw
   board pin mappings.
-- Keep HAL, BAL, OSAL, and APP interfaces narrow, explicit, and documented.
-- Prefer C++ in `app/`, `bal/`, and `osal/` first.
-- In `hal/`, use C++ when it improves clarity without obscuring low-level intent
-  or fighting Zephyr integration points.
+- Keep OSHAL, BAL, and APP interfaces narrow, explicit, and documented.
+- Prefer C++ in `app/`, `bal/`, and `oshal/` first.
+- Keep direct Zephyr init hooks, ISR entry points, and similarly C-shaped
+  integration points thin even when they live inside `oshal/`.
 
 ## API Documentation Format
 
@@ -95,15 +95,15 @@ int bal_led_set(const Led& led, bool on);
 Example header:
 
 ```text
-refactor: move BAL and OSAL implementations to C++
+refactor: merge HAL and OSAL into OSHAL
 ```
 
 Example with optional body:
 
 ```text
-refactor: move BAL and OSAL implementations to C++
+refactor: merge HAL and OSAL into OSHAL
 
-- switch BAL and OSAL build targets from `.c` to `.cpp`
-- add C++-first wrapper headers while preserving the C ABI
-- update README and repo instructions to document the mixed-language boundary
+- collapse Zephyr boundary services under `oshal/`
+- keep the `SYS_INIT()` hook thin while preserving the C ABI
+- update README and repo instructions to document the new layering
 ```

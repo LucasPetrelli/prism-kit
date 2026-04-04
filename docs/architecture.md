@@ -5,12 +5,13 @@ layering rules and the boot path that phase 1 implements.
 
 ## Layer Ownership
 
-### HAL
+### OSHAL
 
-HAL owns hardware-facing services and early startup. In phase 1 it provides:
+OSHAL owns the Zephyr-facing boundary. In phase 1 it provides:
 
 - a system readiness contract,
-- and a GPIO signal contract for the board status LED.
+- a GPIO signal contract for the board status LED,
+- and the time/sleep contract APP currently needs.
 
 The backend is currently Zephyr-based because that is the lowest-friction way
 to validate architecture before introducing a timing-specific WS2812 engine.
@@ -20,22 +21,17 @@ to validate architecture before introducing a timing-specific WS2812 engine.
 BAL owns board resources and the application bootstrap. That is why `main()`
 hands off to BAL instead of calling APP directly.
 
-### OSAL
-
-OSAL wraps only what APP actually needs. Right now that is sleep/time. Thread,
-queue, or mutex abstractions should be added only when the app needs them.
-
 ### APP
 
 APP must not include Zephyr headers or know devicetree aliases. It talks to BAL
-for board objects and OSAL for execution services.
+for board objects and OSHAL for execution services.
 
 ## Boot Flow
 
 ```text
 Zephyr startup
     |
-    +--> HAL SYS_INIT at APPLICATION level
+        +--> OSHAL SYS_INIT at APPLICATION level
             |
             +--> validate hardware-facing prerequisites
     |
@@ -49,7 +45,7 @@ Zephyr startup
                             +--> blink smoke test
 ```
 
-## Why HAL Uses APPLICATION-Level SYS_INIT
+## Why OSHAL Uses APPLICATION-Level SYS_INIT
 
 The repository wants a staged boot path, but also needs Zephyr's device model to
 have finished bringing up GPIO drivers first. `APPLICATION` is the best fit for
@@ -57,7 +53,7 @@ that compromise:
 
 - it still runs before `main()`,
 - it avoids racing driver initialization,
-- and it keeps the HAL stage explicit in the final init sequence.
+- and it keeps the OSHAL stage explicit in the final init sequence.
 
 If a future WS2812 backend genuinely needs earlier hardware setup, that work can
 move to a lower init level without changing the APP contract.
@@ -71,4 +67,4 @@ Zephyr `jlink` runner. The recommended follow-up options are:
    `jlink` runner support.
 2. Keep the board target upstream and document a manual J-Link flow.
 
-Neither choice requires changes to APP, BAL, or OSAL.
+Neither choice requires changes to APP, BAL, or OSHAL.

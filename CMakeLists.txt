@@ -12,7 +12,6 @@ target_include_directories(app PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
 target_sources(app PRIVATE src/main.c)
 
-add_subdirectory(hal)
-add_subdirectory(osal)
+add_subdirectory(oshal)
 add_subdirectory(bal)
 add_subdirectory(app)

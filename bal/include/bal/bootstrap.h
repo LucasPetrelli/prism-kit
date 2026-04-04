@@ -7,9 +7,9 @@
 extern "C" {
 #endif
 
-/// @brief Validate HAL state, initialize BAL-owned objects, and call APP.
+/// @brief Validate OSHAL state, initialize BAL-owned objects, and call APP.
 /// @return STATUS_OK on success, or a negative project-defined status code if
-///     HAL validation or board bring-up fails.
+///     OSHAL validation or board bring-up fails.
 /// @note This function is the owned transition from the Zephyr-facing startup
 ///     path into the board and application layers.
 int bal_bootstrap_run(void);

@@ -1,20 +1,20 @@
 #include <array>
 
 #include "bal/led.h"
-#include "hal/gpio.h"
+#include "oshal/gpio.h"
 #include "status/status.h"
 
 namespace {
 
 struct LedBinding {
 	bal_led_t public_led;
-	hal_gpio_signal_id_t signal_id;
+	oshal_gpio_signal_id_t signal_id;
 };
 
 constexpr std::size_t kStatusLedIndex = 0U;
 
 const std::array<LedBinding, 1> kLedBindings{{
-	LedBinding{{"status_led"}, HAL_GPIO_SIGNAL_STATUS_LED},
+	LedBinding{{"status_led"}, OSHAL_GPIO_SIGNAL_STATUS_LED},
 }};
 
 bool g_leds_are_initialized = false;
@@ -39,12 +39,12 @@ int bal_leds_init(void)
 	}
 
 	const auto &status_led = kLedBindings[kStatusLedIndex];
-	if (!hal_gpio_is_ready(status_led.signal_id)) {
+	if (!oshal_gpio_is_ready(status_led.signal_id)) {
 		return STATUS_ERR_DEVICE_UNAVAILABLE;
 	}
 
 	/* Configure the board-owned status LED once before APP starts using it. */
-	const int ret = hal_gpio_configure_output(status_led.signal_id, false);
+	const int ret = oshal_gpio_configure_output(status_led.signal_id, false);
 	if (ret < 0) {
 		return ret;
 	}
@@ -69,7 +69,7 @@ int bal_led_set(const bal_led_t *led, bool on)
 		return STATUS_ERR_INVALID_ARGUMENT;
 	}
 
-	return hal_gpio_set_active(binding->signal_id, on);
+	return oshal_gpio_set_active(binding->signal_id, on);
 }
 
 int bal_led_toggle(const bal_led_t *led)
@@ -83,5 +83,5 @@ int bal_led_toggle(const bal_led_t *led)
 		return STATUS_ERR_INVALID_ARGUMENT;
 	}
 
-	return hal_gpio_toggle(binding->signal_id);
+	return oshal_gpio_toggle(binding->signal_id);
 }

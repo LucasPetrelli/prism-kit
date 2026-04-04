@@ -13,33 +13,33 @@ Phase 1 is implemented.
 - The repository is wired as a Zephyr application with a reproducible `west.yml`.
 - Zephyr C++ support is enabled, and APP now builds as C++17 behind a
 	C-compatible entry point.
-- BAL and OSAL now also build as C++ where the code is policy-oriented rather
-	than Zephyr-boundary-oriented.
+- BAL and OSHAL now build as C++ where the code is policy-oriented rather than
+	Zephyr-boundary-oriented, while the direct Zephyr init hook stays in C.
 - C++-first layers expose `.hpp` wrappers, while `.h` headers remain as the
 	thin C ABI used by Zephyr-facing code.
-- Code is split into HAL, BAL, OSAL, and APP layers with public headers.
-- HAL startup runs through `SYS_INIT()` so the staged boot sequence remains
+- Code is split into OSHAL, BAL, and APP layers with public headers.
+- OSHAL startup runs through `SYS_INIT()` so the staged boot sequence remains
 	explicit under Zephyr.
 - BAL owns board resources and bootstraps the application.
-- APP depends only on BAL and OSAL interfaces and currently blinks the board's
+- APP depends only on BAL and OSHAL interfaces and currently blinks the board's
 	`led0` alias as a smoke test.
 
 ## Design Intent
 
-The repo is structured around four layers.
+The repo is structured around three layers.
 
-- `hal/`: hardware-facing services and early initialization.
+- `oshal/`: the single Zephyr-boundary layer for GPIO, sleep/time, and early
+	initialization.
 - `bal/`: board abstraction and ownership of board resources such as status LEDs.
-- `osal/`: the smallest portable operating-system facade the app currently needs.
 - `app/`: product logic that should not care about Zephyr, SAMD21 registers, or
 	board-specific pin names.
 
 The dependency direction is one-way.
 
-- APP may use BAL and OSAL.
-- BAL may use HAL and call APP.
-- HAL never depends on BAL or APP.
-- Zephyr headers stay in the implementation files for HAL, BAL glue, OSAL, and
+- APP may use BAL and OSHAL.
+- BAL may use OSHAL and call APP.
+- OSHAL never depends on BAL or APP.
+- Zephyr headers stay in the implementation files for OSHAL, BAL glue, and
 	the thin root entry point.
 
 ## Boot Sequence
@@ -48,11 +48,11 @@ The desired staged boot is kept, but adapted to Zephyr's lifecycle instead of
 replacing it.
 
 1. Zephyr boots and initializes the kernel and device model.
-2. HAL runs a `SYS_INIT()` hook at the `APPLICATION` init level.
+2. OSHAL runs a `SYS_INIT()` hook at the `APPLICATION` init level.
 3. Zephyr enters `main()` in `src/main.c`.
 4. `main()` transfers control to BAL.
 5. BAL initializes board-owned objects and then calls APP.
-6. APP runs using only BAL and OSAL interfaces.
+6. APP runs using only BAL and OSHAL interfaces.
 
 This keeps the stage boundaries explicit without fighting Zephyr's startup
 rules.
@@ -77,18 +77,16 @@ rules.
 |       `-- board_led.cpp
 |-- docs/
 |   `-- architecture.md
-|-- hal/
+|-- oshal/
 |   |-- CMakeLists.txt
-|   |-- include/hal/gpio.h
-|   |-- include/hal/system.h
+|   |-- include/oshal/gpio.h
+|   |-- include/oshal/system.h
+|   |-- include/oshal/time.h
+|   |-- include/oshal/time.hpp
 |   `-- src/
 |       |-- gpio_zephyr.c
 |       `-- system_zephyr.c
-|-- osal/
-|   |-- CMakeLists.txt
-|   |-- include/osal/time.h
-|   |-- include/osal/time.hpp
-|   `-- src/time_zephyr.cpp
+|       `-- time_zephyr.cpp
 |-- src/
 |   `-- main.c
 |-- CMakeLists.txt
@@ -260,19 +258,21 @@ the same GDB session for step-debugging.
 
 If you prefer to stay fully inside the Zephyr runner model, the repo is already
 organized so that a future out-of-tree board override can add `jlink` support
-without touching APP, BAL, or HAL interfaces.
+without touching APP, BAL, or OSHAL interfaces.
 
 ## Layer Walkthrough
 
-### HAL
+### OSHAL
 
-HAL currently exposes two small contracts.
+OSHAL currently exposes three small contracts.
 
-- `hal/system.h`: reports whether early HAL startup succeeded.
-- `hal/gpio.h`: exposes abstract GPIO signals rather than raw Zephyr GPIO
+
+- `oshal/system.h`: reports whether early OSHAL startup succeeded.
+- `oshal/gpio.h`: exposes abstract GPIO signals rather than raw Zephyr GPIO
 	types to upper layers.
+- `oshal/time.h`: exposes millisecond sleep without leaking Zephyr kernel APIs.
 
-The phase-1 HAL backend is Zephyr-based. That keeps startup simple now while
+The phase-1 OSHAL backend is Zephyr-based. That keeps startup simple now while
 leaving room for a lower-level timing backend later for WS2812 bit generation.
 
 ### BAL
@@ -286,24 +286,20 @@ BAL owns board resources and the transition into the application.
 Phase 1 exposes only a single status LED object because that is enough to test
 the architecture.
 
-### OSAL
-
-OSAL stays narrow on purpose. The only service exposed today is millisecond
-sleep. More services should be added only when the app actually needs them.
-
 ### APP
 
 APP is intentionally unaware of Zephyr headers, devicetree aliases, and the
-SAMD21 GPIO backend. It asks BAL for a status LED object and uses OSAL for
+SAMD21 GPIO backend. It asks BAL for a status LED object and uses OSHAL for
 timing.
 
 The current APP implementation is compiled as C++17, but its public entry point
 stays C-compatible so BAL and the low-level Zephyr-facing stages can remain in C
 until there is a stronger reason to migrate them.
 
-BAL and OSAL now follow the same pattern in their implementations. HAL GPIO and
-startup code stay in C because they sit directly on Zephyr's device and init
-boundaries, where the C-shaped integration points are easier to inspect.
+BAL and the higher-level OSHAL wrappers follow the same pattern in their
+implementations. The direct OSHAL GPIO and startup code stay in C because they
+sit directly on Zephyr's device and init boundaries, where the C-shaped
+integration points are easier to inspect.
 
 For layers that are primarily consumed from C++, the repository now provides a
 paired header pattern:
@@ -316,7 +312,7 @@ paired header pattern:
 
 The current application toggles the board-owned status LED forever.
 
-- If HAL startup fails, BAL refuses to start APP.
+- If OSHAL startup fails, BAL refuses to start APP.
 - If BAL cannot initialize the board LED object, APP never starts.
 - If the blink loop starts, the repository layering and boot path are working.
 
@@ -338,5 +334,5 @@ Reasonable candidates are:
 - a timer-assisted backend,
 - or an encoded SPI/SERCOM backend if it maps cleanly to the SAMD21.
 
-That decision can be added behind the current HAL and BAL seams without changing
+That decision can be added behind the current OSHAL and BAL seams without changing
 the app contract.

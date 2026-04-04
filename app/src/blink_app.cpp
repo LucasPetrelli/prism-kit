@@ -1,6 +1,6 @@
 #include "app/app.h"
 #include "bal/led.hpp"
-#include "osal/time.hpp"
+#include "oshal/time.hpp"
 #include "status/status.h"
 
 namespace {
@@ -29,6 +29,6 @@ int app_run(void)
 			return ret;
 		}
 
-		osal::sleep_ms(kBlinkPeriodMs);
+		oshal::sleep_ms(kBlinkPeriodMs);
 	}
 }

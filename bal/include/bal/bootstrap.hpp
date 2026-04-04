@@ -7,7 +7,7 @@ namespace bal {
 
 /// @brief Run BAL bootstrap through the stable C ABI entry point.
 /// @return STATUS_OK on success, or a negative project-defined status code if
-///     HAL validation or board bring-up fails.
+///     OSHAL validation or board bring-up fails.
 inline int run_bootstrap()
 {
 	return bal_bootstrap_run();

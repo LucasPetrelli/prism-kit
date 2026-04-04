@@ -1,19 +1,19 @@
-#ifndef OSAL_TIME_HPP_
-#define OSAL_TIME_HPP_
+#ifndef OSHAL_TIME_HPP_
+#define OSHAL_TIME_HPP_
 
 #include <cstdint>
 
-#include "osal/time.h"
+#include "oshal/time.h"
 
-namespace osal {
+namespace oshal {
 
 /// @brief Sleep for the requested number of milliseconds.
 /// @param duration_ms Duration to sleep, in milliseconds.
 inline void sleep_ms(std::uint32_t duration_ms)
 {
-	osal_sleep_ms(duration_ms);
+	oshal_sleep_ms(duration_ms);
 }
 
-} // namespace osal
+} // namespace oshal
 
-#endif /* OSAL_TIME_HPP_ */
+#endif /* OSHAL_TIME_HPP_ */
