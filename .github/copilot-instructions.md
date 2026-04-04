@@ -61,6 +61,15 @@
 - Keep implementation comments focused on intent, invariants, and hardware
   constraints instead of narrating obvious code.
 
+## Source File Comments
+
+- Add concise comments to source files when a section, ordered code path, or
+  hardware-facing sequence would otherwise require mental unpacking.
+- Prefer comments that explain intent, ordering, and why a choice exists over
+  comments that restate symbol names or literal operations.
+- When documenting execution paths, keep the wording plain and short; avoid
+  stacking jargon where a simple explanation is enough.
+
 ## Documentation Example
 
 ```cpp

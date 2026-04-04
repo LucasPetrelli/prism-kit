@@ -1,0 +1,19 @@
+#include <dt-bindings/pinctrl/samd21-da1gXabcd-pinctrl.h>
+
+&pinctrl {
+	tcc0_pa8_default: tcc0_pa8_default {
+		group1 {
+			pinmux = <PA8E_TCC0_WO0>;
+		};
+	};
+};
+
+&sercom2 {
+	status = "disabled";
+};
+
+&tcc0 {
+	status = "okay";
+	pinctrl-0 = <&tcc0_pa8_default>;
+	pinctrl-names = "default";
+};

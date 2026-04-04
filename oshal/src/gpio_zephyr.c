@@ -18,10 +18,7 @@ struct oshal_gpio_binding {
 	struct gpio_dt_spec spec;
 };
 
-/*
-	 * Keep the hardware-facing signal table in plain C so the devicetree and GPIO
-	 * wiring remain easy to inspect during bring-up.
- */
+/* Keep the board-facing pin table flat so bring-up stays easy to audit. */
 static const struct oshal_gpio_binding oshal_gpio_bindings[] = {
 	[OSHAL_GPIO_PIN_PA17] = {
 		.name = "PA17",
@@ -60,6 +57,7 @@ bool oshal_gpio_pin_is_ready(oshal_gpio_pin_id_t pin_id)
 		return false;
 	}
 
+	/* Readiness is the cheap gate used by startup and board init before real I/O. */
 	return gpio_is_ready_dt(&binding->spec);
 }
 
@@ -75,6 +73,7 @@ int oshal_gpio_pin_configure_output(oshal_gpio_pin_id_t pin_id, bool initial_hig
 		return STATUS_ERR_DEVICE_UNAVAILABLE;
 	}
 
+	/* Configuration owns the initial level so callers do not need a second write. */
 	return oshal_status_from_backend_result(gpio_pin_configure(
 		binding->spec.port,
 		binding->spec.pin,
@@ -93,6 +92,7 @@ int oshal_gpio_pin_set(oshal_gpio_pin_id_t pin_id, bool high)
 		return STATUS_ERR_DEVICE_UNAVAILABLE;
 	}
 
+	/* Keep set and toggle as the only live output paths exposed above the backend. */
 	return oshal_status_from_backend_result(
 		gpio_pin_set(binding->spec.port, binding->spec.pin, high ? 1 : 0));
 }
