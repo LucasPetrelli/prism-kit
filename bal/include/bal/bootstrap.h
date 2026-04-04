@@ -1,8 +1,6 @@
 #ifndef BAL_BOOTSTRAP_H_
 #define BAL_BOOTSTRAP_H_
 
-#include "status/status.h"
-
 #ifdef __cplusplus
 extern "C" {
 #endif

@@ -22,14 +22,14 @@ Phase 1 is implemented.
 	explicit under Zephyr.
 - BAL owns board resources and bootstraps the application.
 - APP depends only on BAL and OSHAL interfaces and currently blinks the board's
-	`led0` alias as a smoke test.
+	status LED on PA17 as a smoke test.
 
 ## Design Intent
 
 The repo is structured around three layers.
 
 - `oshal/`: the single Zephyr-boundary layer for GPIO, sleep/time, and early
-	initialization.
+	initialization, plus shared status codes.
 - `bal/`: board abstraction and ownership of board resources such as status LEDs.
 - `app/`: product logic that should not care about Zephyr, SAMD21 registers, or
 	board-specific pin names.
@@ -80,6 +80,7 @@ rules.
 |-- oshal/
 |   |-- CMakeLists.txt
 |   |-- include/oshal/gpio.h
+|   |-- include/oshal/status.h
 |   |-- include/oshal/system.h
 |   |-- include/oshal/time.h
 |   |-- include/oshal/time.hpp
@@ -110,10 +111,9 @@ repo is still in early bring-up.
 
 The upstream Zephyr board target for the XIAO SAMD21 is `seeeduino_xiao`.
 
-The current phase-1 implementation assumes that board target and uses the board
-`led0` devicetree alias for the smoke test. The alias already captures whether
-the LED is active-high or active-low, so the blink code does not hard-code the
-polarity.
+The current phase-1 implementation assumes that board target and exposes GPIO
+control for PA17 through OSHAL. BAL then maps the board status LED onto that
+pin and owns the active-low policy defined by the XIAO board DTS.
 
 ### Flash and Debug Strategy
 
@@ -298,11 +298,12 @@ without touching APP, BAL, or OSHAL interfaces.
 
 ### OSHAL
 
-OSHAL currently exposes three small contracts.
+OSHAL currently exposes four small contracts.
 
+- `oshal/status.h`: defines the project-wide status codes shared across layers.
 - `oshal/system.h`: reports whether early OSHAL startup succeeded.
-- `oshal/gpio.h`: exposes abstract GPIO signals rather than raw Zephyr GPIO
-	types to upper layers.
+- `oshal/gpio.h`: exposes a small pin-level GPIO contract for PA17 without
+	leaking Zephyr GPIO types upward.
 - `oshal/time.h`: exposes millisecond sleep without leaking Zephyr kernel APIs.
 
 The phase-1 OSHAL backend is Zephyr-based. That keeps startup simple now while

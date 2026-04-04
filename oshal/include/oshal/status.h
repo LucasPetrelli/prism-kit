@@ -1,11 +1,11 @@
-#ifndef STATUS_STATUS_H_
-#define STATUS_STATUS_H_
+#ifndef OSHAL_STATUS_H_
+#define OSHAL_STATUS_H_
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-/// @brief Project-wide status codes shared across firmware layers.
+/// @brief Project-wide status codes owned by OSHAL and shared across firmware layers.
 /// @note Zero means success. Negative values describe project-defined failure
 ///     reasons without exposing backend-specific errno values.
 typedef enum status_code {
@@ -25,4 +25,4 @@ typedef enum status_code {
 }
 #endif
 
-#endif /* STATUS_STATUS_H_ */
+#endif /* OSHAL_STATUS_H_ */

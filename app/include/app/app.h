@@ -1,15 +1,13 @@
 #ifndef APP_APP_H_
 #define APP_APP_H_
 
-#include "status/status.h"
-
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 /// @brief Run the application after BAL has prepared board-owned resources.
 /// @return STATUS_OK on success, or a negative project-defined status code
-///     declared in status/status.h if startup fails before the steady-state
+///     declared in oshal/status.h if startup fails before the steady-state
 ///     loop begins.
 /// @pre BAL completed board bring-up for every board-owned resource required by
 ///     the application.

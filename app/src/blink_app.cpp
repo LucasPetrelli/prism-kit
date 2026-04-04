@@ -1,7 +1,7 @@
 #include "app/app.h"
 #include "bal/led.hpp"
 #include "oshal/time.hpp"
-#include "status/status.h"
+#include "oshal/status.h"
 
 namespace {
 

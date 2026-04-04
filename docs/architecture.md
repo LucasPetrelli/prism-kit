@@ -9,8 +9,9 @@ layering rules and the boot path that phase 1 implements.
 
 OSHAL owns the Zephyr-facing boundary. In phase 1 it provides:
 
+- a shared status-code contract,
 - a system readiness contract,
-- a GPIO signal contract for the board status LED,
+- a GPIO pin contract for SAMD21 pin PA17,
 - and the time/sleep contract APP currently needs.
 
 The backend is currently Zephyr-based because that is the lowest-friction way
