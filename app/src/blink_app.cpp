@@ -2,6 +2,7 @@
 
 #include "app/app.h"
 #include "bal/led.hpp"
+#include "oshal/debug_port.hpp"
 #include "oshal/pwm.hpp"
 #include "oshal/time.hpp"
 #include "oshal/status.h"
@@ -44,6 +45,11 @@ int app_run(void)
 	}
 
 	ret = demo_pwm.enable();
+	if (ret < 0) {
+		return ret;
+	}
+
+	ret = oshal::debug_port.printf("DebugPort online on %s\n", oshal::debug_port.name());
 	if (ret < 0) {
 		return ret;
 	}

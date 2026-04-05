@@ -1,5 +1,11 @@
 #include <dt-bindings/pinctrl/samd21-da1gXabcd-pinctrl.h>
 
+/ {
+	chosen {
+		zephyr,console = &cdc_acm_uart0;
+	};
+};
+
 &pinctrl {
 	tcc0_pa8_default: tcc0_pa8_default {
 		group1 {
@@ -10,6 +16,12 @@
 
 &sercom2 {
 	status = "disabled";
+};
+
+&zephyr_udc0 {
+	cdc_acm_uart0: cdc_acm_uart0 {
+		compatible = "zephyr,cdc-acm-uart";
+	};
 };
 
 &tcc0 {

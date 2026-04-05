@@ -42,6 +42,11 @@
   board pin mappings.
 - Keep OSHAL, BAL, and APP interfaces narrow, explicit, and documented.
 - Prefer C++ in `app/`, `bal/`, and `oshal/` first.
+- Prefer exposing OSHAL, BAL, and APP interfaces as C++ objects and methods by
+  default instead of maintaining parallel C-style wrapper APIs.
+- Only add a `.h` C ABI surface when a real C boundary requires it, such as a
+  Zephyr startup hook, ISR-facing glue layer, or another consumer that cannot
+  call the C++ interface directly.
 - Keep direct Zephyr init hooks, ISR entry points, and similarly C-shaped
   integration points thin even when they live inside `oshal/`.
 
@@ -67,8 +72,13 @@
   hardware-facing sequence would otherwise require mental unpacking.
 - Prefer comments that explain intent, ordering, and why a choice exists over
   comments that restate symbol names or literal operations.
-- When documenting execution paths, keep the wording plain and short; avoid
-  stacking jargon where a simple explanation is enough.
+- When documenting execution paths, keep the wording plain and direct, but err
+  on the side of more explanation for non-trivial embedded code, transport
+  backends, concurrency, initialization order, and callback-driven flows.
+- For source files with threading, ISR/workqueue interaction, buffering, or
+  hardware/driver constraints, prefer fuller block comments that explain the
+  state machine, wakeup/completion model, and why a synchronization choice
+  exists rather than leaving only terse inline notes.
 
 ## Documentation Example
 
