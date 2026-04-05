@@ -20,8 +20,8 @@ to validate architecture before introducing a timing-specific WS2812 engine.
 
 ### BAL
 
-BAL owns board resources and the application bootstrap. That is why `main()`
-hands off to BAL instead of calling APP directly.
+BAL owns board resources and the application bootstrap. The Zephyr root entry
+still hands off to BAL instead of calling APP directly.
 
 ### APP
 
@@ -37,7 +37,7 @@ Zephyr startup
             |
             +--> validate hardware-facing prerequisites
     |
-    +--> main()
+        +--> main() in oshal/src/system_zephyr.c
             |
             +--> BAL bootstrap
                     |

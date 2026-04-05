@@ -10,7 +10,7 @@ namespace bal {
 ///     OSHAL validation or board bring-up fails.
 inline int run_bootstrap()
 {
-	return bal_bootstrap_run();
+	return bal_run();
 }
 
 } // namespace bal

@@ -3,7 +3,7 @@
 #include "bal/led.hpp"
 #include "oshal/system.h"
 
-int bal_bootstrap_run(void)
+int bal_run(void)
 {
 	/* Refuse to continue if the earlier OSHAL-owned startup stage already failed. */
 	if (!oshal_system_ready()) {

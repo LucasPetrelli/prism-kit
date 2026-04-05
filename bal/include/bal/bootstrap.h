@@ -10,7 +10,7 @@ extern "C" {
 ///     OSHAL validation or board bring-up fails.
 /// @note This function is the owned transition from the Zephyr-facing startup
 ///     path into the board and application layers.
-int bal_bootstrap_run(void);
+int bal_run(void);
 
 #ifdef __cplusplus
 }

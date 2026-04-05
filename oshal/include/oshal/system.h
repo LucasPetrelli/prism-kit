@@ -9,7 +9,7 @@ extern "C" {
 
 /// @brief Report whether the OSHAL startup stage completed successfully.
 /// @return True when OSHAL startup completed successfully, otherwise false.
-/// @note The startup stage runs before main() through SYS_INIT().
+/// @note The startup validation stage runs before main() through SYS_INIT().
 bool oshal_system_ready(void);
 
 /// @brief Return the status code produced by the OSHAL startup stage.

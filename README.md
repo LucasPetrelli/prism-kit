@@ -38,9 +38,9 @@ The dependency direction is one-way.
 
 - APP may use BAL and OSHAL.
 - BAL may use OSHAL and call APP.
-- OSHAL never depends on BAL or APP.
+- OSHAL interfaces never depend on BAL or APP.
 - Zephyr headers stay in the implementation files for OSHAL, BAL glue, and
-	the thin root entry point.
+	the thin root entry point hosted in `oshal/src/system_zephyr.c`.
 
 ## Boot Sequence
 
@@ -49,7 +49,7 @@ replacing it.
 
 1. Zephyr boots and initializes the kernel and device model.
 2. OSHAL runs a `SYS_INIT()` hook at the `APPLICATION` init level.
-3. Zephyr enters `main()` in `src/main.c`.
+3. Zephyr enters `main()` in `oshal/src/system_zephyr.c`.
 4. `main()` transfers control to BAL.
 5. BAL initializes board-owned objects and then calls APP.
 6. APP runs using only BAL and OSHAL interfaces.
@@ -91,8 +91,6 @@ rules.
 |       |-- samd21.cpp
 |       |-- system_zephyr.c
 |       `-- time_zephyr.cpp
-|-- src/
-|   `-- main.c
 |-- CMakeLists.txt
 |-- prj.conf
 `-- west.yml
@@ -337,7 +335,8 @@ until there is a stronger reason to migrate them.
 
 BAL and the higher-level OSHAL wrappers follow the same pattern in their
 implementations. The direct OSHAL startup hook stays in C because it sits on
-Zephyr's `SYS_INIT()` boundary, while the GPIO and PWM backends themselves are
+Zephyr's `SYS_INIT()` boundary, and the same translation unit now hosts the
+thin `main()` handoff into BAL, while the GPIO and PWM backends themselves are
 implemented in C++ behind board-owned OSHAL objects.
 
 For layers that are primarily consumed from C++, the repository now provides a
