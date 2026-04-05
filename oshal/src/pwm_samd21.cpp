@@ -39,6 +39,9 @@ constexpr Samd21PwmPrescalerOption kSamd21PwmPrescalerOptions[] = {
 	{1024U, TCC_CTRLA_PRESCALER_DIV1024},
 };
 
+/* Sentinel for unresolved DMAC trigger routing. */
+constexpr std::uint8_t kInvalidDmaTriggerSource = 0xFFU;
+
 } // namespace
 
 namespace oshal::internal {
@@ -59,6 +62,21 @@ Samd21PwmOutput::Samd21PwmOutput(const char *pwm_name, Tcc *regs, std::uint8_t c
 	  period_ns_(0U),
 	  period_cycles_(0U),
 	  pulse_cycles_(0U)
+{
+}
+
+Samd21DmaPwmOutput::Samd21DmaPwmOutput(const char *pwm_name, Tcc *regs, std::uint8_t channel_index,
+	std::uint8_t port_group_index, std::uint8_t port_pin_index, std::uint8_t pin_mux_value,
+	std::uint8_t dmac_channel_index)
+	: Samd21PwmOutput(pwm_name, regs, channel_index, port_group_index, port_pin_index, pin_mux_value),
+	  dma_trigger_source_(kInvalidDmaTriggerSource),
+	  dmac_channel_(dmac_channel_index),
+	  dma_pulse_cycles_{},
+	  dma_pulse_count_(0U),
+	  dma_remaining_repeats_(0U),
+	  dma_repeat_forever_(false),
+	  dma_sequence_active_(false),
+	  dma_sequence_error_(false)
 {
 }
 
@@ -112,8 +130,7 @@ int Samd21PwmOutput::choose_prescaler(std::uint32_t period_ns, std::uint16_t *di
 	const std::uint64_t numerator = static_cast<std::uint64_t>(kPwmInputClockHz) *
 		static_cast<std::uint64_t>(period_ns);
 
-	for (std::size_t index = 0; index < std::size(kSamd21PwmPrescalerOptions);
-		 ++index) {
+	for (std::size_t index = 0; index < std::size(kSamd21PwmPrescalerOptions); ++index) {
 		const Samd21PwmPrescalerOption &option = kSamd21PwmPrescalerOptions[index];
 		const std::uint64_t denominator = 1000000000ULL * static_cast<std::uint64_t>(option.divisor);
 		std::uint64_t cycles = (numerator + (denominator / 2ULL)) / denominator;
@@ -185,6 +202,129 @@ int Samd21PwmOutput::program_waveform(std::uint32_t period_cycles, std::uint32_t
 	return STATUS_OK;
 }
 
+int Samd21PwmOutput::stop_transient_activity()
+{
+	return STATUS_OK;
+}
+
+void Samd21PwmOutput::reset_waveform_state()
+{
+	configured_ = false;
+	enabled_ = false;
+	prescaler_divisor_ = 0U;
+	prescaler_bits_ = 0U;
+	period_ns_ = 0U;
+	period_cycles_ = 0U;
+	pulse_cycles_ = 0U;
+}
+
+int Samd21DmaPwmOutput::resolve_dma_trigger_source(const Tcc *regs, std::uint8_t channel_index,
+	std::uint8_t *trigger_source)
+{
+	if (trigger_source == nullptr) {
+		return STATUS_ERR_INVALID_ARGUMENT;
+	}
+
+	if (regs == TCC0) {
+		*trigger_source = TCC0_DMAC_ID_OVF;
+		return STATUS_OK;
+	}
+
+	if (regs == TCC1) {
+		*trigger_source = TCC1_DMAC_ID_OVF;
+		return STATUS_OK;
+	}
+
+	if (regs == TCC2) {
+		*trigger_source = TCC2_DMAC_ID_OVF;
+		return STATUS_OK;
+	}
+
+	(void)channel_index;
+	return STATUS_ERR_INVALID_ARGUMENT;
+}
+
+void Samd21DmaPwmOutput::on_dma_sequence_event(void *context, bool transfer_error)
+{
+	auto *self = static_cast<Samd21DmaPwmOutput *>(context);
+
+	if (self != nullptr) {
+		self->handle_dma_sequence_event(transfer_error);
+	}
+}
+
+void Samd21DmaPwmOutput::handle_dma_sequence_event(bool transfer_error)
+{
+	int ret;
+
+	if (transfer_error) {
+		dma_sequence_error_ = true;
+		dma_sequence_active_ = false;
+		(void)dmac_channel_.stop();
+		return;
+	}
+
+	if (!dma_sequence_active_ || dma_repeat_forever_) {
+		return;
+	}
+
+	if (dma_remaining_repeats_ == 0U) {
+		dma_sequence_active_ = false;
+		return;
+	}
+
+	ret = dmac_channel_.start();
+	if (ret < 0) {
+		dma_sequence_error_ = true;
+		dma_sequence_active_ = false;
+		return;
+	}
+
+	--dma_remaining_repeats_;
+}
+
+int Samd21DmaPwmOutput::build_dma_sequence(const std::uint32_t *pulse_ns_sequence,
+	std::size_t pulse_count)
+{
+	int ret;
+
+	if ((pulse_ns_sequence == nullptr) || (pulse_count == 0U) || (pulse_count > kMaxDmaPulseCount)) {
+		return STATUS_ERR_INVALID_ARGUMENT;
+	}
+
+	for (std::size_t index = 0; index < pulse_count; ++index) {
+		std::uint32_t pulse_cycles;
+
+		if (pulse_ns_sequence[index] > period_ns_) {
+			return STATUS_ERR_INVALID_ARGUMENT;
+		}
+
+		ret = ns_to_cycles(pulse_ns_sequence[index], prescaler_divisor_, &pulse_cycles);
+		if (ret < 0) {
+			return ret;
+		}
+
+		if (pulse_cycles > period_cycles_) {
+			return STATUS_ERR_INVALID_ARGUMENT;
+		}
+
+		/* DMAC source addressing decrements per beat, so stage values in reverse order. */
+		dma_pulse_cycles_[pulse_count - 1U - index] = pulse_cycles;
+	}
+
+	dma_pulse_count_ = pulse_count;
+	return STATUS_OK;
+}
+
+void Samd21DmaPwmOutput::reset_sequence_state()
+{
+	dma_pulse_count_ = 0U;
+	dma_remaining_repeats_ = 0U;
+	dma_repeat_forever_ = false;
+	dma_sequence_active_ = false;
+	dma_sequence_error_ = false;
+}
+
 int Samd21PwmOutput::initialize()
 {
 	if (backend_status_ == STATUS_OK) {
@@ -207,14 +347,28 @@ int Samd21PwmOutput::initialize()
 	wait_for_tcc_sync(regs_);
 
 	/* Clear all cached state so the first configure call starts from a known software model too. */
-	configured_ = false;
-	enabled_ = false;
-	prescaler_divisor_ = 0U;
-	prescaler_bits_ = 0U;
-	period_ns_ = 0U;
-	period_cycles_ = 0U;
-	pulse_cycles_ = 0U;
+	reset_waveform_state();
 	backend_status_ = STATUS_OK;
+	return STATUS_OK;
+}
+
+int Samd21DmaPwmOutput::initialize()
+{
+	int ret;
+
+	ret = Samd21PwmOutput::initialize();
+	if (ret < 0) {
+		return ret;
+	}
+
+	if (dma_trigger_source_ == kInvalidDmaTriggerSource) {
+		ret = resolve_dma_trigger_source(regs_, channel_index_, &dma_trigger_source_);
+		if (ret < 0) {
+			return ret;
+		}
+	}
+
+	reset_sequence_state();
 	return STATUS_OK;
 }
 
@@ -227,6 +381,11 @@ int Samd21PwmOutput::configure(std::uint32_t period_ns, std::uint32_t pulse_ns)
 	/* Reject impossible requests early so the register programming path stays simple. */
 	if ((period_ns == 0U) || (pulse_ns > period_ns)) {
 		return STATUS_ERR_INVALID_ARGUMENT;
+	}
+
+	ret = stop_transient_activity();
+	if (ret < 0) {
+		return ret;
 	}
 
 	/* Lazy init keeps startup narrow while still allowing direct PWM use later on. */
@@ -260,6 +419,11 @@ int Samd21PwmOutput::set_pulse(std::uint32_t pulse_ns)
 	/* Duty-cycle updates only make sense after a full configure established the period. */
 	if (!configured_) {
 		return STATUS_ERR_NOT_READY;
+	}
+
+	ret = stop_transient_activity();
+	if (ret < 0) {
+		return ret;
 	}
 
 	if (pulse_ns > period_ns_) {
@@ -303,10 +467,97 @@ int Samd21PwmOutput::disable()
 		return STATUS_OK;
 	}
 
+	int ret = stop_transient_activity();
+	if (ret < 0) {
+		return ret;
+	}
+
 	regs_->CTRLA.bit.ENABLE = 0;
 	wait_for_tcc_sync(regs_);
 	enabled_ = false;
 	return STATUS_OK;
+}
+
+int Samd21DmaPwmOutput::play_pulse_sequence(const std::uint32_t *pulse_ns_sequence,
+	std::size_t pulse_count,
+	std::uint32_t repeat_count)
+{
+	int ret;
+
+	/* Sequence playback depends on a ready backend plus resolved DMAC trigger routing. */
+	if (backend_status_ != STATUS_OK) {
+		ret = initialize();
+		if (ret < 0) {
+			return ret;
+		}
+	}
+
+	if (!configured_) {
+		return STATUS_ERR_NOT_READY;
+	}
+
+	if (dma_trigger_source_ == kInvalidDmaTriggerSource) {
+		return STATUS_ERR_NOT_READY;
+	}
+
+	ret = build_dma_sequence(pulse_ns_sequence, pulse_count);
+	if (ret < 0) {
+		return ret;
+	}
+
+	ret = stop_pulse_sequence();
+	if (ret < 0) {
+		return ret;
+	}
+
+	dma_repeat_forever_ = (repeat_count == 0U);
+	dma_remaining_repeats_ = dma_repeat_forever_ ? 0U : repeat_count;
+	dma_sequence_error_ = false;
+
+	ret = dmac_channel_.configure_word_stream(&regs_->CC[channel_index_].reg, dma_pulse_cycles_,
+		dma_pulse_count_, dma_trigger_source_, dma_repeat_forever_,
+		&Samd21DmaPwmOutput::on_dma_sequence_event,
+		this);
+	if (ret < 0) {
+		return ret;
+	}
+
+	if (!enabled_) {
+		ret = enable();
+		if (ret < 0) {
+			return ret;
+		}
+	}
+
+	ret = dmac_channel_.start();
+	if (ret < 0) {
+		return ret;
+	}
+
+	dma_sequence_active_ = true;
+	if (!dma_repeat_forever_ && (dma_remaining_repeats_ > 0U)) {
+		--dma_remaining_repeats_;
+	}
+	return STATUS_OK;
+}
+
+int Samd21DmaPwmOutput::stop_pulse_sequence()
+{
+	(void)dmac_channel_.stop();
+	dma_sequence_active_ = false;
+	dma_repeat_forever_ = false;
+	dma_remaining_repeats_ = 0U;
+	return STATUS_OK;
+}
+
+bool Samd21DmaPwmOutput::is_pulse_sequence_active() const
+{
+	return dma_sequence_active_ && !dma_sequence_error_;
+}
+
+int Samd21DmaPwmOutput::stop_transient_activity()
+{
+	return stop_pulse_sequence();
 }
 
 } // namespace oshal::internal

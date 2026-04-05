@@ -1,4 +1,5 @@
 #include <cstdint>
+#include <iterator>
 
 #include "app/app.h"
 #include "bal/led.hpp"
@@ -18,12 +19,19 @@ constexpr std::uint32_t pulse_width_for_percent(std::uint8_t duty_cycle_percent)
 	return (kPwmPeriodNs * static_cast<std::uint32_t>(duty_cycle_percent)) / 100U;
 }
 
+constexpr std::uint32_t kPulseSequenceNs[] = {
+	pulse_width_for_percent(kDutyCyclePercents[0]), pulse_width_for_percent(kDutyCyclePercents[1]),
+	pulse_width_for_percent(kDutyCyclePercents[2]), pulse_width_for_percent(kDutyCyclePercents[3]),
+	pulse_width_for_percent(kDutyCyclePercents[4]),
+};
+
 } // namespace
 
 int app_run(void)
 {
 	bal::Led &status_led = bal::status_led();
 	oshal::PwmOutput &demo_pwm = oshal::pa8_tcc0_wo0;
+	oshal::PwmSequenceOutput &demo_pwm_sequence = oshal::pa8_tcc0_wo0_sequence;
 	int ret;
 
 	/*
@@ -49,24 +57,22 @@ int app_run(void)
 		return ret;
 	}
 
+	ret = demo_pwm_sequence.play_pulse_sequence(kPulseSequenceNs, std::size(kPulseSequenceNs), 0U);
+	if (ret < 0) {
+		return ret;
+	}
+
 	ret = oshal::debug_port.printf("DebugPort online on %s\n", oshal::debug_port.name());
 	if (ret < 0) {
 		return ret;
 	}
 
 	while (true) {
-		for (const std::uint8_t duty_cycle_percent : kDutyCyclePercents) {
-			ret = status_led.toggle();
-			if (ret < 0) {
-				return ret;
-			}
-
-			ret = demo_pwm.set_pulse(pulse_width_for_percent(duty_cycle_percent));
-			if (ret < 0) {
-				return ret;
-			}
-
-			oshal::sleep_ms(kDemoStepPeriodMs);
+		ret = status_led.toggle();
+		if (ret < 0) {
+			return ret;
 		}
+
+		oshal::sleep_ms(kDemoStepPeriodMs);
 	}
 }

@@ -1,6 +1,7 @@
 #ifndef OSHAL_PWM_HPP_
 #define OSHAL_PWM_HPP_
 
+#include <cstddef>
 #include <cstdint>
 
 namespace oshal {
@@ -49,8 +50,43 @@ protected:
 	PwmOutput() = default;
 };
 
+/// @brief Optional capability interface for PWM outputs that support pulse sequencing.
+/// @note This stays separate from PwmOutput so plain PWM backends do not need
+///     to expose sequencing methods they cannot satisfy.
+class PwmSequenceOutput {
+public:
+	PwmSequenceOutput(const PwmSequenceOutput &) = delete;
+	PwmSequenceOutput &operator=(const PwmSequenceOutput &) = delete;
+	virtual ~PwmSequenceOutput() = default;
+
+	/// @brief Play a sequence of pulse widths while keeping the configured period.
+	/// @param pulse_ns_sequence Pointer to pulse widths in nanoseconds.
+	/// @param pulse_count Number of entries in pulse_ns_sequence.
+	/// @param repeat_count Number of full sequence repetitions.
+	/// @details A repeat_count of 0 requests repeat-forever behavior.
+	/// @return STATUS_OK on success, or a negative project-defined status code on
+	///     failure.
+	virtual int play_pulse_sequence(const std::uint32_t *pulse_ns_sequence, std::size_t pulse_count,
+		std::uint32_t repeat_count) = 0;
+
+	/// @brief Stop an active pulse sequence and keep the current PWM configuration.
+	/// @return STATUS_OK on success.
+	virtual int stop_pulse_sequence() = 0;
+
+	/// @brief Report whether sequence playback is currently active.
+	/// @return True when a pulse sequence is active, otherwise false.
+	virtual bool is_pulse_sequence_active() const = 0;
+
+protected:
+	PwmSequenceOutput() = default;
+};
+
 /// @brief Public OSHAL reference to the physical SAMD21 PA8 TCC0/WO[0] PWM output.
 extern PwmOutput &pa8_tcc0_wo0;
+
+/// @brief Sequencing-capable view of the physical SAMD21 PA8 TCC0/WO[0] output.
+/// @note This references the same physical output as pa8_tcc0_wo0.
+extern PwmSequenceOutput &pa8_tcc0_wo0_sequence;
 
 } // namespace oshal
 

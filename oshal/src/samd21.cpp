@@ -46,8 +46,8 @@ oshal::internal::ZephyrCdcAcmDebugPort g_debug_port{"zephyr.console.cdc_acm",
 oshal::internal::ZephyrDebugPort g_debug_port{"zephyr.console", DEVICE_DT_GET(DEBUG_PORT_NODE)};
 #endif
 oshal::internal::ZephyrGpio g_pa17{"PA17", {DEVICE_DT_GET(GPIO_PA17_PORT_NODE), GPIO_PA17_PIN, 0U}};
-oshal::internal::Samd21PwmOutput g_pa8_tcc0_wo0{
-	"PA8/TCC0_WO0", TCC0, 0U, PWM_PA8_PORT_GROUP_INDEX, PWM_PA8_PIN, MUX_PA08E_TCC0_WO0};
+oshal::internal::Samd21DmaPwmOutput g_pa8_tcc0_wo0{
+	"PA8/TCC0_WO0", TCC0, 0U, PWM_PA8_PORT_GROUP_INDEX, PWM_PA8_PIN, MUX_PA08E_TCC0_WO0, 0U};
 
 } // namespace
 
@@ -56,6 +56,7 @@ namespace oshal {
 DebugPort &debug_port = g_debug_port;
 Gpio &pa17 = g_pa17;
 PwmOutput &pa8_tcc0_wo0 = g_pa8_tcc0_wo0;
+PwmSequenceOutput &pa8_tcc0_wo0_sequence = g_pa8_tcc0_wo0;
 
 } // namespace oshal
 
