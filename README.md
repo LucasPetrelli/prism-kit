@@ -80,14 +80,14 @@ rules.
 |-- oshal/
 |   |-- CMakeLists.txt
 |   |-- include/oshal/gpio.hpp
-|   |-- include/oshal/pwm.h
+|   |-- include/oshal/pwm.hpp
 |   |-- include/oshal/status.h
 |   |-- include/oshal/system.h
 |   |-- include/oshal/time.h
 |   |-- include/oshal/time.hpp
 |   `-- src/
 |       |-- gpio_zephyr.cpp
-|       |-- pwm_samd21.c
+|       |-- pwm_samd21.cpp
 |       |-- samd21.cpp
 |       |-- system_zephyr.c
 |       `-- time_zephyr.cpp
@@ -301,12 +301,14 @@ without touching APP, BAL, or OSHAL interfaces.
 
 ### OSHAL
 
-OSHAL currently exposes four small contracts.
+OSHAL currently exposes five small contracts.
 
 - `oshal/status.h`: defines the project-wide status codes shared across layers.
 - `oshal/system.h`: reports whether early OSHAL startup succeeded.
 - `oshal/gpio.hpp`: exposes the generic C++ GPIO interface and the public PA17
 	object reference without leaking Zephyr GPIO types upward.
+- `oshal/pwm.hpp`: exposes the generic C++ PWM interface and the public PA8
+	object reference without leaking SAMD21 timer details upward.
 - `oshal/time.h`: exposes millisecond sleep without leaking Zephyr kernel APIs.
 
 The phase-1 OSHAL backend is Zephyr-based. That keeps startup simple now while
@@ -335,8 +337,8 @@ until there is a stronger reason to migrate them.
 
 BAL and the higher-level OSHAL wrappers follow the same pattern in their
 implementations. The direct OSHAL startup hook stays in C because it sits on
-Zephyr's `SYS_INIT()` boundary, while the GPIO backend itself is now implemented
-in C++ behind a board-owned OSHAL object.
+Zephyr's `SYS_INIT()` boundary, while the GPIO and PWM backends themselves are
+implemented in C++ behind board-owned OSHAL objects.
 
 For layers that are primarily consumed from C++, the repository now provides a
 paired header pattern:

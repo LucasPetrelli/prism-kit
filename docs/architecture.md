@@ -12,6 +12,7 @@ OSHAL owns the Zephyr-facing boundary. In phase 1 it provides:
 - a shared status-code contract,
 - a system readiness contract,
 - a GPIO pin contract for SAMD21 pin PA17,
+- a PWM output contract for SAMD21 pin PA8 routed as TCC0/WO[0],
 - and the time/sleep contract APP currently needs.
 
 The backend is currently Zephyr-based because that is the lowest-friction way
