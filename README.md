@@ -80,14 +80,16 @@ rules.
 |-- oshal/
 |   |-- CMakeLists.txt
 |   |-- include/oshal/gpio.hpp
+|   |-- include/oshal/pwm.h
 |   |-- include/oshal/status.h
 |   |-- include/oshal/system.h
 |   |-- include/oshal/time.h
 |   |-- include/oshal/time.hpp
 |   `-- src/
 |       |-- gpio_zephyr.cpp
+|       |-- pwm_samd21.c
 |       |-- samd21.cpp
-|       `-- system_zephyr.c
+|       |-- system_zephyr.c
 |       `-- time_zephyr.cpp
 |-- src/
 |   `-- main.c
@@ -332,9 +334,9 @@ stays C-compatible so BAL and the low-level Zephyr-facing stages can remain in C
 until there is a stronger reason to migrate them.
 
 BAL and the higher-level OSHAL wrappers follow the same pattern in their
-implementations. The direct OSHAL GPIO and startup code stay in C because they
-sit directly on Zephyr's device and init boundaries, where the C-shaped
-integration points are easier to inspect.
+implementations. The direct OSHAL startup hook stays in C because it sits on
+Zephyr's `SYS_INIT()` boundary, while the GPIO backend itself is now implemented
+in C++ behind a board-owned OSHAL object.
 
 For layers that are primarily consumed from C++, the repository now provides a
 paired header pattern:
