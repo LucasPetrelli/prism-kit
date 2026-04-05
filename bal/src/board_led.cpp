@@ -68,12 +68,12 @@ namespace bal {
 
 int initialize_leds()
 {
-	return internal::g_status_led_backend.initialize();
+	return internal::status_led_backend().initialize();
 }
 
 Led &status_led()
 {
-	return internal::g_status_led_backend;
+	return internal::status_led_backend();
 }
 
 } // namespace bal

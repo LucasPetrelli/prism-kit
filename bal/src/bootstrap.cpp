@@ -1,10 +1,14 @@
-#include "app/app.hpp"
 #include "bal/bootstrap.h"
 #include "bal/led.hpp"
+#include "oshal/status.h"
 #include "oshal/system.h"
 
-int bal_run(void)
+extern "C" int bal_run(bal_application_entry_t app_entry)
 {
+	if (app_entry == nullptr) {
+		return STATUS_ERR_INVALID_ARGUMENT;
+	}
+
 	/* Refuse to continue if the earlier OSHAL-owned startup stage already failed. */
 	if (!oshal_system_ready()) {
 		return oshal_system_status();
@@ -16,6 +20,6 @@ int bal_run(void)
 		return ret;
 	}
 
-	/* BAL owns the transfer into the application layer. */
-	return app::run();
+	/* BAL owns the transfer into the application layer through a supplied C ABI entry point. */
+	return app_entry();
 }

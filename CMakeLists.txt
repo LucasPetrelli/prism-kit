@@ -7,8 +7,11 @@ find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
 project(ws2812_samd21_led_driver)
 
 # Keep the Zephyr-facing integration thin and compose the firmware from
-# explicit layers. The Zephyr main() entry point now resides in the OSHAL
-# layer, while this root build file continues to define the layer structure.
+# explicit layers. The Zephyr main() entry point resides in the OSHAL layer,
+# while the root app target owns only the thin composition glue that wires APP
+# and BAL into the OSHAL-owned handoff hook.
+
+target_sources(app PRIVATE src/boot_handoff_zephyr.c)
 
 add_subdirectory(oshal)
 add_subdirectory(bal)

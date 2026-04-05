@@ -13,16 +13,24 @@ Phase 1 is implemented.
 - The repository is wired as a Zephyr application with a reproducible `west.yml`.
 - Zephyr C++ support is enabled, and APP now builds as C++17 behind a
 	C-compatible entry point.
-- BAL and OSHAL now build as C++ where the code is policy-oriented rather than
-	Zephyr-boundary-oriented, while the direct Zephyr init hook stays in C.
+- BAL and OSHAL now build as standalone static libraries where the code is
+	policy-oriented rather than Zephyr-app-target-oriented, while the direct
+	Zephyr init hook stays in C.
 - C++-first layers expose `.hpp` wrappers, while `.h` headers remain as the
 	thin C ABI used by Zephyr-facing code.
 - Code is split into OSHAL, BAL, and APP layers with public headers.
 - OSHAL startup runs through `SYS_INIT()` so the staged boot sequence remains
 	explicit under Zephyr.
-- BAL owns board resources and bootstraps the application.
+- `main()` still lives in OSHAL, but the APP-plus-BAL startup composition now
+	lives in a thin repository-level handoff file so `system_zephyr.c` no longer
+	includes APP or BAL headers.
+- BAL owns board resources and bootstraps the application from a supplied APP
+	entry point.
 - APP depends only on BAL and OSHAL interfaces and currently blinks the board's
 	status LED on PA17 as a smoke test.
+- OSHAL is being shaped as the future reusable Zephyr-plus-SAMD21 support
+	module, while BAL is being shaped as the future reusable XIAO-board support
+	module for other firmware repos.
 
 ## Design Intent
 
@@ -33,14 +41,25 @@ The repo is structured around three layers.
 - `bal/`: board abstraction and ownership of board resources such as status LEDs.
 - `app/`: product logic that should not care about Zephyr, SAMD21 registers, or
 	board-specific pin names.
+- `src/`: thin repository-level composition glue that satisfies OSHAL-declared
+	handoff hooks without moving `main()` out of OSHAL.
+
+The longer-term goal is to let `oshal/` and `bal/` mature into reusable
+submodules that can move between future Zephyr firmware repositories.
+
+- `oshal/` is intended to carry the reusable Zephyr and SAMD21-facing runtime
+	contracts and backends.
+- `bal/` is intended to carry reusable Seeed XIAO board ownership and policy.
+- `app/` remains the product-specific layer for this repository.
 
 The dependency direction is one-way.
 
 - APP may use BAL and OSHAL.
-- BAL may use OSHAL and call APP.
+- BAL may use OSHAL and invoke a supplied APP entry point, but does not depend
+	on APP headers directly.
 - OSHAL interfaces never depend on BAL or APP.
-- Zephyr headers stay in the implementation files for OSHAL, BAL glue, and
-	the thin root entry point hosted in `oshal/src/system_zephyr.c`.
+- Zephyr headers stay in the implementation files for OSHAL, BAL glue, and the
+	thin composition glue hosted in `src/boot_handoff_zephyr.c`.
 
 ## Boot Sequence
 
@@ -50,7 +69,7 @@ replacing it.
 1. Zephyr boots and initializes the kernel and device model.
 2. OSHAL runs a `SYS_INIT()` hook at the `APPLICATION` init level.
 3. Zephyr enters `main()` in `oshal/src/system_zephyr.c`.
-4. `main()` transfers control to BAL.
+4. `main()` calls an OSHAL-declared handoff hook implemented by the repository composition layer.
 5. BAL initializes board-owned objects and then calls APP.
 6. APP runs using only BAL and OSHAL interfaces.
 
@@ -70,15 +89,16 @@ rules.
 |   |-- CMakeLists.txt
 |   |-- include/bal/bootstrap.h
 |   |-- include/bal/bootstrap.hpp
-|   |-- include/bal/led.h
 |   |-- include/bal/led.hpp
 |   `-- src/
 |       |-- bootstrap.cpp
-|       `-- board_led.cpp
+|       |-- board_led.cpp
+|       `-- board_led_seeeduino_xiao.cpp
 |-- docs/
 |   `-- architecture.md
 |-- oshal/
 |   |-- CMakeLists.txt
+|   |-- include/oshal/debug_port.hpp
 |   |-- include/oshal/gpio.hpp
 |   |-- include/oshal/pwm.hpp
 |   |-- include/oshal/status.h
@@ -86,11 +106,15 @@ rules.
 |   |-- include/oshal/time.h
 |   |-- include/oshal/time.hpp
 |   `-- src/
+|       |-- debug_port_cdc_acm.cpp
+|       |-- debug_port_zephyr.cpp
 |       |-- gpio_zephyr.cpp
 |       |-- pwm_samd21.cpp
 |       |-- samd21.cpp
 |       |-- system_zephyr.c
 |       `-- time_zephyr.cpp
+|-- src/
+|   `-- boot_handoff_zephyr.c
 |-- CMakeLists.txt
 |-- prj.conf
 `-- west.yml
@@ -206,6 +230,10 @@ Without activating the virtual environment first:
 ```
 
 The resulting ELF is expected at `build/zephyr/zephyr.elf`.
+
+Internally, the build now compiles `oshal/` and `bal/` as their own static
+libraries and links them into Zephyr's `app` target. That keeps the current
+firmware build Zephyr-native while matching the intended future submodule split.
  
 For clangd-based editor indexing, the build helper also refreshes
 `compile_commands.json` at the repository root from the Zephyr build directory.
@@ -317,8 +345,8 @@ leaving room for a lower-level timing backend later for WS2812 bit generation.
 BAL owns board resources and the transition into the application.
 
 - `bal/bootstrap.h`: one entry point that prepares the board layer and then
-	calls APP.
-- `bal/led.h`: a board-level LED object API that hides how the LED is wired.
+	invokes a caller-supplied APP entry point.
+- `bal/led.hpp`: a board-level LED object API that hides how the LED is wired.
 
 Phase 1 exposes only a single status LED object because that is enough to test
 the architecture.
@@ -330,14 +358,21 @@ SAMD21 GPIO backend. It asks BAL for a status LED object and uses OSHAL for
 timing.
 
 The current APP implementation is compiled as C++17, but its public entry point
-stays C-compatible so BAL and the low-level Zephyr-facing stages can remain in C
-until there is a stronger reason to migrate them.
+stays C-compatible so the Zephyr-facing root handoff can pass APP into BAL
+without making BAL depend on APP headers until there is a stronger reason to
+migrate that boundary.
 
 BAL and the higher-level OSHAL wrappers follow the same pattern in their
 implementations. The direct OSHAL startup hook stays in C because it sits on
-Zephyr's `SYS_INIT()` boundary, and the same translation unit now hosts the
-thin `main()` handoff into BAL, while the GPIO and PWM backends themselves are
-implemented in C++ behind board-owned OSHAL objects.
+Zephyr's `SYS_INIT()` boundary, and the same translation unit still hosts
+`main()`. The APP-plus-BAL composition handoff now lives in
+`src/boot_handoff_zephyr.c`, so OSHAL no longer needs direct APP or BAL header
+dependencies. The GPIO and PWM backends themselves remain implemented in C++
+behind board-owned OSHAL objects.
+
+The repository build also treats BAL and OSHAL as independent libraries now so
+their public headers, private implementation files, and inter-layer dependency
+rules line up with the planned future submodule extraction.
 
 For layers that are primarily consumed from C++, the repository now provides a
 paired header pattern:

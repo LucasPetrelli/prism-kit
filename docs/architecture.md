@@ -11,6 +11,7 @@ OSHAL owns the Zephyr-facing boundary. In phase 1 it provides:
 
 - a shared status-code contract,
 - a system readiness contract,
+- a startup handoff hook contract,
 - a GPIO pin contract for SAMD21 pin PA17,
 - a PWM output contract for SAMD21 pin PA8 routed as TCC0/WO[0],
 - and the time/sleep contract APP currently needs.
@@ -21,7 +22,8 @@ to validate architecture before introducing a timing-specific WS2812 engine.
 ### BAL
 
 BAL owns board resources and the application bootstrap. The Zephyr root entry
-still hands off to BAL instead of calling APP directly.
+still hands off to BAL instead of calling APP directly, but now does so through
+an OSHAL-declared handoff hook that the repository composition layer implements.
 
 ### APP
 
@@ -39,7 +41,9 @@ Zephyr startup
     |
         +--> main() in oshal/src/system_zephyr.c
             |
-            +--> BAL bootstrap
+            +--> OSHAL-declared handoff hook
+                |
+                +--> BAL bootstrap with APP entry callback
                     |
                     +--> initialize board LED object(s)
                     +--> call APP entry
@@ -70,3 +74,19 @@ Zephyr `jlink` runner. The recommended follow-up options are:
 2. Keep the board target upstream and document a manual J-Link flow.
 
 Neither choice requires changes to APP, BAL, or OSHAL.
+
+## Build Shape
+
+The repository still builds as a normal Zephyr application, but BAL and OSHAL
+now compile as their own static libraries and then link into Zephyr's `app`
+target.
+
+- `ws2812_oshal` owns the Zephyr and SAMD21-facing implementation files and is
+    the only layer target that links directly against `zephyr_interface`.
+- `ws2812_bal` owns board policy and links against `ws2812_oshal`.
+- Zephyr's root `app` target owns product sources plus the thin
+    `src/boot_handoff_zephyr.c` composition file and links against both lower
+    layer libraries.
+
+That split matches the longer-term goal of extracting `oshal/` and `bal/` into
+reusable submodules without pretending they are already independent repositories.

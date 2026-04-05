@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ctypes
+import argparse
 import json
 import os
 from pathlib import Path, PureWindowsPath
@@ -21,6 +22,24 @@ GCC_ONLY_PATTERNS = (
     r"\s+--param=\S+",
     r"\s+-fno-defer-pop",
 )
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Build the firmware with the repo-local Zephyr toolchain setup."
+    )
+    optimization_group = parser.add_mutually_exclusive_group()
+    optimization_group.add_argument(
+        "--no-opt",
+        action="store_true",
+        help="Build with CONFIG_NO_OPTIMIZATIONS=y for instruction-by-instruction debugging.",
+    )
+    optimization_group.add_argument(
+        "--debug-opt",
+        action="store_true",
+        help="Build with CONFIG_DEBUG_OPTIMIZATIONS=y for a more debuggable -Og style build.",
+    )
+    return parser.parse_args()
 
 
 def repo_root() -> Path:
@@ -92,10 +111,19 @@ def remove_build_directory(root: Path) -> None:
     shutil.rmtree(root / "build", ignore_errors=True)
 
 
-def run_west_build(root: Path, python_exe: Path, toolchain_root: Path) -> None:
+def run_west_build(
+    root: Path,
+    python_exe: Path,
+    toolchain_root: Path,
+    extra_conf_files: list[Path],
+) -> None:
     env = os.environ.copy()
     env["ZEPHYR_TOOLCHAIN_VARIANT"] = "gnuarmemb"
     env["GNUARMEMB_TOOLCHAIN_PATH"] = str(toolchain_root)
+    cmake_args = ["-DCMAKE_EXPORT_COMPILE_COMMANDS=ON"]
+    if extra_conf_files:
+        extra_conf_value = ";".join(str(path) for path in extra_conf_files)
+        cmake_args.append(f"-DEXTRA_CONF_FILE={extra_conf_value}")
 
     subprocess.run(
         [
@@ -109,7 +137,7 @@ def run_west_build(root: Path, python_exe: Path, toolchain_root: Path) -> None:
             "always",
             ".",
             "--",
-            "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON",
+            *cmake_args,
         ],
         cwd=root,
         env=env,
@@ -182,13 +210,19 @@ def sanitize_compile_database(root: Path) -> None:
 
 
 def main() -> int:
+    args = parse_args()
     root = repo_root()
     python_exe = ensure_repo_python(root)
     toolchain_root = resolve_toolchain_root()
+    extra_conf_files: list[Path] = []
+    if args.no_opt:
+        extra_conf_files.append(root / "prj.noopt.conf")
+    elif args.debug_opt:
+        extra_conf_files.append(root / "prj.debug.conf")
 
     os.chdir(root)
     remove_build_directory(root)
-    run_west_build(root, python_exe, toolchain_root)
+    run_west_build(root, python_exe, toolchain_root, extra_conf_files)
     sanitize_compile_database(root)
     return 0
 

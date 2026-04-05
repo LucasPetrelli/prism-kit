@@ -17,6 +17,13 @@ bool oshal_system_ready(void);
 ///     status code that explains the failure.
 int oshal_system_status(void);
 
+/// @brief Continue startup beyond the OSHAL-owned Zephyr entry point.
+/// @return STATUS_OK on success, or a negative project-defined status code if
+///     board bring-up or application hand-off fails.
+/// @note This hook is declared by OSHAL and implemented by the outer firmware
+///     composition layer so OSHAL does not depend directly on BAL or APP.
+int oshal_main_handoff(void);
+
 #ifdef __cplusplus
 }
 #endif

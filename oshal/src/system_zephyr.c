@@ -5,9 +5,6 @@
 #include "oshal/status.h"
 #include "samd21_bridge.h"
 
-/* BAL bootstrap entry point called from main(). */
-extern int bal_run(void);
-
 LOG_MODULE_REGISTER(system_startup, CONFIG_LOG_DEFAULT_LEVEL);
 
 static int oshal_last_status = STATUS_ERR_NOT_READY;
@@ -46,10 +43,10 @@ SYS_INIT(oshal_system_init, APPLICATION, 0);
 
 int main(void)
 {
-	const int ret = bal_run();
+	const int ret = oshal_main_handoff();
 
 	if (ret < 0) {
-		LOG_ERR("BAL bootstrap failed: %d", ret);
+		LOG_ERR("Startup handoff failed: %d", ret);
 		return ret;
 	}
 

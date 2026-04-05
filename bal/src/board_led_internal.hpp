@@ -30,8 +30,9 @@ private:
 	mutable bool is_initialized_;
 };
 
-/// @brief Reference to the board-specific status LED backend selected for this build.
-extern Led &g_status_led_backend;
+/// @brief Return the board-specific status LED backend selected for this build.
+/// @return Reference to a lazily-initialized backend object.
+Led &status_led_backend();
 
 } // namespace bal::internal
 
