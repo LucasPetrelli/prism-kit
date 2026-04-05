@@ -1,18 +1,21 @@
 #ifndef BAL_BOOTSTRAP_HPP_
 #define BAL_BOOTSTRAP_HPP_
 
-#include "bal/bootstrap.h"
-
 namespace bal {
 
-/// @brief Run BAL bootstrap through the stable C ABI entry point.
-/// @param app_entry C ABI application entry point provided by the caller.
+/// @brief C++ task-entry signature BAL receives after board bring-up.
+/// @param context Optional caller-owned context passed into the APP task entry.
 /// @return STATUS_OK on success, or a negative project-defined status code if
-///     OSHAL validation, board bring-up, or application hand-off fails.
-inline int run_bootstrap(bal_application_entry_t app_entry)
-{
-	return bal_run(app_entry);
-}
+///     startup fails before the steady-state loop begins.
+using ApplicationEntry = int (*)(void *context);
+
+/// @brief Validate OSHAL state, initialize BAL-owned objects, and launch the supplied APP task.
+/// @param app_entry Application entry point provided by the caller.
+/// @return STATUS_OK on success, or a negative project-defined status code if
+///     OSHAL validation, board bring-up, or application task launch fails.
+/// @note This function is the owned transition from the Zephyr-facing startup
+///     path into the board and application layers.
+int run_bootstrap(ApplicationEntry app_entry);
 
 } // namespace bal
 

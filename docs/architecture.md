@@ -12,18 +12,22 @@ OSHAL owns the Zephyr-facing boundary. In phase 1 it provides:
 - a shared status-code contract,
 - a system readiness contract,
 - a startup handoff hook contract,
+- a C++ task-execution contract layered over Zephyr threads,
 - a GPIO pin contract for SAMD21 pin PA17,
 - a PWM output contract for SAMD21 pin PA8 routed as TCC0/WO[0],
 - and the time/sleep contract APP currently needs.
 
 The backend is currently Zephyr-based because that is the lowest-friction way
 to validate architecture before introducing a timing-specific WS2812 engine.
+The task interface is intentionally C++-only because no current C-shaped
+integration point needs to create or manage tasks directly.
 
 ### BAL
 
 BAL owns board resources and the application bootstrap. The Zephyr root entry
 still hands off to BAL instead of calling APP directly, but now does so through
-an OSHAL-declared handoff hook that the repository composition layer implements.
+an OSHAL-declared handoff hook that the repository C++ composition layer
+implements.
 
 ### APP
 
@@ -43,12 +47,14 @@ Zephyr startup
             |
             +--> OSHAL-declared handoff hook
                 |
-                +--> BAL bootstrap with APP entry callback
+                +--> C++ composition bridge
                     |
-                    +--> initialize board LED object(s)
-                    +--> call APP entry
-                            |
-                            +--> blink smoke test
+                    +--> BAL bootstrap with APP task entry callback
+                    |
+                        +--> initialize board LED object(s)
+                        +--> launch APP task through OSHAL
+                                |
+                                +--> Zephyr schedules blink smoke test
 ```
 
 ## Why OSHAL Uses APPLICATION-Level SYS_INIT
@@ -85,7 +91,7 @@ target.
     the only layer target that links directly against `zephyr_interface`.
 - `ws2812_bal` owns board policy and links against `ws2812_oshal`.
 - Zephyr's root `app` target owns product sources plus the thin
-    `src/boot_handoff_zephyr.c` composition file and links against both lower
+    `src/boot_handoff_zephyr.cpp` composition file and links against both lower
     layer libraries.
 
 That split matches the longer-term goal of extracting `oshal/` and `bal/` into

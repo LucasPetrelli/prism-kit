@@ -1,7 +1,7 @@
 #include <cstdint>
 #include <iterator>
 
-#include "app/app.h"
+#include "app/app.hpp"
 #include "bal/led.hpp"
 #include "oshal/debug_port.hpp"
 #include "oshal/pwm.hpp"
@@ -27,8 +27,10 @@ constexpr std::uint32_t kPulseSequenceNs[] = {
 
 } // namespace
 
-int app_run(void)
+int app::run(void *context)
 {
+	static_cast<void>(context);
+
 	bal::Led &status_led = bal::status_led();
 	oshal::PwmOutput &demo_pwm = oshal::pa8_tcc0_wo0;
 	oshal::PwmSequenceOutput &demo_pwm_sequence = oshal::pa8_tcc0_wo0_sequence;

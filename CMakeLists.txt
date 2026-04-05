@@ -11,7 +11,7 @@ project(ws2812_samd21_led_driver)
 # while the root app target owns only the thin composition glue that wires APP
 # and BAL into the OSHAL-owned handoff hook.
 
-target_sources(app PRIVATE src/boot_handoff_zephyr.c)
+target_sources(app PRIVATE src/boot_handoff_zephyr.cpp)
 
 add_subdirectory(oshal)
 add_subdirectory(bal)
