@@ -79,13 +79,14 @@ rules.
 |   `-- architecture.md
 |-- oshal/
 |   |-- CMakeLists.txt
-|   |-- include/oshal/gpio.h
+|   |-- include/oshal/gpio.hpp
 |   |-- include/oshal/status.h
 |   |-- include/oshal/system.h
 |   |-- include/oshal/time.h
 |   |-- include/oshal/time.hpp
 |   `-- src/
-|       |-- gpio_zephyr.c
+|       |-- gpio_zephyr.cpp
+|       |-- samd21.cpp
 |       `-- system_zephyr.c
 |       `-- time_zephyr.cpp
 |-- src/
@@ -302,8 +303,8 @@ OSHAL currently exposes four small contracts.
 
 - `oshal/status.h`: defines the project-wide status codes shared across layers.
 - `oshal/system.h`: reports whether early OSHAL startup succeeded.
-- `oshal/gpio.h`: exposes a small pin-level GPIO contract for PA17 without
-	leaking Zephyr GPIO types upward.
+- `oshal/gpio.hpp`: exposes the generic C++ GPIO interface and the public PA17
+	object reference without leaking Zephyr GPIO types upward.
 - `oshal/time.h`: exposes millisecond sleep without leaking Zephyr kernel APIs.
 
 The phase-1 OSHAL backend is Zephyr-based. That keeps startup simple now while

@@ -1,10 +1,12 @@
 #include <zephyr/init.h>
 
-#include "oshal/gpio.h"
 #include "oshal/pwm.h"
 #include "oshal/system.h"
 #include "oshal/status.h"
 #include "pwm_backend.h"
+
+/* Keep the GPIO readiness bridge local because C callers outside startup no longer exist. */
+extern bool oshal_gpio_pa17_is_ready(void);
 
 static int oshal_last_status = STATUS_ERR_NOT_READY;
 
@@ -29,7 +31,7 @@ static int oshal_system_init(void)
 	}
 
 	/* Keep the phase-1 GPIO path in the same startup gate so regressions stay visible. */
-	if (!oshal_gpio_pin_is_ready(OSHAL_GPIO_PIN_PA17)) {
+	if (!oshal_gpio_pa17_is_ready()) {
 		oshal_last_status = STATUS_ERR_DEVICE_UNAVAILABLE;
 		return oshal_last_status;
 	}
