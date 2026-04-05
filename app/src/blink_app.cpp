@@ -1,34 +1,67 @@
+#include <cstdint>
+
 #include "app/app.h"
 #include "bal/led.hpp"
+#include "oshal/pwm.hpp"
 #include "oshal/time.hpp"
 #include "oshal/status.h"
 
 namespace {
 
-constexpr auto kBlinkPeriodMs = 1000U;
+constexpr std::uint32_t kDemoStepPeriodMs = 1000U;
+constexpr std::uint32_t kPwmPeriodNs = 1000000U;
+constexpr std::uint8_t kDutyCyclePercents[] = {10U, 25U, 50U, 75U, 90U};
+
+constexpr std::uint32_t pulse_width_for_percent(std::uint8_t duty_cycle_percent)
+{
+	return (kPwmPeriodNs * static_cast<std::uint32_t>(duty_cycle_percent)) / 100U;
+}
 
 } // namespace
 
 int app_run(void)
 {
-	const bal_led_t *status_led = nullptr;
+	const bal::Led *status_led = nullptr;
+	oshal::PwmOutput &demo_pwm = oshal::pa8_tcc0_wo0;
+	int ret;
 
 	/*
-	 * APP depends on a board-owned LED handle instead of a raw GPIO or Zephyr
-	 * alias so the product logic stays decoupled from board wiring and RTOS
-	 * details.
+	 * APP depends on board-owned LED and PWM objects instead of direct GPIO,
+	 * timer, or Zephyr driver details so the demo stays decoupled from board
+	 * wiring and the SAMD21 register map.
 	 */
 	status_led = bal::status_led();
 	if (status_led == nullptr) {
 		return STATUS_ERR_DEVICE_UNAVAILABLE;
 	}
 
-	while (true) {
-		const int ret = bal::toggle_led(*status_led);
-		if (ret < 0) {
-			return ret;
-		}
+	if (!demo_pwm.is_ready()) {
+		return STATUS_ERR_DEVICE_UNAVAILABLE;
+	}
 
-		oshal::sleep_ms(kBlinkPeriodMs);
+	ret = demo_pwm.configure(kPwmPeriodNs, pulse_width_for_percent(kDutyCyclePercents[0]));
+	if (ret < 0) {
+		return ret;
+	}
+
+	ret = demo_pwm.enable();
+	if (ret < 0) {
+		return ret;
+	}
+
+	while (true) {
+		for (const std::uint8_t duty_cycle_percent : kDutyCyclePercents) {
+			ret = bal::toggle_led(*status_led);
+			if (ret < 0) {
+				return ret;
+			}
+
+			ret = demo_pwm.set_pulse(pulse_width_for_percent(duty_cycle_percent));
+			if (ret < 0) {
+				return ret;
+			}
+
+			oshal::sleep_ms(kDemoStepPeriodMs);
+		}
 	}
 }
