@@ -1,45 +1,53 @@
 #ifndef BAL_LED_HPP_
 #define BAL_LED_HPP_
 
-#include "bal/led.h"
-
 namespace bal {
 
-using Led = bal_led_t;
+/// @brief Generic board-owned LED interface exposed by BAL.
+/// @note BAL owns logical LED policy while OSHAL continues to own physical GPIO
+///     bindings.
+class Led {
+public:
+	Led(const Led &) = delete;
+	Led &operator=(const Led &) = delete;
+	virtual ~Led() = default;
 
-/// @brief Initialize BAL-owned LED objects through the stable C ABI.
+	/// @brief Return a human-readable board LED name.
+	/// @return Pointer to a static string describing the LED object.
+	virtual const char *name() const = 0;
+
+	/// @brief Report whether the backend for this LED object is ready.
+	/// @return True when the underlying GPIO backend is ready, otherwise false.
+	virtual bool is_ready() const = 0;
+
+	/// @brief Prepare the LED object for application use.
+	/// @return STATUS_OK on success, or a negative project-defined status code on
+	///     failure.
+	virtual int initialize() = 0;
+
+	/// @brief Set the logical LED state.
+	/// @param on True drives the logical LED state on, false drives it off.
+	/// @return STATUS_OK on success, or a negative project-defined status code on
+	///     failure.
+	virtual int set(bool on) const = 0;
+
+	/// @brief Toggle the logical LED state.
+	/// @return STATUS_OK on success, or a negative project-defined status code on
+	///     failure.
+	virtual int toggle() const = 0;
+
+protected:
+	Led() = default;
+};
+
+/// @brief Initialize BAL-owned LED objects.
 /// @return STATUS_OK on success, or a negative project-defined status code on
 ///     failure.
-inline int initialize_leds()
-{
-	return bal_leds_init();
-}
+int initialize_leds();
 
-/// @brief Return the board-owned status LED handle.
-/// @return Pointer to the stable status LED handle.
-inline const Led *status_led()
-{
-	return bal_status_led();
-}
-
-/// @brief Set the logical state of a board-owned LED.
-/// @param led Reference to a board-owned LED handle.
-/// @param on True drives the logical LED state on, false drives it off.
-/// @return STATUS_OK on success, or a negative project-defined status code on
-///     failure.
-inline int set_led(const Led &led, bool on)
-{
-	return bal_led_set(&led, on);
-}
-
-/// @brief Toggle the logical state of a board-owned LED.
-/// @param led Reference to a board-owned LED handle.
-/// @return STATUS_OK on success, or a negative project-defined status code on
-///     failure.
-inline int toggle_led(const Led &led)
-{
-	return bal_led_toggle(&led);
-}
+/// @brief Return the board-owned status LED object.
+/// @return Reference to the board-owned status LED object.
+Led &status_led();
 
 } // namespace bal
 

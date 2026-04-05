@@ -1,94 +1,79 @@
-#include <array>
-
-#include "bal/led.h"
+#include "bal/led.hpp"
 #include "oshal/gpio.hpp"
 #include "oshal/status.h"
+#include "board_led_internal.hpp"
 
-namespace {
+namespace bal::internal {
 
-struct LedBinding {
-	bal_led_t public_led;
-	const oshal::Gpio *gpio;
-	bool is_active_low;
-};
-
-constexpr std::size_t kStatusLedIndex = 0U;
-
-const std::array<LedBinding, 1> kLedBindings{{
-	LedBinding{{"status_led"}, &oshal::pa17, true},
-}};
-
-bool g_leds_are_initialized = false;
-
-bool led_output_level_for_state(const LedBinding &binding, bool on)
+LedStatus::LedStatus(const char *led_name, const oshal::Gpio &gpio, bool is_active_low)
+	: led_name_(led_name), gpio_(gpio), is_active_low_(is_active_low), is_initialized_(false)
 {
-	return binding.is_active_low ? !on : on;
 }
 
-const LedBinding *lookup_led(const bal_led_t *led)
+const char *LedStatus::name() const
 {
-	for (const auto &binding : kLedBindings) {
-		if (led == &binding.public_led) {
-			return &binding;
-		}
-	}
-
-	return nullptr;
+	return led_name_;
 }
 
-} // namespace
-
-int bal_leds_init(void)
+bool LedStatus::is_ready() const
 {
-	if (g_leds_are_initialized) {
-		return 0;
+	return gpio_.is_ready();
+}
+
+int LedStatus::initialize()
+{
+	if (is_initialized_) {
+		return STATUS_OK;
 	}
 
-	const auto &status_led = kLedBindings[kStatusLedIndex];
-	if (!status_led.gpio->is_ready()) {
+	if (!is_ready()) {
 		return STATUS_ERR_DEVICE_UNAVAILABLE;
 	}
 
-	/* Configure the board-owned status LED once before APP starts using it. */
-	const int ret =
-		status_led.gpio->configure_output(led_output_level_for_state(status_led, false));
+	const int ret = gpio_.configure_output(output_level_for_state(false));
 	if (ret < 0) {
 		return ret;
 	}
 
-	g_leds_are_initialized = true;
-	return 0;
+	is_initialized_ = true;
+	return STATUS_OK;
 }
 
-const bal_led_t *bal_status_led(void)
+int LedStatus::set(bool on) const
 {
-	return &kLedBindings[kStatusLedIndex].public_led;
-}
-
-int bal_led_set(const bal_led_t *led, bool on)
-{
-	if (!g_leds_are_initialized) {
+	if (!is_initialized_) {
 		return STATUS_ERR_NOT_READY;
 	}
 
-	const auto *binding = lookup_led(led);
-	if (binding == nullptr) {
-		return STATUS_ERR_INVALID_ARGUMENT;
-	}
-
-	return binding->gpio->set(led_output_level_for_state(*binding, on));
+	return gpio_.set(output_level_for_state(on));
 }
 
-int bal_led_toggle(const bal_led_t *led)
+int LedStatus::toggle() const
 {
-	if (!g_leds_are_initialized) {
+	if (!is_initialized_) {
 		return STATUS_ERR_NOT_READY;
 	}
 
-	const auto *binding = lookup_led(led);
-	if (binding == nullptr) {
-		return STATUS_ERR_INVALID_ARGUMENT;
-	}
-
-	return binding->gpio->toggle();
+	return gpio_.toggle();
 }
+
+bool LedStatus::output_level_for_state(bool on) const
+{
+	return is_active_low_ ? !on : on;
+}
+
+} // namespace bal::internal
+
+namespace bal {
+
+int initialize_leds()
+{
+	return internal::g_status_led_backend.initialize();
+}
+
+Led &status_led()
+{
+	return internal::g_status_led_backend;
+}
+
+} // namespace bal

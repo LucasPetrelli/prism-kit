@@ -21,7 +21,7 @@ constexpr std::uint32_t pulse_width_for_percent(std::uint8_t duty_cycle_percent)
 
 int app_run(void)
 {
-	const bal::Led *status_led = nullptr;
+	bal::Led &status_led = bal::status_led();
 	oshal::PwmOutput &demo_pwm = oshal::pa8_tcc0_wo0;
 	int ret;
 
@@ -30,8 +30,7 @@ int app_run(void)
 	 * timer, or Zephyr driver details so the demo stays decoupled from board
 	 * wiring and the SAMD21 register map.
 	 */
-	status_led = bal::status_led();
-	if (status_led == nullptr) {
+	if (!status_led.is_ready()) {
 		return STATUS_ERR_DEVICE_UNAVAILABLE;
 	}
 
@@ -51,7 +50,7 @@ int app_run(void)
 
 	while (true) {
 		for (const std::uint8_t duty_cycle_percent : kDutyCyclePercents) {
-			ret = bal::toggle_led(*status_led);
+			ret = status_led.toggle();
 			if (ret < 0) {
 				return ret;
 			}
