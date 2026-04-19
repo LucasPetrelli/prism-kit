@@ -1,5 +1,5 @@
-#ifndef OSHAL_GPIO_ZEPHYR_INTERNAL_HPP_
-#define OSHAL_GPIO_ZEPHYR_INTERNAL_HPP_
+#ifndef OSHAL_ZEPHYR_GPIO_INTERNAL_HPP_
+#define OSHAL_ZEPHYR_GPIO_INTERNAL_HPP_
 
 #include <zephyr/drivers/gpio.h>
 
@@ -28,4 +28,4 @@ class ZephyrGpio final : public Gpio {
 
 }  // namespace oshal::internal
 
-#endif /* OSHAL_GPIO_ZEPHYR_INTERNAL_HPP_ */
+#endif /* OSHAL_ZEPHYR_GPIO_INTERNAL_HPP_ */

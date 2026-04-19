@@ -1,7 +1,7 @@
 #include <zephyr/drivers/gpio.h>
 
-#include "gpio_zephyr_internal.hpp"
 #include "oshal/status.h"
+#include "zephyr_gpio_internal.hpp"
 
 namespace {
 

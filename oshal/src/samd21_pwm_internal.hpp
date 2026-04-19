@@ -1,5 +1,5 @@
-#ifndef OSHAL_PWM_SAMD21_INTERNAL_HPP_
-#define OSHAL_PWM_SAMD21_INTERNAL_HPP_
+#ifndef OSHAL_SAMD21_PWM_INTERNAL_HPP_
+#define OSHAL_SAMD21_PWM_INTERNAL_HPP_
 
 #include <soc.h>
 
@@ -206,4 +206,4 @@ class Samd21DmaPwmOutput final : public Samd21PwmOutput,
 
 }  // namespace oshal::internal
 
-#endif /* OSHAL_PWM_SAMD21_INTERNAL_HPP_ */
+#endif /* OSHAL_SAMD21_PWM_INTERNAL_HPP_ */

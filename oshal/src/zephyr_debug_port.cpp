@@ -3,8 +3,8 @@
 
 #include <climits>
 
-#include "debug_port_zephyr_internal.hpp"
 #include "oshal/status.h"
+#include "zephyr_debug_port_internal.hpp"
 
 namespace {
 

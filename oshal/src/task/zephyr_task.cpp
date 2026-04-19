@@ -3,7 +3,7 @@
 #include <cstring>
 
 #include "oshal/status.h"
-#include "task/task_zephyr_internal.hpp"
+#include "task/zephyr_task_internal.hpp"
 
 namespace {
 

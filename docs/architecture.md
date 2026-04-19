@@ -43,7 +43,7 @@ Zephyr startup
             |
             +--> validate hardware-facing prerequisites
     |
-        +--> main() in oshal/src/system_zephyr.c
+        +--> main() in oshal/src/zephyr_system.c
             |
             +--> OSHAL-declared handoff hook
                 |

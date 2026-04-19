@@ -1,5 +1,5 @@
-#ifndef OSHAL_DEBUG_PORT_ZEPHYR_INTERNAL_HPP_
-#define OSHAL_DEBUG_PORT_ZEPHYR_INTERNAL_HPP_
+#ifndef OSHAL_ZEPHYR_DEBUG_PORT_INTERNAL_HPP_
+#define OSHAL_ZEPHYR_DEBUG_PORT_INTERNAL_HPP_
 
 #include <zephyr/device.h>
 #include <zephyr/kernel.h>
@@ -39,4 +39,4 @@ class ZephyrDebugPort final : public DebugPort {
 
 }  // namespace oshal::internal
 
-#endif /* OSHAL_DEBUG_PORT_ZEPHYR_INTERNAL_HPP_ */
+#endif /* OSHAL_ZEPHYR_DEBUG_PORT_INTERNAL_HPP_ */

@@ -7,7 +7,7 @@
 #include <iterator>
 
 #include "oshal/status.h"
-#include "pwm_samd21_internal.hpp"
+#include "samd21_pwm_internal.hpp"
 
 namespace {
 

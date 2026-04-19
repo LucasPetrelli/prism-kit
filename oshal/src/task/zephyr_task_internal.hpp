@@ -1,5 +1,5 @@
-#ifndef OSHAL_TASK_ZEPHYR_INTERNAL_HPP_
-#define OSHAL_TASK_ZEPHYR_INTERNAL_HPP_
+#ifndef OSHAL_ZEPHYR_TASK_INTERNAL_HPP_
+#define OSHAL_ZEPHYR_TASK_INTERNAL_HPP_
 
 #include <zephyr/kernel.h>
 
@@ -56,4 +56,4 @@ TaskSlot* find_task_slot(std::uint8_t slot_index, std::uint8_t generation);
 
 }  // namespace oshal::internal
 
-#endif /* OSHAL_TASK_ZEPHYR_INTERNAL_HPP_ */
+#endif /* OSHAL_ZEPHYR_TASK_INTERNAL_HPP_ */

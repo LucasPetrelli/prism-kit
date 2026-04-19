@@ -1,17 +1,17 @@
 #include <zephyr/devicetree.h>
 
-#include "debug_port_cdc_acm_internal.hpp"
-#include "gpio_zephyr_internal.hpp"
 #include "oshal/debug_port.hpp"
 #include "oshal/gpio.hpp"
 #include "oshal/pwm.hpp"
-#include "pwm_samd21_internal.hpp"
 #include "samd21_bridge.h"
+#include "samd21_pwm_internal.hpp"
+#include "zephyr_debug_port_cdc_acm_internal.hpp"
+#include "zephyr_gpio_internal.hpp"
 
 #define DEBUG_PORT_NODE DT_CHOSEN(zephyr_console)
 
 #if !DT_NODE_HAS_COMPAT(DEBUG_PORT_NODE, zephyr_cdc_acm_uart)
-#include "debug_port_zephyr_internal.hpp"
+#include "zephyr_debug_port_internal.hpp"
 #endif
 
 #define GPIO_PA17_PORT_NODE DT_NODELABEL(porta)

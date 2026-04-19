@@ -26,7 +26,7 @@ Phase 1 is implemented.
 - OSHAL startup runs through `SYS_INIT()` so the staged boot sequence remains
 	explicit under Zephyr.
 - `main()` still lives in OSHAL, but the APP-plus-BAL startup composition now
-	lives in a thin repository-level handoff file so `system_zephyr.c` no longer
+	lives in a thin repository-level handoff file so `zephyr_system.c` no longer
 	includes APP or BAL headers.
 - BAL owns board resources and bootstraps the application from a supplied APP
 	task entry point.
@@ -72,7 +72,7 @@ replacing it.
 
 1. Zephyr boots and initializes the kernel and device model.
 2. OSHAL runs a `SYS_INIT()` hook at the `APPLICATION` init level.
-3. Zephyr enters `main()` in `oshal/src/system_zephyr.c`.
+3. Zephyr enters `main()` in `oshal/src/zephyr_system.c`.
 4. `main()` calls an OSHAL-declared handoff hook implemented by the repository composition layer.
 5. BAL initializes board-owned objects and then launches APP as an OSHAL task.
 6. Zephyr schedules APP after startup, and APP runs using only BAL and OSHAL interfaces.
@@ -109,13 +109,13 @@ rules.
 |   |-- include/oshal/time.h
 |   |-- include/oshal/time.hpp
 |   `-- src/
-|       |-- debug_port_cdc_acm.cpp
-|       |-- debug_port_zephyr.cpp
-|       |-- gpio_zephyr.cpp
-|       |-- pwm_samd21.cpp
+|       |-- samd21_pwm.cpp
+|       |-- zephyr_debug_port.cpp
+|       |-- zephyr_debug_port_cdc_acm.cpp
+|       |-- zephyr_gpio.cpp
 |       |-- samd21.cpp
-|       |-- system_zephyr.c
-|       `-- time_zephyr.cpp
+|       |-- zephyr_system.c
+|       `-- zephyr_time.cpp
 |-- src/
 |   `-- boot_handoff_zephyr.cpp
 |-- CMakeLists.txt
