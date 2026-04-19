@@ -1,0 +1,17 @@
+#!/bin/sh
+
+set -e
+
+if command -v python >/dev/null 2>&1; then
+  PYTHON=python
+elif command -v python3 >/dev/null 2>&1; then
+  PYTHON=python3
+else
+  echo "python or python3 is required to run the formatting hook." >&2
+  exit 1
+fi
+
+repo_root=$(git rev-parse --show-toplevel)
+cd "$repo_root"
+
+"$PYTHON" scripts/format.py --staged --git-add

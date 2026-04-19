@@ -140,6 +140,10 @@ repo is still in early bring-up.
 The repository now carries a root `.clang-format` file derived from `Google`
 style with explicit two-space indentation and spaces instead of literal tabs.
 
+The repository also carries checked-in VS Code settings that enable
+format-on-save for C and C++ files when you have a clang-format-capable
+formatter extension installed.
+
 If `clang-format` is on your `PATH`, you can format the tracked firmware source
 tree from the repository root with:
 
@@ -161,6 +165,32 @@ python scripts/format.py app/src/blink_app.cpp oshal/include
 
 On Windows, the helper also falls back to
 `C:\Program Files\LLVM\bin\clang-format.exe` if it is installed there.
+
+To format only staged C and C++ files from the current git index:
+
+```bash
+python scripts/format.py --staged
+```
+
+To install the repo-local pre-commit hook that formats staged C and C++ files
+and re-stages the rewritten results before each commit:
+
+```bash
+python scripts/install_git_hooks.py
+```
+
+That installer sets `core.hooksPath` to the tracked `.githooks` directory for
+this clone. The hook itself runs:
+
+```bash
+python scripts/format.py --staged --git-add
+```
+
+If you prefer to wire the hook path yourself, the equivalent manual command is:
+
+```bash
+git config core.hooksPath .githooks
+```
 
 ### Board Target
 
