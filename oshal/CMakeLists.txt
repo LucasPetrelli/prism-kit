@@ -14,7 +14,8 @@ target_sources(ws2812_oshal
 		src/samd21.cpp
 		src/pwm_samd21.cpp
 		src/system_zephyr.c
-		src/task_zephyr.cpp
+		src/task/task_zephyr.cpp
+		src/task/task_stats_zephyr.cpp
 		src/time_zephyr.cpp)
 
 # OSHAL is the only layer that compiles directly against Zephyr and SoC headers,

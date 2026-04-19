@@ -1,11 +1,9 @@
 #include <zephyr/init.h>
-#include <zephyr/logging/log.h>
+#include <zephyr/sys/printk.h>
 
 #include "oshal/system.h"
 #include "oshal/status.h"
 #include "samd21_bridge.h"
-
-LOG_MODULE_REGISTER(system_startup, CONFIG_LOG_DEFAULT_LEVEL);
 
 static int oshal_last_status = STATUS_ERR_NOT_READY;
 
@@ -46,7 +44,7 @@ int main(void)
 	const int ret = oshal_main_handoff();
 
 	if (ret < 0) {
-		LOG_ERR("Startup handoff failed: %d", ret);
+		printk("Startup handoff failed: %d\n", ret);
 		return ret;
 	}
 

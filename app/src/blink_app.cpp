@@ -2,17 +2,23 @@
 #include <iterator>
 
 #include "app/app.hpp"
+#include "app/task_runtime_reporter.hpp"
 #include "bal/led.hpp"
 #include "oshal/debug_port.hpp"
 #include "oshal/pwm.hpp"
-#include "oshal/time.hpp"
 #include "oshal/status.h"
+#include "oshal/time.hpp"
 
 namespace {
 
 constexpr std::uint32_t kDemoStepPeriodMs = 1000U;
+constexpr std::uint32_t kRuntimeReportPeriodMs = 5000U;
+constexpr std::uint32_t kRuntimeReportStepInterval = kRuntimeReportPeriodMs / kDemoStepPeriodMs;
 constexpr std::uint32_t kPwmPeriodNs = 1000000U;
 constexpr std::uint8_t kDutyCyclePercents[] = {10U, 25U, 50U, 75U, 90U};
+
+static_assert(kRuntimeReportStepInterval > 0U,
+	"Runtime report period must be at least one demo step.");
 
 constexpr std::uint32_t pulse_width_for_percent(std::uint8_t duty_cycle_percent)
 {
@@ -34,6 +40,10 @@ int app::run(void *context)
 	bal::Led &status_led = bal::status_led();
 	oshal::PwmOutput &demo_pwm = oshal::pa8_tcc0_wo0;
 	oshal::PwmSequenceOutput &demo_pwm_sequence = oshal::pa8_tcc0_wo0_sequence;
+	const oshal::TaskHandle app_task_handle = oshal::TaskHandle::current();
+	app::TaskRuntimeReporter runtime_reporter(app_task_handle);
+	bool reported_runtime_failure = false;
+	std::uint32_t demo_step_count = 0U;
 	int ret;
 
 	/*
@@ -73,6 +83,16 @@ int app::run(void *context)
 		ret = status_led.toggle();
 		if (ret < 0) {
 			return ret;
+		}
+
+		++demo_step_count;
+		if ((demo_step_count % kRuntimeReportStepInterval) == 0U) {
+			const int diagnostics_ret = runtime_reporter.report();
+			if ((diagnostics_ret < 0) && !reported_runtime_failure) {
+				reported_runtime_failure = true;
+				static_cast<void>(oshal::debug_port.printf(
+					"Task runtime diagnostics unavailable (%d)\n", diagnostics_ret));
+			}
 		}
 
 		oshal::sleep_ms(kDemoStepPeriodMs);

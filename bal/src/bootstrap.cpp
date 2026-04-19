@@ -52,5 +52,5 @@ int bal::run_bootstrap(ApplicationEntry app_entry)
 	 * BAL still owns the transition into APP, but now hands execution to Zephyr
 	 * through the OSHAL task abstraction once board-owned resources are ready.
 	 */
-	return oshal::start(g_app_task, make_app_task_config(app_entry));
+	return oshal::TaskHandle::create(g_app_task, make_app_task_config(app_entry));
 }

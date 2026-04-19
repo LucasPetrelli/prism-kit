@@ -2,7 +2,7 @@
 # Zephyr-specific APIs out of the public application interface.
 target_include_directories(app PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
-target_sources(app PRIVATE src/blink_app.cpp)
+target_sources(app PRIVATE src/blink_app.cpp src/task_runtime_reporter.cpp)
 
 # Link APP against the reusable lower layers instead of treating them as source
 # buckets inside the Zephyr app target.
