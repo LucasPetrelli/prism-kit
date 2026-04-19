@@ -135,6 +135,33 @@ The manifest in this repository pins the Zephyr revision and then imports the
 upstream Zephyr manifest for compatibility. That keeps setup reliable while this
 repo is still in early bring-up.
 
+### Code Formatting
+
+The repository now carries a root `.clang-format` file derived from `Google`
+style with explicit two-space indentation and spaces instead of literal tabs.
+
+If `clang-format` is on your `PATH`, you can format the tracked firmware source
+tree from the repository root with:
+
+```bash
+python scripts/format.py
+```
+
+To check formatting in CI or before committing without rewriting files:
+
+```bash
+python scripts/format.py --check
+```
+
+You can also target specific files or folders:
+
+```bash
+python scripts/format.py app/src/blink_app.cpp oshal/include
+```
+
+On Windows, the helper also falls back to
+`C:\Program Files\LLVM\bin\clang-format.exe` if it is installed there.
+
 ### Board Target
 
 The upstream Zephyr board target for the XIAO SAMD21 is `seeeduino_xiao`.

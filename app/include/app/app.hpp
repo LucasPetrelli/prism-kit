@@ -12,8 +12,8 @@ namespace app {
 /// @note Steady-state application flows are allowed to run indefinitely and may
 ///     therefore never return on success. When Zephyr schedules APP as a task,
 ///     this function is the task main for that application task.
-int run(void *context = nullptr);
+int run(void* context = nullptr);
 
-} // namespace app
+}  // namespace app
 
 #endif /* APP_APP_HPP_ */

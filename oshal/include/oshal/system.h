@@ -13,7 +13,8 @@ extern "C" {
 bool oshal_system_ready(void);
 
 /// @brief Return the status code produced by the OSHAL startup stage.
-/// @return STATUS_OK when OSHAL startup succeeded, or a negative project-defined
+/// @return STATUS_OK when OSHAL startup succeeded, or a negative
+/// project-defined
 ///     status code that explains the failure.
 int oshal_system_status(void);
 
