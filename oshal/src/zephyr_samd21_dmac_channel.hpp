@@ -1,5 +1,5 @@
-#ifndef OSHAL_SAMD21_DMAC_CHANNEL_HPP_
-#define OSHAL_SAMD21_DMAC_CHANNEL_HPP_
+#ifndef OSHAL_ZEPHYR_SAMD_21_DMAC_CHANNEL_HPP_
+#define OSHAL_ZEPHYR_SAMD_21_DMAC_CHANNEL_HPP_
 
 #include <soc.h>
 
@@ -78,4 +78,4 @@ class Samd21DmacChannel final {
 
 }  // namespace oshal::internal
 
-#endif /* OSHAL_SAMD21_DMAC_CHANNEL_HPP_ */
+#endif /* OSHAL_ZEPHYR_SAMD_21_DMAC_CHANNEL_HPP_ */

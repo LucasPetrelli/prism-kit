@@ -10,9 +10,10 @@ target_sources(ws2812_oshal
 		src/zephyr_debug_port.cpp
 		src/zephyr_debug_port_cdc_acm.cpp
 		src/zephyr_gpio.cpp
-		src/samd21_dmac_channel.cpp
+		src/zephyr_samd21_dmac_channel.cpp
 		src/samd21.cpp
 		src/samd21_pwm.cpp
+		src/samd21_ws2812.cpp
 		src/zephyr_system.c
 		src/task/zephyr_task.cpp
 		src/task/zephyr_task_stats.cpp

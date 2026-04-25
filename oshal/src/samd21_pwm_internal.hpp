@@ -7,7 +7,7 @@
 #include <cstdint>
 
 #include "oshal/pwm.hpp"
-#include "samd21_dmac_channel.hpp"
+#include "zephyr_samd21_dmac_channel.hpp"
 
 namespace oshal::internal {
 
@@ -158,6 +158,11 @@ class Samd21DmaPwmOutput final : public Samd21PwmOutput,
   /// @return True when a sequence is active and no DMA error was observed.
   bool is_pulse_sequence_active() const override;
 
+  /// @brief Report the maximum pulse count supported by this DMA staging
+  ///     buffer.
+  /// @return Maximum supported sequence length.
+  std::size_t max_pulse_sequence_length() const override;
+
  protected:
   /// @brief Stop active DMA activity before base PWM reconfiguration or
   /// disable.
@@ -183,8 +188,13 @@ class Samd21DmaPwmOutput final : public Samd21PwmOutput,
   /// @brief Reset sequencing runtime state after DMA setup or stop.
   void reset_sequence_state();
 
-  /// @brief Maximum supported sequence length for this first DMA extension.
-  static constexpr std::size_t kMaxDmaPulseCount = 64U;
+  /// @brief Maximum pulse entries staged by the DMA backend.
+  /// @note A 7-pixel WS2812 frame needs 168 pulse entries
+  ///     (7 pixels * 3 bytes/pixel * 8 bits/byte). This buffer is rounded up
+  ///     to 256 entries so the staging capacity stays a simple power-of-two
+  ///     size while leaving 88 entries of headroom for sequencing overhead and
+  ///     modest growth beyond the minimum frame.
+  static constexpr std::size_t kMaxDmaPulseCount = 256U;
 
   /// @brief Resolved DMAC trigger source for this TCC instance/channel.
   std::uint8_t dma_trigger_source_;

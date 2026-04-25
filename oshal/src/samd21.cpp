@@ -3,8 +3,10 @@
 #include "oshal/debug_port.hpp"
 #include "oshal/gpio.hpp"
 #include "oshal/pwm.hpp"
+#include "oshal/ws2812.hpp"
 #include "samd21_bridge.h"
 #include "samd21_pwm_internal.hpp"
+#include "samd21_ws2812_internal.hpp"
 #include "zephyr_debug_port_cdc_acm_internal.hpp"
 #include "zephyr_gpio_internal.hpp"
 
@@ -52,6 +54,8 @@ oshal::internal::ZephyrGpio g_pa17{
 oshal::internal::Samd21DmaPwmOutput g_pa8_tcc0_wo0{
   "PA8/TCC0_WO0",     TCC0, 0U, PWM_PA8_PORT_GROUP_INDEX, PWM_PA8_PIN,
   MUX_PA08E_TCC0_WO0, 0U};
+oshal::internal::Samd21PwmWs2812Transport g_pa8_tcc0_wo0_ws2812{
+  "PA8/TCC0_WO0.ws2812", g_pa8_tcc0_wo0, g_pa8_tcc0_wo0};
 
 }  // namespace
 
@@ -61,6 +65,7 @@ DebugPort& debug_port = g_debug_port;
 Gpio& pa17 = g_pa17;
 PwmOutput& pa8_tcc0_wo0 = g_pa8_tcc0_wo0;
 PwmSequenceOutput& pa8_tcc0_wo0_sequence = g_pa8_tcc0_wo0;
+Ws2812Transport& pa8_tcc0_wo0_ws2812 = g_pa8_tcc0_wo0_ws2812;
 
 }  // namespace oshal
 

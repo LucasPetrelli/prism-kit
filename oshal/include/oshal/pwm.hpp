@@ -81,6 +81,11 @@ class PwmSequenceOutput {
   /// @return True when a pulse sequence is active, otherwise false.
   virtual bool is_pulse_sequence_active() const = 0;
 
+  /// @brief Report the maximum number of pulse entries this backend can stage
+  ///     in one sequence submission.
+  /// @return Maximum supported pulse-sequence length.
+  virtual std::size_t max_pulse_sequence_length() const = 0;
+
  protected:
   PwmSequenceOutput() = default;
 };

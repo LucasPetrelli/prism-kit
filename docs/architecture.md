@@ -1,13 +1,13 @@
 # Architecture Notes
 
 This document complements the repository README with a tighter view of the
-layering rules and the boot path that phase 1 implements.
+layering rules and the boot path that phase 2 implements.
 
 ## Layer Ownership
 
 ### OSHAL
 
-OSHAL owns the Zephyr-facing boundary. In phase 1 it provides:
+OSHAL owns the Zephyr-facing boundary. In phase 2 it provides:
 
 - a shared status-code contract,
 - a system readiness contract,
@@ -15,10 +15,12 @@ OSHAL owns the Zephyr-facing boundary. In phase 1 it provides:
 - a C++ task-execution contract layered over Zephyr threads,
 - a GPIO pin contract for SAMD21 pin PA17,
 - a PWM output contract for SAMD21 pin PA8 routed as TCC0/WO[0],
+- a WS2812 frame-transport contract layered over the PA8 PWM sequence backend,
 - and the time/sleep contract APP currently needs.
 
-The backend is currently Zephyr-based because that is the lowest-friction way
-to validate architecture before introducing a timing-specific WS2812 engine.
+The backend is currently Zephyr-based and uses the SAMD21 PWM-plus-DMA path as
+the first timing-specific WS2812 engine while keeping the public transport
+contract independent from PWM versus future SPI signaling.
 The task interface is intentionally C++-only because no current C-shaped
 integration point needs to create or manage tasks directly.
 
@@ -27,12 +29,14 @@ integration point needs to create or manage tasks directly.
 BAL owns board resources and the application bootstrap. The Zephyr root entry
 still hands off to BAL instead of calling APP directly, but now does so through
 an OSHAL-declared handoff hook that the repository C++ composition layer
-implements.
+implements. BAL also owns the fixed 7-pixel strip object, logical RGB pixel
+views, and the board-specific GRB ordering policy for that strip.
 
 ### APP
 
 APP must not include Zephyr headers or know devicetree aliases. It talks to BAL
-for board objects and OSHAL for execution services.
+for board objects and OSHAL for execution services. APP does not talk directly
+to PWM or any other transport backend.
 
 ## Boot Flow
 
@@ -52,9 +56,10 @@ Zephyr startup
                     +--> BAL bootstrap with APP task entry callback
                     |
                         +--> initialize board LED object(s)
+                        +--> initialize WS2812 strip object(s)
                         +--> launch APP task through OSHAL
                                 |
-                                +--> Zephyr schedules blink smoke test
+                            +--> Zephyr schedules strip color-cycle demo
 ```
 
 ## Why OSHAL Uses APPLICATION-Level SYS_INIT

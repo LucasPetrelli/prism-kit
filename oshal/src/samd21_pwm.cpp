@@ -559,6 +559,10 @@ bool Samd21DmaPwmOutput::is_pulse_sequence_active() const {
   return dma_sequence_active_ && !dma_sequence_error_;
 }
 
+std::size_t Samd21DmaPwmOutput::max_pulse_sequence_length() const {
+  return kMaxDmaPulseCount;
+}
+
 int Samd21DmaPwmOutput::stop_transient_activity() {
   return stop_pulse_sequence();
 }

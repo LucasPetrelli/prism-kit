@@ -1,6 +1,7 @@
-#include "samd21_dmac_channel.hpp"
+#include "zephyr_samd21_dmac_channel.hpp"
 
 #include <soc.h>
+#include <zephyr/irq.h>
 
 #include <cstddef>
 #include <cstdint>
@@ -10,6 +11,13 @@
 namespace {
 
 using oshal::internal::Samd21DmacChannel;
+
+extern "C" void DMAC_Handler(void);
+
+constexpr unsigned int kDmacIrqPriority = 0U;
+constexpr std::uint32_t kDmacIrqFlags = 0U;
+
+void zephyr_dmac_irq_handler(const void*) { DMAC_Handler(); }
 
 /* Descriptor section consumed by hardware fetches for all channels. */
 alignas(16) DmacDescriptor g_dmac_descriptors[DMAC_CH_NUM];
@@ -53,8 +61,10 @@ int Samd21DmacChannel::initialize_controller() {
     reinterpret_cast<std::uint32_t>(&g_dmac_writeback_descriptors[0]);
   DMAC->CTRL.reg = DMAC_CTRL_DMAENABLE | DMAC_CTRL_LVLEN0;
 
+  IRQ_CONNECT(DMAC_IRQn, kDmacIrqPriority, zephyr_dmac_irq_handler, nullptr,
+              kDmacIrqFlags);
   NVIC_ClearPendingIRQ(DMAC_IRQn);
-  NVIC_EnableIRQ(DMAC_IRQn);
+  irq_enable(DMAC_IRQn);
 
   g_dmac_controller_initialized = true;
   return STATUS_OK;

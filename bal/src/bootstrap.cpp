@@ -1,6 +1,7 @@
 #include "bal/bootstrap.hpp"
 
 #include "bal/led.hpp"
+#include "bal/ws2812_strip.hpp"
 #include "oshal/status.h"
 #include "oshal/system.h"
 #include "oshal/task.hpp"
@@ -44,7 +45,12 @@ int bal::run_bootstrap(ApplicationEntry app_entry) {
   }
 
   /* Bring BAL-owned objects online before APP takes control. */
-  const int ret = bal::initialize_leds();
+  int ret = bal::initialize_leds();
+  if (ret < 0) {
+    return ret;
+  }
+
+  ret = bal::initialize_ws2812_strips();
   if (ret < 0) {
     return ret;
   }

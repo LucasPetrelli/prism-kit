@@ -1,14 +1,13 @@
 # WS2812 SAMD21 LED Driver
 
 This repository is a Zephyr-first firmware workspace for developing a WS2812
-driver on the Seeed XIAO SAMD21. The current implementation is intentionally
-small: it establishes the repo shape, keeps the application independent from
-Zephyr and board details, and validates the boot path with a board LED blink
-smoke test before any timing-critical WS2812 signaling is added.
+driver on the Seeed XIAO SAMD21. The current implementation keeps the
+application independent from Zephyr and board details while driving a 7-pixel
+WS2812 strip over a PWM-sequence-backed OSHAL transport.
 
 ## Current Status
 
-Phase 1 is implemented.
+Phase 2 is implemented.
 
 - The repository is wired as a Zephyr application with a reproducible `west.yml`.
 - Zephyr C++ support is enabled, and APP now builds as C++17 behind a
@@ -30,8 +29,12 @@ Phase 1 is implemented.
 	includes APP or BAL headers.
 - BAL owns board resources and bootstraps the application from a supplied APP
 	task entry point.
-- APP depends only on BAL and OSHAL interfaces and currently blinks the board's
-	status LED on PA17 as a smoke test.
+- OSHAL now exposes a WS2812 transport layered over the SAMD21 PA8 TCC0/WO[0]
+	PWM-sequencing path.
+- BAL now owns a 7-pixel WS2812 strip object and logical RGB pixel views.
+- APP depends only on BAL and OSHAL interfaces and now cycles the full strip
+	through red, blue, and green while still blinking the board status LED on
+	PA17.
 - OSHAL is being shaped as the future reusable Zephyr-plus-SAMD21 support
 	module, while BAL is being shaped as the future reusable XIAO-board support
 	module for other firmware repos.
@@ -41,8 +44,10 @@ Phase 1 is implemented.
 The repo is structured around three layers.
 
 - `oshal/`: the single Zephyr-boundary layer for GPIO, sleep/time, C++ task
-	execution, and early initialization, plus shared status codes.
-- `bal/`: board abstraction and ownership of board resources such as status LEDs.
+	execution, early initialization, and transport backends such as WS2812 frame
+	output, plus shared status codes.
+- `bal/`: board abstraction and ownership of board resources such as status
+	LEDs and the 7-pixel WS2812 strip.
 - `app/`: product logic that should not care about Zephyr, SAMD21 registers, or
 	board-specific pin names.
 - `src/`: thin repository-level C++ composition glue that satisfies

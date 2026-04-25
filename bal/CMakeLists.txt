@@ -9,7 +9,9 @@ target_sources(ws2812_bal
 	PRIVATE
 		src/bootstrap.cpp
 		src/board_led.cpp
-		src/board_led_seeeduino_xiao.cpp)
+		src/board_led_seeeduino_xiao.cpp
+		src/board_ws2812.cpp
+		src/board_ws2812_seeeduino_xiao.cpp)
 
 # BAL still compiles inside Zephyr's build environment even though it now lands
 # in the final image as an object target instead of a static archive.
