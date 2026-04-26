@@ -1,5 +1,5 @@
-#ifndef BAL_BOARD_LED_INTERNAL_HPP_
-#define BAL_BOARD_LED_INTERNAL_HPP_
+#ifndef BAL_LED_INTERNAL_HPP_
+#define BAL_LED_INTERNAL_HPP_
 
 #include "bal/led.hpp"
 
@@ -36,4 +36,4 @@ Led& status_led_backend();
 
 }  // namespace bal::internal
 
-#endif /* BAL_BOARD_LED_INTERNAL_HPP_ */
+#endif /* BAL_LED_INTERNAL_HPP_ */

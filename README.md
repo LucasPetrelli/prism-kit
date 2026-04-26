@@ -100,13 +100,16 @@ rules.
 |   |-- include/bal/bootstrap.hpp
 |   |-- include/bal/led.hpp
 |   `-- src/
-|       |-- board_pin_map_seeeduino_xiao.cpp
 |       |-- bootstrap.cpp
-|       |-- board_led.cpp
-|       |-- board_led_seeeduino_xiao.cpp
-|       |-- board_ws2812.cpp
-|       |-- board_ws2812_seeeduino_xiao.cpp
-|       `-- pin_map.hpp
+|       |-- led.cpp
+|       |-- led_internal.hpp
+|       |-- pin_map.hpp
+|       |-- ws2812.cpp
+|       |-- ws2812_internal.hpp
+|       `-- seeeduino_xiao/
+|           |-- led.cpp
+|           |-- pin_map.cpp
+|           `-- ws2812.cpp
 |-- docs/
 |   `-- architecture.md
 |-- oshal/
@@ -282,7 +285,7 @@ itself.
 
 ## Build
 
-Build the current blink smoke test for the XIAO SAMD21 with a pristine build.
+Build the current demo firmware for the XIAO SAMD21 with a pristine build.
 
 ```bash
 west build -b seeeduino_xiao --pristine always .
@@ -427,8 +430,9 @@ BAL owns board resources and the transition into the application.
 - `bal/src/pin_map.hpp`: an internal board pin map that labels physical OSHAL
 	resources with board-meaningful roles.
 
-Phase 1 exposes only a single status LED object because that is enough to test
-the architecture.
+The current BAL surface exposes one board-owned status LED object and one fixed
+7-pixel WS2812 strip object, which is enough to exercise the ownership and
+transport boundaries.
 
 ### APP
 
@@ -464,11 +468,14 @@ startup boundary.
 
 ## Smoke Test Behavior
 
-The current application toggles the board-owned status LED forever.
+The current application cycles the board-owned WS2812 strip through red, blue,
+and green while toggling the board-owned status LED once per color step.
 
 - If OSHAL startup fails, BAL refuses to start APP.
 - If BAL cannot initialize the board LED object, APP never starts.
-- If the blink loop starts, the repository layering and boot path are working.
+- If BAL cannot initialize the board WS2812 strip object, APP never starts.
+- If the color-cycle loop starts, the repository layering and boot path are
+	working.
 
 This is the right first milestone before implementing WS2812 signaling, because
 it validates structure, startup, build wiring, and debug access in isolation.

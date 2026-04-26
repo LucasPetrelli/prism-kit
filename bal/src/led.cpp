@@ -1,5 +1,6 @@
 #include "bal/led.hpp"
-#include "board_led_internal.hpp"
+
+#include "led_internal.hpp"
 #include "oshal/gpio.hpp"
 #include "oshal/status.h"
 

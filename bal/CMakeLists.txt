@@ -8,11 +8,11 @@ target_include_directories(bal_implementation
 target_sources(bal_implementation
 	PRIVATE
 		src/bootstrap.cpp
-		src/board_pin_map_seeeduino_xiao.cpp
-		src/board_led.cpp
-		src/board_led_seeeduino_xiao.cpp
-		src/board_ws2812.cpp
-		src/board_ws2812_seeeduino_xiao.cpp)
+		src/seeeduino_xiao/pin_map.cpp
+		src/led.cpp
+		src/seeeduino_xiao/led.cpp
+		src/ws2812.cpp
+		src/seeeduino_xiao/ws2812.cpp)
 
 # BAL depends only on the OSHAL implementation target; the required Zephyr
 # compile environment propagates through OSHAL's public interface usage

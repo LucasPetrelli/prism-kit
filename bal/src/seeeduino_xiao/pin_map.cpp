@@ -1,5 +1,6 @@
-#include "oshal/samd21_resources.hpp"
 #include "pin_map.hpp"
+
+#include "oshal/samd21_resources.hpp"
 
 namespace bal::internal::pin_map {
 

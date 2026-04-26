@@ -1,5 +1,5 @@
-#include "board_ws2812_internal.hpp"
 #include "pin_map.hpp"
+#include "ws2812_internal.hpp"
 
 namespace {
 

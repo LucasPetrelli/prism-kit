@@ -1,4 +1,4 @@
-#include "board_ws2812_internal.hpp"
+#include "ws2812_internal.hpp"
 
 namespace bal::internal {
 
