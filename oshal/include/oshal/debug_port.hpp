@@ -9,6 +9,9 @@ namespace oshal {
 /// @brief Generic debug output interface exposed by OSHAL.
 /// @note The board selects the backing transport while higher layers rely on a
 ///     stable formatting and byte-stream API.
+/// @note This interface is intentionally best-effort. Backends may block
+///     briefly, queue data for later transmission, or drop bytes under
+///     sustained backpressure to preserve caller forward progress.
 class DebugPort {
  public:
   DebugPort(const DebugPort&) = delete;
@@ -26,15 +29,19 @@ class DebugPort {
   /// @brief Write raw bytes to the debug port.
   /// @param buffer Pointer to the bytes to transmit.
   /// @param length Number of bytes to transmit.
-  /// @return STATUS_OK on success, or a negative project-defined status code on
+  /// @return STATUS_OK when the backend accepted the request according to its
+  ///     transport policy, or a negative project-defined status code on
   ///     failure.
+  /// @note STATUS_OK does not guarantee that a host already consumed every
+  /// byte.
   virtual int write(const char* buffer, std::size_t length) const = 0;
 
   /// @brief Format and write a message to the debug port.
   /// @param format Printf-style format string.
   /// @param args Format argument list.
-  /// @return STATUS_OK on success, or a negative project-defined status code on
-  ///     failure.
+  /// @return STATUS_OK when the backend accepted the formatted output
+  ///     according to its transport policy, or a negative project-defined
+  ///     status code on failure.
   virtual int vprintf(const char* format, std::va_list args) const = 0;
 
   /// @brief Format and write a message to the debug port.

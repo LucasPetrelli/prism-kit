@@ -90,13 +90,13 @@ class PwmSequenceOutput {
   PwmSequenceOutput() = default;
 };
 
-/// @brief Public OSHAL reference to the physical SAMD21 PA8 TCC0/WO[0] PWM
-/// output.
-extern PwmOutput& pa8_tcc0_wo0;
+/// @brief Public OSHAL reference to the PWM output reserved for the board-owned
+/// strip waveform path.
+extern PwmOutput& strip_pwm_output;
 
-/// @brief Sequencing-capable view of the physical SAMD21 PA8 TCC0/WO[0] output.
-/// @note This references the same physical output as pa8_tcc0_wo0.
-extern PwmSequenceOutput& pa8_tcc0_wo0_sequence;
+/// @brief Sequencing-capable view of the board-owned strip waveform output.
+/// @note This references the same physical output as strip_pwm_output.
+extern PwmSequenceOutput& strip_pwm_sequence_output;
 
 }  // namespace oshal
 

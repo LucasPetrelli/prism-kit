@@ -13,9 +13,11 @@ OSHAL owns the Zephyr-facing boundary. In phase 2 it provides:
 - a system readiness contract,
 - a startup handoff hook contract,
 - a C++ task-execution contract layered over Zephyr threads,
-- a GPIO pin contract for SAMD21 pin PA17,
-- a PWM output contract for SAMD21 pin PA8 routed as TCC0/WO[0],
-- a WS2812 frame-transport contract layered over the PA8 PWM sequence backend,
+- a status-indicator GPIO contract currently backed by SAMD21 pin PA17,
+- a strip-waveform PWM contract currently backed by SAMD21 PA8 routed as
+    TCC0/WO[0],
+- a strip-facing WS2812 frame-transport contract layered over that PWM
+    sequence backend,
 - and the time/sleep contract APP currently needs.
 
 The backend is currently Zephyr-based and uses the SAMD21 PWM-plus-DMA path as
@@ -89,12 +91,15 @@ Neither choice requires changes to APP, BAL, or OSHAL.
 ## Build Shape
 
 The repository still builds as a normal Zephyr application, but BAL and OSHAL
-now compile as their own static libraries and then link into Zephyr's `app`
+now compile as their own object libraries and then link into Zephyr's `app`
 target.
 
-- `ws2812_oshal` owns the Zephyr and SAMD21-facing implementation files and is
-    the only layer target that links directly against `zephyr_interface`.
-- `ws2812_bal` owns board policy and links against `ws2812_oshal`.
+- `oshal_interface` owns the Zephyr compile environment and hides the
+    direct `zephyr_interface` dependency behind an OSHAL-named target.
+- `oshal_implementation` owns the Zephyr and SAMD21-facing implementation
+    files and re-exports that interface target publicly.
+- `bal_implementation` owns board policy and links against
+    `oshal_implementation`.
 - Zephyr's root `app` target owns product sources plus the thin
     `src/boot_handoff_zephyr.cpp` composition file and links against both lower
     layer libraries.

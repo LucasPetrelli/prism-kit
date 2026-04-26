@@ -12,7 +12,7 @@ Phase 2 is implemented.
 - The repository is wired as a Zephyr application with a reproducible `west.yml`.
 - Zephyr C++ support is enabled, and APP now builds as C++17 behind a
 	C++ task entry point.
-- BAL and OSHAL now build as standalone static libraries where the code is
+- BAL and OSHAL now build as dedicated object libraries where the code is
 	policy-oriented rather than Zephyr-app-target-oriented, while the direct
 	Zephyr init hook stays in C.
 - APP and BAL public interfaces are now C++-only.
@@ -29,8 +29,8 @@ Phase 2 is implemented.
 	includes APP or BAL headers.
 - BAL owns board resources and bootstraps the application from a supplied APP
 	task entry point.
-- OSHAL now exposes a WS2812 transport layered over the SAMD21 PA8 TCC0/WO[0]
-	PWM-sequencing path.
+- OSHAL now exposes a strip-facing WS2812 transport layered over the SAMD21
+	PA8 TCC0/WO[0] PWM-sequencing path.
 - BAL now owns a 7-pixel WS2812 strip object and logical RGB pixel views.
 - APP depends only on BAL and OSHAL interfaces and now cycles the full strip
 	through red, blue, and green while still blinking the board status LED on
@@ -201,9 +201,10 @@ git config core.hooksPath .githooks
 
 The upstream Zephyr board target for the XIAO SAMD21 is `seeeduino_xiao`.
 
-The current phase-1 implementation assumes that board target and exposes GPIO
-control for PA17 through OSHAL. BAL then maps the board status LED onto that
-pin and owns the active-low policy defined by the XIAO board DTS.
+The current implementation assumes that board target and exposes a generic
+status-indicator GPIO plus strip-facing waveform bindings through OSHAL. BAL
+then maps the board status LED and WS2812 strip policy onto those bindings and
+owns the XIAO-specific active-low and GRB decisions.
 
 ### Flash and Debug Strategy
 
@@ -396,10 +397,10 @@ OSHAL currently exposes five small contracts.
 
 - `oshal/status.h`: defines the project-wide status codes shared across layers.
 - `oshal/system.h`: reports whether early OSHAL startup succeeded.
-- `oshal/gpio.hpp`: exposes the generic C++ GPIO interface and the public PA17
-	object reference without leaking Zephyr GPIO types upward.
-- `oshal/pwm.hpp`: exposes the generic C++ PWM interface and the public PA8
-	object reference without leaking SAMD21 timer details upward.
+- `oshal/gpio.hpp`: exposes the generic C++ GPIO interface and the public
+	`status_gpio` object reference without leaking Zephyr GPIO types upward.
+- `oshal/pwm.hpp`: exposes the generic C++ PWM interface plus strip-facing PWM
+	object references without leaking SAMD21 timer details upward.
 - `oshal/time.h`: exposes millisecond sleep without leaking Zephyr kernel APIs.
 
 The phase-1 OSHAL backend is Zephyr-based. That keeps startup simple now while
@@ -434,10 +435,9 @@ with only a thin `extern "C"` bridge for `oshal_main_handoff()`, so OSHAL still
 avoids direct APP or BAL header dependencies. The GPIO and PWM backends
 themselves remain implemented in C++ behind board-owned OSHAL objects.
 
-The repository build also treats BAL and OSHAL as independent libraries now so
-their public headers, private implementation files, and inter-layer dependency
-rules line up with the planned future submodule extraction.
-
+The repository build also treats BAL and OSHAL as independent object libraries
+now so their public headers, private implementation files, and inter-layer
+dependency rules line up with the planned future submodule extraction.
 For layers that cross a real C boundary, the repository provides narrow `.h`
 headers alongside the C++ interface when needed:
 

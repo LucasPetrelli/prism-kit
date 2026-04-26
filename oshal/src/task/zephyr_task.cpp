@@ -21,7 +21,7 @@ namespace {
  * byte array.
  */
 K_THREAD_STACK_ARRAY_DEFINE(g_task_stacks, oshal::internal::kTaskPoolSize,
-                            oshal::internal::kTaskMaxStackSizeBytes);
+                            oshal::kTaskMaxStackSizeBytes);
 
 /*
  * Zephyr thread entry points use the three-argument kernel signature, so the
@@ -75,7 +75,7 @@ int TaskHandle::create(TaskHandle& handle, const TaskConfig& config) {
   }
 
   if ((config.entry == nullptr) || (config.stack_size_bytes == 0U) ||
-      (config.stack_size_bytes > internal::kTaskMaxStackSizeBytes)) {
+      (config.stack_size_bytes > kTaskMaxStackSizeBytes)) {
     return STATUS_ERR_INVALID_ARGUMENT;
   }
 

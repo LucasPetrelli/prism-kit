@@ -1,11 +1,11 @@
 # BAL owns board resources and the application bootstrap hand-off.
-add_library(ws2812_bal OBJECT)
+add_library(bal_implementation OBJECT)
 
-target_include_directories(ws2812_bal
+target_include_directories(bal_implementation
 	PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include
 	PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
 
-target_sources(ws2812_bal
+target_sources(bal_implementation
 	PRIVATE
 		src/bootstrap.cpp
 		src/board_led.cpp
@@ -13,8 +13,7 @@ target_sources(ws2812_bal
 		src/board_ws2812.cpp
 		src/board_ws2812_seeeduino_xiao.cpp)
 
-# BAL still compiles inside Zephyr's build environment even though it now lands
-# in the final image as an object target instead of a static archive.
-target_link_libraries(ws2812_bal
-	PRIVATE zephyr_interface
-	PUBLIC ws2812_oshal)
+# BAL depends only on the OSHAL implementation target; the required Zephyr
+# compile environment propagates through OSHAL's public interface usage
+# requirements.
+target_link_libraries(bal_implementation PUBLIC oshal_implementation)

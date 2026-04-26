@@ -10,7 +10,7 @@ bal::internal::BoardWs2812Strip<7U>& ws2812_strip_backend_instance() {
    * unit static initialization order issues between BAL and OSHAL globals.
    */
   static bal::internal::BoardWs2812Strip<7U> ws2812_strip{
-    "SeeeduinoXiao.ws2812_strip", oshal::pa8_tcc0_wo0_ws2812,
+    "SeeeduinoXiao.ws2812_strip", oshal::strip_ws2812_transport,
     bal::internal::WireColorOrder::kGrb};
   return ws2812_strip;
 }

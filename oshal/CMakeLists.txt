@@ -1,11 +1,21 @@
 # OSHAL owns the Zephyr-facing backend services and early init hooks.
-add_library(ws2812_oshal OBJECT)
+add_library(oshal_interface INTERFACE)
 
-target_include_directories(ws2812_oshal
+target_include_directories(oshal_interface
+	INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+
+# Keep the Zephyr compile environment behind an OSHAL-owned interface target so
+# lower layers can inherit the required Cortex-M flags without taking a direct
+# dependency on zephyr_interface by name.
+target_link_libraries(oshal_interface INTERFACE zephyr_interface)
+
+add_library(oshal_implementation OBJECT)
+
+target_include_directories(oshal_implementation
 	PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include
 	PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
 
-target_sources(ws2812_oshal
+target_sources(oshal_implementation
 	PRIVATE
 		src/zephyr_debug_port.cpp
 		src/zephyr_debug_port_cdc_acm.cpp
@@ -19,6 +29,7 @@ target_sources(ws2812_oshal
 		src/task/zephyr_task_stats.cpp
 		src/zephyr_time.cpp)
 
-# OSHAL is the only layer that compiles directly against Zephyr and SoC headers,
-# so give that dependency to the object target explicitly.
-target_link_libraries(ws2812_oshal PRIVATE zephyr_interface)
+# OSHAL consumes the Zephyr compile environment through its own interface
+# target so the implementation choice stays hidden behind an OSHAL-named
+# abstraction.
+target_link_libraries(oshal_implementation PUBLIC oshal_interface)

@@ -42,8 +42,9 @@ class Gpio {
   Gpio() = default;
 };
 
-/// @brief Public OSHAL reference to the physical SAMD21 PA17 GPIO object.
-extern Gpio& pa17;
+/// @brief Public OSHAL reference to the GPIO reserved for the board-owned
+/// status indicator.
+extern Gpio& status_gpio;
 
 }  // namespace oshal
 

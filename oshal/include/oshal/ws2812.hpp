@@ -44,8 +44,9 @@ class Ws2812Transport {
   Ws2812Transport() = default;
 };
 
-/// @brief Public OSHAL reference to the WS2812 transport bound to SAMD21 PA8.
-extern Ws2812Transport& pa8_tcc0_wo0_ws2812;
+/// @brief Public OSHAL reference to the WS2812 transport reserved for the
+/// board-owned strip.
+extern Ws2812Transport& strip_ws2812_transport;
 
 }  // namespace oshal
 

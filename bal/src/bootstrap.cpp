@@ -11,12 +11,10 @@ namespace {
 /*
  * The XIAO SAMD21 only provides 32 KiB of SRAM for all Zephyr runtime state,
  * task stacks, and application data, so the APP thread stack must stay modest.
- * 1536 bytes is a deliberate compromise for this task's current needs: it gives
- * the application entry path and normal steady-state call depth comfortable
- * headroom without spending an unnecessarily large share of the board's limited
- * RAM budget.
+ * Use the current OSHAL-backed task ceiling so BAL and the backend stay aligned
+ * on the supported thread stack budget.
  */
-constexpr std::size_t kAppTaskStackSizeBytes = 1536U;
+constexpr std::size_t kAppTaskStackSizeBytes = oshal::kTaskMaxStackSizeBytes;
 constexpr int kAppTaskPriority = 0;
 oshal::TaskHandle g_app_task;
 

@@ -106,7 +106,8 @@ int ZephyrDebugPort::write(const char* buffer, std::size_t length) const {
    * can send already-formatted data through the same path later without taking
    * a dependency on printf-style formatting. In the generic backend that still
    * means per-byte poll_out() writes, because the only promise this class can
-   * safely make is "works on any Zephyr UART-like console device".
+   * safely make is "works on any Zephyr UART-like console device" while still
+   * satisfying the best-effort DebugPort contract.
    */
   for (std::size_t index = 0; index < length; ++index) {
     uart_poll_out(device_, static_cast<unsigned char>(buffer[index]));

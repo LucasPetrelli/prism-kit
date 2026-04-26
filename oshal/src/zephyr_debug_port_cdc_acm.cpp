@@ -23,7 +23,7 @@ ZephyrCdcAcmDebugPort::ZephyrCdcAcmDebugPort(const char* port_name,
    * The CDC ACM backend keeps its own small synchronization model because the
    * USB class driver does not expose a simple blocking uart_tx() API. Instead
    * we queue bytes into the CDC ACM UART FIFO whenever it reports TX-ready and
-   * let the caller sleep until the current request is drained.
+   * return as soon as the current request is accepted into the local queue.
    */
   k_mutex_init(&write_mutex_);
   /*
@@ -70,10 +70,10 @@ int ZephyrCdcAcmDebugPort::write(const char* buffer, std::size_t length) const {
    * running even under sustained USB backpressure.
    */
   k_mutex_lock(&write_mutex_, K_FOREVER);
+  std::size_t accepted = 0U;
   std::size_t dropped = 0U;
   {
     const k_spinlock_key_t key = k_spin_lock(&state_lock_);
-    std::size_t accepted = 0U;
     while ((accepted < length) && (tx_size_ < tx_queue_.size())) {
       tx_queue_[tx_tail_] = static_cast<std::uint8_t>(buffer[accepted]);
       tx_tail_ = (tx_tail_ + 1U) % tx_queue_.size();
@@ -100,12 +100,13 @@ int ZephyrCdcAcmDebugPort::write(const char* buffer, std::size_t length) const {
   uart_irq_tx_enable(device_);
   k_mutex_unlock(&write_mutex_);
 
-  ARG_UNUSED(dropped);
   if (dropped > 0U) {
     /*
      * Dropped-byte accounting is kept so this path can grow diagnostics later
-     * without changing the queueing logic. For now, writes remain silent under
-     * backpressure and simply report STATUS_OK after enqueueing what fit.
+     * without changing the queueing logic. The public DebugPort contract stays
+     * best-effort, so writes report success after giving the transport a
+     * chance to queue what fit, even when host-side backpressure means the
+     * current call could not stage any bytes immediately.
      */
   }
   return STATUS_OK;
@@ -186,7 +187,7 @@ int ZephyrCdcAcmDebugPort::flush_format_buffer(FormatBuffer* buffer) const {
 
   /*
    * Reuse write() so both raw writes and formatted writes share exactly the
-   * same FIFO-draining, semaphore-blocking transport logic. That keeps the CDC
+   * same FIFO-draining, non-blocking transport logic. That keeps the CDC
    * ACM behavior consistent no matter how bytes enter the backend.
    */
   buffer->status = write(buffer->data, buffer->length);

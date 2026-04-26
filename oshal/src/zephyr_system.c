@@ -14,22 +14,18 @@ static int oshal_system_init(void) {
    * Keep the SYS_INIT hook in C because it sits directly on Zephyr's startup
    * boundary, but still publish the result through the OSHAL contract.
    */
-  ret = oshal_pwm_pa8_tcc0_wo0_init();
+  ret = oshal_strip_pwm_output_init();
   if (ret < 0) {
     oshal_last_status = ret;
     return oshal_last_status;
   }
 
-  /* Treat missing PA8 PWM ownership as a startup fault, not a deferred runtime
-   * surprise. */
-  if (!oshal_pwm_pa8_tcc0_wo0_is_ready()) {
+  if (!oshal_strip_pwm_output_is_ready()) {
     oshal_last_status = STATUS_ERR_DEVICE_UNAVAILABLE;
     return oshal_last_status;
   }
 
-  /* Keep the phase-1 GPIO path in the same startup gate so regressions stay
-   * visible. */
-  if (!oshal_gpio_pa17_is_ready()) {
+  if (!oshal_status_gpio_is_ready()) {
     oshal_last_status = STATUS_ERR_DEVICE_UNAVAILABLE;
     return oshal_last_status;
   }

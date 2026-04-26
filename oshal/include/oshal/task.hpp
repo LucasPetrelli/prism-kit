@@ -21,6 +21,11 @@ constexpr std::uint32_t kTaskRuntimePercentUnavailable =
 constexpr std::size_t kTaskStackUsageUnavailable =
   std::numeric_limits<std::size_t>::max();
 
+/// @brief Maximum stack size, in bytes, accepted for an OSHAL-managed task.
+/// @note The active backend reserves storage for at most this many bytes per
+///     OSHAL-managed task. Higher layers should size tasks within this budget.
+constexpr std::size_t kTaskMaxStackSizeBytes = 1536U;
+
 /// @brief Stable C++ task-entry signature owned by OSHAL.
 /// @param context Optional caller-supplied task context.
 /// @return STATUS_OK on success, or a negative project-defined status code if
@@ -90,8 +95,8 @@ struct TaskConfig {
   /// @brief Optional caller-owned context passed to @p entry.
   void* context = nullptr;
   /// @brief Requested stack size in bytes.
-  /// @note The active backend may reject requests that exceed its statically
-  ///     reserved stack storage budget.
+  /// @note The active backend may reject requests that exceed
+  ///     kTaskMaxStackSizeBytes.
   std::size_t stack_size_bytes = 0U;
   /// @brief Backend-defined task priority.
   /// @note Priority values follow the semantics of the active OSHAL backend.

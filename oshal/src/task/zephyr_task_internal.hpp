@@ -18,15 +18,6 @@ namespace oshal::internal {
 /// and the additional per-slot RAM cost is acceptable for the board's SRAM
 /// budget.
 inline constexpr std::size_t kTaskPoolSize = 1U;
-
-/// @brief Maximum stack size, in bytes, accepted for an OSHAL-managed task.
-/// @note The 1536-byte limit is a conservative upper bound chosen to balance
-/// task stack headroom against tight SRAM constraints. Adjust this value only
-/// after measuring Zephyr thread stack usage for the real workload on the
-/// target: increase it if valid tasks approach exhaustion, or reduce it if SRAM
-/// pressure requires a smaller cap and profiling confirms adequate safety
-/// margin.
-inline constexpr std::size_t kTaskMaxStackSizeBytes = 1536U;
 inline constexpr std::uint8_t kInvalidTaskSlotIndex = UINT8_MAX;
 
 static_assert(
