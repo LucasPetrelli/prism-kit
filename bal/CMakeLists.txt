@@ -8,6 +8,7 @@ target_include_directories(bal_implementation
 target_sources(bal_implementation
 	PRIVATE
 		src/bootstrap.cpp
+		src/board_pin_map_seeeduino_xiao.cpp
 		src/board_led.cpp
 		src/board_led_seeeduino_xiao.cpp
 		src/board_ws2812.cpp

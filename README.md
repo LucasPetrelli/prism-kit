@@ -1,4 +1,4 @@
-# WS2812 SAMD21 LED Driver
+# Sentient Mask
 
 This repository is a Zephyr-first firmware workspace for developing a WS2812
 driver on the Seeed XIAO SAMD21. The current implementation keeps the
@@ -29,9 +29,11 @@ Phase 2 is implemented.
 	includes APP or BAL headers.
 - BAL owns board resources and bootstraps the application from a supplied APP
 	task entry point.
-- OSHAL now exposes a strip-facing WS2812 transport layered over the SAMD21
-	PA8 TCC0/WO[0] PWM-sequencing path.
+- OSHAL now keeps generic GPIO, PWM, and WS2812 interfaces separate from the
+	SAMD21-specific resource exports used by this build.
 - BAL now owns a 7-pixel WS2812 strip object and logical RGB pixel views.
+- BAL now owns the board pin map that labels the SAMD21 physical resources for
+	the XIAO wiring.
 - APP depends only on BAL and OSHAL interfaces and now cycles the full strip
 	through red, blue, and green while still blinking the board status LED on
 	PA17.
@@ -98,9 +100,13 @@ rules.
 |   |-- include/bal/bootstrap.hpp
 |   |-- include/bal/led.hpp
 |   `-- src/
+|       |-- board_pin_map_seeeduino_xiao.cpp
 |       |-- bootstrap.cpp
 |       |-- board_led.cpp
-|       `-- board_led_seeeduino_xiao.cpp
+|       |-- board_led_seeeduino_xiao.cpp
+|       |-- board_ws2812.cpp
+|       |-- board_ws2812_seeeduino_xiao.cpp
+|       `-- pin_map.hpp
 |-- docs/
 |   `-- architecture.md
 |-- oshal/
@@ -108,6 +114,7 @@ rules.
 |   |-- include/oshal/debug_port.hpp
 |   |-- include/oshal/gpio.hpp
 |   |-- include/oshal/pwm.hpp
+|   |-- include/oshal/samd21_resources.hpp
 |   |-- include/oshal/status.h
 |   |-- include/oshal/system.h
 |   |-- include/oshal/task.hpp
@@ -201,10 +208,12 @@ git config core.hooksPath .githooks
 
 The upstream Zephyr board target for the XIAO SAMD21 is `seeeduino_xiao`.
 
-The current implementation assumes that board target and exposes a generic
-status-indicator GPIO plus strip-facing waveform bindings through OSHAL. BAL
-then maps the board status LED and WS2812 strip policy onto those bindings and
-owns the XIAO-specific active-low and GRB decisions.
+The current implementation assumes that board target. OSHAL publishes the
+generic GPIO, PWM, and WS2812 contracts in its agnostic headers, and publishes
+the concrete SAMD21 PA17 and PA8 TCC0/WO[0] resources through
+`oshal/samd21_resources.hpp`. BAL then maps the board status LED and WS2812
+strip policy onto those physical resources and owns the XIAO-specific active-low
+and GRB decisions.
 
 ### Flash and Debug Strategy
 
@@ -265,7 +274,7 @@ west zephyr-export
 
 When you run `west init -l .` from inside an already cloned repository, west
 creates the workspace topdir in the parent directory. For example, if this repo
-is at `C:\dev\ws2812-samd21-led-driver`, then the west workspace topdir becomes
+is at `C:\dev\sentient-mask`, then the west workspace topdir becomes
 `C:\dev`, and Zephyr is fetched as a sibling directory such as `C:\dev\zephyr`.
 
 That is normal, and it means the fetched dependencies stay outside the app repo
@@ -397,10 +406,12 @@ OSHAL currently exposes five small contracts.
 
 - `oshal/status.h`: defines the project-wide status codes shared across layers.
 - `oshal/system.h`: reports whether early OSHAL startup succeeded.
-- `oshal/gpio.hpp`: exposes the generic C++ GPIO interface and the public
-	`status_gpio` object reference without leaking Zephyr GPIO types upward.
-- `oshal/pwm.hpp`: exposes the generic C++ PWM interface plus strip-facing PWM
-	object references without leaking SAMD21 timer details upward.
+- `oshal/gpio.hpp`: exposes the generic C++ GPIO interface without leaking
+	Zephyr GPIO types upward.
+- `oshal/pwm.hpp`: exposes the generic C++ PWM interfaces without leaking
+	SAMD21 timer details upward.
+- `oshal/samd21_resources.hpp`: publishes the concrete SAMD21 physical resource
+	handles used by this build.
 - `oshal/time.h`: exposes millisecond sleep without leaking Zephyr kernel APIs.
 
 The phase-1 OSHAL backend is Zephyr-based. That keeps startup simple now while
@@ -413,6 +424,8 @@ BAL owns board resources and the transition into the application.
 - `bal/bootstrap.hpp`: one entry point that prepares the board layer and then
 	launches a caller-supplied APP task entry point.
 - `bal/led.hpp`: a board-level LED object API that hides how the LED is wired.
+- `bal/src/pin_map.hpp`: an internal board pin map that labels physical OSHAL
+	resources with board-meaningful roles.
 
 Phase 1 exposes only a single status LED object because that is enough to test
 the architecture.

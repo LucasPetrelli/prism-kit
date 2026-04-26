@@ -14,18 +14,18 @@ static int oshal_system_init(void) {
    * Keep the SYS_INIT hook in C because it sits directly on Zephyr's startup
    * boundary, but still publish the result through the OSHAL contract.
    */
-  ret = oshal_strip_pwm_output_init();
+  ret = oshal_samd21_pwm_pa8_tcc0_wo0_init();
   if (ret < 0) {
     oshal_last_status = ret;
     return oshal_last_status;
   }
 
-  if (!oshal_strip_pwm_output_is_ready()) {
+  if (!oshal_samd21_pwm_pa8_tcc0_wo0_is_ready()) {
     oshal_last_status = STATUS_ERR_DEVICE_UNAVAILABLE;
     return oshal_last_status;
   }
 
-  if (!oshal_status_gpio_is_ready()) {
+  if (!oshal_samd21_gpio_pa17_is_ready()) {
     oshal_last_status = STATUS_ERR_DEVICE_UNAVAILABLE;
     return oshal_last_status;
   }

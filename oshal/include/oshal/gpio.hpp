@@ -42,10 +42,6 @@ class Gpio {
   Gpio() = default;
 };
 
-/// @brief Public OSHAL reference to the GPIO reserved for the board-owned
-/// status indicator.
-extern Gpio& status_gpio;
-
 }  // namespace oshal
 
 #endif /* OSHAL_GPIO_HPP_ */

@@ -1,9 +1,7 @@
 #include <zephyr/devicetree.h>
 
 #include "oshal/debug_port.hpp"
-#include "oshal/gpio.hpp"
-#include "oshal/pwm.hpp"
-#include "oshal/ws2812.hpp"
+#include "oshal/samd21_resources.hpp"
 #include "samd21_bridge.h"
 #include "samd21_pwm_internal.hpp"
 #include "samd21_ws2812_internal.hpp"
@@ -62,25 +60,26 @@ oshal::internal::Samd21PwmWs2812Transport g_strip_ws2812_transport{
 namespace oshal {
 
 DebugPort& debug_port = g_debug_port;
-Gpio& status_gpio = g_status_gpio;
-PwmOutput& strip_pwm_output = g_strip_pwm_output;
-PwmSequenceOutput& strip_pwm_sequence_output = g_strip_pwm_output;
-Ws2812Transport& strip_ws2812_transport = g_strip_ws2812_transport;
+Gpio& samd21_gpio_pa17 = g_status_gpio;
+PwmOutput& samd21_pwm_pa8_tcc0_wo0 = g_strip_pwm_output;
+PwmSequenceOutput& samd21_pwm_pa8_tcc0_wo0_sequence_output = g_strip_pwm_output;
+Ws2812Transport& samd21_ws2812_pa8_tcc0_wo0_transport =
+  g_strip_ws2812_transport;
 
 }  // namespace oshal
 
-bool oshal_status_gpio_is_ready(void) {
+bool oshal_samd21_gpio_pa17_is_ready(void) {
   /* This bridge is intentionally narrow because Zephyr SYS_INIT still executes
    * from C. */
-  return oshal::status_gpio.is_ready();
+  return oshal::samd21_gpio_pa17.is_ready();
 }
 
-int oshal_strip_pwm_output_init(void) {
+int oshal_samd21_pwm_pa8_tcc0_wo0_init(void) {
   /* This bridge keeps SYS_INIT in C while the PWM backend itself stays in C++.
    */
   return g_strip_pwm_output.initialize();
 }
 
-bool oshal_strip_pwm_output_is_ready(void) {
-  return oshal::strip_pwm_output.is_ready();
+bool oshal_samd21_pwm_pa8_tcc0_wo0_is_ready(void) {
+  return oshal::samd21_pwm_pa8_tcc0_wo0.is_ready();
 }

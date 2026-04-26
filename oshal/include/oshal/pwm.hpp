@@ -90,14 +90,6 @@ class PwmSequenceOutput {
   PwmSequenceOutput() = default;
 };
 
-/// @brief Public OSHAL reference to the PWM output reserved for the board-owned
-/// strip waveform path.
-extern PwmOutput& strip_pwm_output;
-
-/// @brief Sequencing-capable view of the board-owned strip waveform output.
-/// @note This references the same physical output as strip_pwm_output.
-extern PwmSequenceOutput& strip_pwm_sequence_output;
-
 }  // namespace oshal
 
 #endif /* OSHAL_PWM_HPP_ */

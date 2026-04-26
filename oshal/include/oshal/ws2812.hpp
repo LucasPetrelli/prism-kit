@@ -44,10 +44,6 @@ class Ws2812Transport {
   Ws2812Transport() = default;
 };
 
-/// @brief Public OSHAL reference to the WS2812 transport reserved for the
-/// board-owned strip.
-extern Ws2812Transport& strip_ws2812_transport;
-
 }  // namespace oshal
 
 #endif /* OSHAL_WS2812_HPP_ */

@@ -7,9 +7,9 @@
 extern "C" {
 #endif
 
-bool oshal_status_gpio_is_ready(void);
-int oshal_strip_pwm_output_init(void);
-bool oshal_strip_pwm_output_is_ready(void);
+bool oshal_samd21_gpio_pa17_is_ready(void);
+int oshal_samd21_pwm_pa8_tcc0_wo0_init(void);
+bool oshal_samd21_pwm_pa8_tcc0_wo0_is_ready(void);
 
 #ifdef __cplusplus
 }

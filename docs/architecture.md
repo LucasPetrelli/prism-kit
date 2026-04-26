@@ -13,11 +13,9 @@ OSHAL owns the Zephyr-facing boundary. In phase 2 it provides:
 - a system readiness contract,
 - a startup handoff hook contract,
 - a C++ task-execution contract layered over Zephyr threads,
-- a status-indicator GPIO contract currently backed by SAMD21 pin PA17,
-- a strip-waveform PWM contract currently backed by SAMD21 PA8 routed as
-    TCC0/WO[0],
-- a strip-facing WS2812 frame-transport contract layered over that PWM
-    sequence backend,
+- generic GPIO, PWM, and WS2812 transport interface contracts,
+- a SAMD21-specific resource surface that publishes the concrete PA17 GPIO and
+    PA8 TCC0/WO[0] PWM-plus-transport bindings for this build,
 - and the time/sleep contract APP currently needs.
 
 The backend is currently Zephyr-based and uses the SAMD21 PWM-plus-DMA path as
@@ -31,8 +29,9 @@ integration point needs to create or manage tasks directly.
 BAL owns board resources and the application bootstrap. The Zephyr root entry
 still hands off to BAL instead of calling APP directly, but now does so through
 an OSHAL-declared handoff hook that the repository C++ composition layer
-implements. BAL also owns the fixed 7-pixel strip object, logical RGB pixel
-views, and the board-specific GRB ordering policy for that strip.
+implements. BAL also owns the board pin map that labels the physical SAMD21
+resources for the XIAO wiring, the fixed 7-pixel strip object, logical RGB
+pixel views, and the board-specific GRB ordering policy for that strip.
 
 ### APP
 
@@ -47,7 +46,7 @@ Zephyr startup
     |
         +--> OSHAL SYS_INIT at APPLICATION level
             |
-            +--> validate hardware-facing prerequisites
+            +--> validate physical hardware prerequisites
     |
         +--> main() in oshal/src/zephyr_system.c
             |
@@ -57,6 +56,8 @@ Zephyr startup
                     |
                     +--> BAL bootstrap with APP task entry callback
                     |
+                        +--> map physical resources onto board-owned labels
+                        +--> initialize board pin-map consumers
                         +--> initialize board LED object(s)
                         +--> initialize WS2812 strip object(s)
                         +--> launch APP task through OSHAL
