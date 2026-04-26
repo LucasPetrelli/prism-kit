@@ -4,6 +4,7 @@
 #include <zephyr/device.h>
 #include <zephyr/kernel.h>
 
+#include <array>
 #include <cstdarg>
 #include <cstddef>
 #include <cstdint>
@@ -26,6 +27,8 @@ class ZephyrCdcAcmDebugPort final : public DebugPort {
   int vprintf(const char* format, std::va_list args) const override;
 
  private:
+  static constexpr std::size_t kTxQueueCapacity = 512U;
+
   /// @brief Scratch buffer used to batch cbprintf output into transport writes.
   struct FormatBuffer {
     /// @brief Owning CDC ACM debug port instance used for flushing chunks.
@@ -48,20 +51,23 @@ class ZephyrCdcAcmDebugPort final : public DebugPort {
   const char* name_;
   /// @brief Zephyr CDC ACM UART device selected as the backing transport.
   const device* device_;
-  /// @brief Serializes writers so only one pending CDC ACM transfer is active.
+  /// @brief Serializes writer-side queue insertion so message chunks stay
+  /// contiguous when space allows.
   mutable k_mutex write_mutex_;
-  /// @brief Wakes the blocked writer once the pending request is drained into
-  /// TX.
-  mutable k_sem write_complete_;
-  /// @brief Protects the shared pending-write state touched by writer and
-  /// callback.
+  /// @brief Protects shared queue state touched by writer and IRQ callback.
   mutable k_spinlock state_lock_;
-  /// @brief Pointer to the next byte that still needs to be queued to TX.
-  mutable const std::uint8_t* pending_buffer_;
-  /// @brief Number of bytes still waiting to be copied into the CDC ACM FIFO.
-  mutable std::size_t pending_length_;
-  /// @brief Sticky STATUS_* result for the in-flight write request.
-  mutable int pending_status_;
+  /// @brief Ring buffer that absorbs short bursts without blocking callers.
+  mutable std::array<std::uint8_t, kTxQueueCapacity> tx_queue_;
+  /// @brief Next byte index to drain from @ref tx_queue_.
+  mutable std::size_t tx_head_;
+  /// @brief Next byte index to append into @ref tx_queue_.
+  mutable std::size_t tx_tail_;
+  /// @brief Number of queued bytes waiting to enter the CDC ACM FIFO.
+  mutable std::size_t tx_size_;
+  /// @brief Guard that prevents concurrent queue-drain loops from racing.
+  mutable bool tx_service_active_;
+  /// @brief Cumulative count of bytes dropped because @ref tx_queue_ was full.
+  mutable std::uint32_t dropped_bytes_;
   /// @brief True when the UART IRQ callback registration succeeded at startup.
   bool tx_irq_callback_bound_;
 };

@@ -12,9 +12,12 @@ ZephyrCdcAcmDebugPort::ZephyrCdcAcmDebugPort(const char* port_name,
                                              const device* device)
     : name_(port_name),
       device_(device),
-      pending_buffer_(nullptr),
-      pending_length_(0U),
-      pending_status_(STATUS_OK),
+      tx_queue_({}),
+      tx_head_(0U),
+      tx_tail_(0U),
+      tx_size_(0U),
+      tx_service_active_(false),
+      dropped_bytes_(0U),
       tx_irq_callback_bound_(false) {
   /*
    * The CDC ACM backend keeps its own small synchronization model because the
@@ -23,8 +26,6 @@ ZephyrCdcAcmDebugPort::ZephyrCdcAcmDebugPort(const char* port_name,
    * let the caller sleep until the current request is drained.
    */
   k_mutex_init(&write_mutex_);
-  k_sem_init(&write_complete_, 0U, 1U);
-
   /*
    * If this callback registration fails there is no useful FIFO-driven
    * transport path left for this backend, so later writes will fail fast with
@@ -60,67 +61,54 @@ int ZephyrCdcAcmDebugPort::write(const char* buffer, std::size_t length) const {
   }
 
   /*
-   * Serialize callers so the backend only ever owns one pending write request
-   * at a time. That keeps the state machine simple: one caller publishes one
-   * byte span, the callback drains it, and the caller wakes when that span
-   * reaches zero remaining bytes.
+   * Copy bytes into the bounded queue and return immediately. This keeps APP
+   * and BAL tasks from blocking on host-side USB consumption when no terminal
+   * is attached, while still letting the IRQ-driven CDC ACM path drain queued
+   * bytes opportunistically.
    *
-   * Without this mutex, concurrent writers would race to replace
-   * pending_buffer_/pending_length_ and the callback would have no reliable way
-   * to know which caller owns the current completion semaphore.
+   * Any bytes that do not fit are intentionally dropped so producers keep
+   * running even under sustained USB backpressure.
    */
   k_mutex_lock(&write_mutex_, K_FOREVER);
-  k_sem_reset(&write_complete_);
-
+  std::size_t dropped = 0U;
   {
-    /*
-     * The callback path advances these fields as it feeds bytes into the CDC
-     * ACM TX FIFO, so publish them under the spinlock before enabling TX IRQ.
-     */
     const k_spinlock_key_t key = k_spin_lock(&state_lock_);
-    pending_buffer_ = reinterpret_cast<const std::uint8_t*>(buffer);
-    pending_length_ = length;
-    pending_status_ = STATUS_OK;
+    std::size_t accepted = 0U;
+    while ((accepted < length) && (tx_size_ < tx_queue_.size())) {
+      tx_queue_[tx_tail_] = static_cast<std::uint8_t>(buffer[accepted]);
+      tx_tail_ = (tx_tail_ + 1U) % tx_queue_.size();
+      ++tx_size_;
+      ++accepted;
+    }
+
+    dropped = length - accepted;
+    if (dropped > 0U) {
+      const std::uint32_t remaining = UINT32_MAX - dropped_bytes_;
+      dropped_bytes_ = dropped > static_cast<std::size_t>(remaining)
+                         ? UINT32_MAX
+                         : static_cast<std::uint32_t>(dropped_bytes_ + dropped);
+    }
     k_spin_unlock(&state_lock_, key);
   }
 
   /*
-   * CDC ACM does not expose uart_tx(), but it does provide a TX FIFO that is
-   * serviced from the USB workqueue. Enabling TX IRQ causes the driver to
-   * invoke the callback whenever more FIFO space is available. That gives this
-   * backend a transport-aware blocking write path: the caller sleeps on a
-   * semaphore while the workqueue and callback path push chunks through the CDC
-   * ACM FIFO.
-   *
-   * service_tx_fifo() is called once immediately so the current thread can fill
-   * any already-available FIFO space without waiting for the next callback.
+   * Drain work is performed from the UART IRQ callback path. For the
+   * interrupt-driven UART API, uart_irq_update()/uart_irq_tx_ready()/
+   * uart_fifo_fill() are ISR-context primitives, so write() only needs to
+   * enable TX IRQ and return.
    */
   uart_irq_tx_enable(device_);
-  service_tx_fifo();
-
-  /*
-   * Completion means "the whole pending request has been copied into the CDC
-   * ACM FIFO path", not necessarily "the host application has consumed every
-   * byte". That matches the contract of most serial write APIs and keeps the
-   * backend from pretending it can observe end-to-end host consumption.
-   */
-  (void)k_sem_take(&write_complete_, K_FOREVER);
-
-  int status;
-  {
-    /*
-     * Tear down the published request state before releasing the writer mutex
-     * so the next caller always starts from a clean slate.
-     */
-    const k_spinlock_key_t key = k_spin_lock(&state_lock_);
-    status = pending_status_;
-    pending_buffer_ = nullptr;
-    pending_length_ = 0U;
-    k_spin_unlock(&state_lock_, key);
-  }
-
   k_mutex_unlock(&write_mutex_);
-  return status;
+
+  ARG_UNUSED(dropped);
+  if (dropped > 0U) {
+    /*
+     * Dropped-byte accounting is kept so this path can grow diagnostics later
+     * without changing the queueing logic. For now, writes remain silent under
+     * backpressure and simply report STATUS_OK after enqueueing what fit.
+     */
+  }
+  return STATUS_OK;
 }
 
 int ZephyrCdcAcmDebugPort::vprintf(const char* format,
@@ -215,68 +203,78 @@ void ZephyrCdcAcmDebugPort::service_tx_fifo() const {
    * will currently accept, then either wait for another callback or complete
    * the write.
    */
+  {
+    const k_spinlock_key_t key = k_spin_lock(&state_lock_);
+    if (tx_service_active_) {
+      k_spin_unlock(&state_lock_, key);
+      return;
+    }
+    tx_service_active_ = true;
+    k_spin_unlock(&state_lock_, key);
+  }
+
   while (true) {
     if (uart_irq_update(device_) <= 0) {
-      return;
+      break;
     }
 
     if (uart_irq_tx_ready(device_) <= 0) {
       /* No FIFO space right now; another callback will resume draining later.
        */
-      return;
+      break;
     }
 
-    const std::uint8_t* buffer;
-    std::size_t remaining;
+    std::size_t head;
+    std::size_t requested;
     {
       const k_spinlock_key_t key = k_spin_lock(&state_lock_);
-      buffer = pending_buffer_;
-      remaining = pending_length_;
-      if (pending_status_ < 0 || remaining == 0U) {
-        /* Either an error already occurred or this request is fully drained. */
+      if (tx_size_ == 0U) {
         k_spin_unlock(&state_lock_, key);
-        uart_irq_tx_disable(device_);
-        k_sem_give(&write_complete_);
-        return;
+        break;
       }
+
+      head = tx_head_;
+      const std::size_t contiguous = tx_queue_.size() - tx_head_;
+      requested = tx_size_ < contiguous ? tx_size_ : contiguous;
       k_spin_unlock(&state_lock_, key);
     }
 
-    const int requested = remaining > static_cast<std::size_t>(INT_MAX)
-                            ? INT_MAX
-                            : static_cast<int>(remaining);
-    const int wrote = uart_fifo_fill(device_, buffer, requested);
+    const int requested_int = requested > static_cast<std::size_t>(INT_MAX)
+                                ? INT_MAX
+                                : static_cast<int>(requested);
+    const int wrote = uart_fifo_fill(device_, &tx_queue_[head], requested_int);
     if (wrote < 0) {
       /* Treat any FIFO API failure as a transport backend failure for OSHAL. */
       const k_spinlock_key_t key = k_spin_lock(&state_lock_);
-      pending_status_ = STATUS_ERR_BACKEND;
+      tx_head_ = 0U;
+      tx_tail_ = 0U;
+      tx_size_ = 0U;
       k_spin_unlock(&state_lock_, key);
-      uart_irq_tx_disable(device_);
-      k_sem_give(&write_complete_);
-      return;
+      break;
     }
 
     if (wrote == 0) {
       /* Driver reported TX-ready but accepted nothing; wait for the next turn.
        */
-      return;
+      break;
     }
 
-    bool completed = false;
     {
       const k_spinlock_key_t key = k_spin_lock(&state_lock_);
-      pending_buffer_ += wrote;
-      pending_length_ -= static_cast<std::size_t>(wrote);
-      completed = pending_length_ == 0U;
+      const std::size_t consumed = static_cast<std::size_t>(wrote);
+      tx_head_ = (tx_head_ + consumed) % tx_queue_.size();
+      tx_size_ -= consumed;
       k_spin_unlock(&state_lock_, key);
     }
+  }
 
-    if (completed) {
-      /* Entire request is handed off into the FIFO path; wake the blocked
-       * writer. */
+  {
+    const k_spinlock_key_t key = k_spin_lock(&state_lock_);
+    const bool queue_empty = tx_size_ == 0U;
+    tx_service_active_ = false;
+    k_spin_unlock(&state_lock_, key);
+    if (queue_empty) {
       uart_irq_tx_disable(device_);
-      k_sem_give(&write_complete_);
-      return;
     }
   }
 }
