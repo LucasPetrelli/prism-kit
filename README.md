@@ -298,13 +298,13 @@ short path so the linker does not break on spaces in the install directory.
 With the repository virtual environment activated:
 
 ```bash
-python scripts/build-local.py
+python scripts/build.py
 ```
 
 Without activating the virtual environment first:
 
 ```text
-.venv\Scripts\python.exe scripts\build-local.py
+.venv\Scripts\python.exe scripts\build.py
 ```
 
 The resulting ELF is expected at `build/zephyr/zephyr.elf`.
@@ -342,13 +342,13 @@ Flash the newest supported build artifact in one line from the repository root.
 With the virtual environment activated:
 
 ```text
-python scripts/flash_jlink.py
+python scripts/flash.py
 ```
 
 Without activating the virtual environment first:
 
 ```text
-.venv\Scripts\python.exe scripts\flash_jlink.py
+.venv\Scripts\python.exe scripts\flash.py
 ```
 
 The helper prefers the newest `.elf`, then `.hex`, then `.bin` under
@@ -362,13 +362,13 @@ argument.
 Explicit artifact example:
 
 ```text
-python scripts/flash_jlink.py build/zephyr/zephyr.elf
+python scripts/flash.py build/zephyr/zephyr.elf
 ```
 
 Dry-run example to verify tool and artifact discovery without touching hardware:
 
 ```text
-python scripts/flash_jlink.py --dry-run
+python scripts/flash.py --dry-run
 ```
 
 If you want to debug instead of doing a one-shot flash, start the GDB server:
