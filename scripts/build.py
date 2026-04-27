@@ -51,19 +51,63 @@ def repo_python_executable(root: Path) -> Path:
     return root / ".venv" / "Scripts" / "python.exe"
 
 
-def ensure_repo_python(root: Path) -> Path:
-    repo_python = repo_python_executable(root)
-    if not repo_python.is_file():
-        raise SystemExit(f"Missing Python environment at '{repo_python}'.")
+def candidate_python_executables(root: Path) -> tuple[Path, ...]:
+    candidates: list[Path] = [
+        repo_python_executable(root),
+        root.parent / ".venv" / "Scripts" / "python.exe",
+    ]
 
+    for sibling in sorted(root.parent.iterdir()):
+        if not sibling.is_dir() or sibling == root:
+            continue
+        candidates.append(sibling / ".venv" / "Scripts" / "python.exe")
+
+    unique_candidates: list[Path] = []
+    seen_candidates: set[Path] = set()
+    for candidate in candidates:
+        if candidate in seen_candidates:
+            continue
+        seen_candidates.add(candidate)
+        unique_candidates.append(candidate)
+
+    return tuple(unique_candidates)
+
+
+def python_supports_west(python_executable: Path) -> bool:
+    if not python_executable.is_file():
+        return False
+
+    completed = subprocess.run(
+        [str(python_executable), "-m", "west", "--version"],
+        check=False,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    return completed.returncode == 0
+
+
+def ensure_repo_python(root: Path) -> Path:
     current_python = Path(sys.executable).resolve()
-    if current_python != repo_python.resolve():
+    for candidate in candidate_python_executables(root):
+        if not python_supports_west(candidate):
+            continue
+
+        resolved_candidate = candidate.resolve()
+        if current_python == resolved_candidate:
+            return current_python
+
         completed = subprocess.run(
-            [str(repo_python), __file__, *sys.argv[1:]], check=False
+            [str(resolved_candidate), __file__, *sys.argv[1:]], check=False
         )
         raise SystemExit(completed.returncode)
 
-    return repo_python
+    if python_supports_west(current_python):
+        return current_python
+
+    raise SystemExit(
+        "Could not find a Python environment with the 'west' module installed. "
+        "Create a repo-local .venv or install west into a workspace Python environment, then rerun this script."
+    )
 
 
 def get_short_path(path: Path) -> Path:

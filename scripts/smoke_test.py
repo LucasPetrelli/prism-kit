@@ -14,7 +14,7 @@ from typing import Any, Iterable, Sequence
 DEFAULT_BAUDRATE = 115200
 DEFAULT_WAIT_FOR_PORT_SECONDS = 10.0
 DEFAULT_CAPTURE_TIMEOUT_SECONDS = 12.0
-DEFAULT_PORT_MATCH_TOKENS = ("XIAO SAMD21 Debug Console",)
+DEFAULT_PORT_MATCH_TOKENS = ("Prism Kit Debug Console",)
 DEFAULT_REQUIRED_MARKERS = ("Task app_main runtime:",)
 DEFAULT_OPTIONAL_MARKERS = (
     "Booting Zephyr OS build",
@@ -35,7 +35,7 @@ class PortInfo:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
-            "Connect to the sentient-mask USB CDC debug console and verify the "
+            "Connect to the prism-kit USB CDC debug console and verify the "
             "expected runtime markers."
         )
     )
@@ -87,7 +87,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--no-default-requirements",
         action="store_true",
-        help="Do not require the built-in sentient-mask runtime markers.",
+        help="Do not require the built-in prism-kit runtime markers.",
     )
     parser.add_argument(
         "--list-ports",

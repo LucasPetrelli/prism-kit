@@ -1,4 +1,4 @@
-# Sentient Mask
+# Prism Kit
 
 This repository is a Zephyr-first firmware workspace for developing a WS2812
 driver on the Seeed XIAO SAMD21. The current implementation keeps the
@@ -299,7 +299,7 @@ python scripts/smoke_test.py
 ```
 
 The default smoke test waits for the port whose USB product string matches
-`XIAO SAMD21 Debug Console`, then requires at least one
+`Prism Kit Debug Console`, then requires at least one
 `Task app_main runtime:` line before passing. If you start it immediately after
 flashing or resetting the board, it will usually also observe the Zephyr boot
 banner and the `DebugPort online ...` startup line.
@@ -330,7 +330,7 @@ west zephyr-export
 
 When you run `west init -l .` from inside an already cloned repository, west
 creates the workspace topdir in the parent directory. For example, if this repo
-is at `C:\dev\sentient-mask`, then the west workspace topdir becomes
+is at `C:\dev\prism-kit`, then the west workspace topdir becomes
 `C:\dev`, and Zephyr is fetched as a sibling directory such as `C:\dev\zephyr`.
 
 That is normal, and it means the fetched dependencies stay outside the app repo
