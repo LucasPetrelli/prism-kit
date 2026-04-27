@@ -1,6 +1,6 @@
 [submodule "bal"]
 	path = bal
-	url = ../bal-repo
+	url = git@github.com:LucasPetrelli/bal.git
 [submodule "oshal"]
 	path = oshal
-	url = ../oshal-repo
+	url = git@github.com:LucasPetrelli/oshal.git
