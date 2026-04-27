@@ -37,9 +37,9 @@ Phase 2 is implemented.
 - APP depends only on BAL and OSHAL interfaces and now cycles the full strip
 	through red, blue, and green while still blinking the board status LED on
 	PA17.
-- OSHAL is being shaped as the future reusable Zephyr-plus-SAMD21 support
-	module, while BAL is being shaped as the future reusable XIAO-board support
-	module for other firmware repos.
+- OSHAL and BAL are now mounted into this repository as dedicated Git
+	submodules at `oshal/` and `bal/` while preserving the existing layer
+	contracts and include paths.
 
 ## Design Intent
 
@@ -55,8 +55,9 @@ The repo is structured around three layers.
 - `src/`: thin repository-level C++ composition glue that satisfies
 	OSHAL-declared handoff hooks without moving `main()` out of OSHAL.
 
-The longer-term goal is to let `oshal/` and `bal/` mature into reusable
-submodules that can move between future Zephyr firmware repositories.
+`oshal/` and `bal/` now live as reusable submodules mounted at stable in-tree
+paths so the Zephyr application can keep the same include graph and build
+shape.
 
 - `oshal/` is intended to carry the reusable Zephyr and SAMD21-facing runtime
 	contracts and backends.
@@ -245,6 +246,20 @@ Copilot skill contract.
 
 These commands assume you start in the repository root.
 
+### 0. Initialize the BAL and OSHAL submodules
+
+For a fresh clone, prefer:
+
+```bash
+git clone --recurse-submodules <repo-url>
+```
+
+For an existing clone, run:
+
+```bash
+git submodule update --init --recursive
+```
+
 ### 1. Create and activate a Python environment
 
 Windows PowerShell:
@@ -349,7 +364,8 @@ The resulting ELF is expected at `build/zephyr/zephyr.elf`.
 
 Internally, the build now compiles `oshal/` and `bal/` as their own static
 libraries and links them into Zephyr's `app` target. That keeps the current
-firmware build Zephyr-native while matching the intended future submodule split.
+firmware build Zephyr-native while consuming BAL and OSHAL through their
+submodule mount points.
  
 For clangd-based editor indexing, the build helper also refreshes
 `compile_commands.json` at the repository root from the Zephyr build directory.
@@ -491,8 +507,8 @@ avoids direct APP or BAL header dependencies. The GPIO and PWM backends
 themselves remain implemented in C++ behind board-owned OSHAL objects.
 
 The repository build also treats BAL and OSHAL as independent object libraries
-now so their public headers, private implementation files, and inter-layer
-dependency rules line up with the planned future submodule extraction.
+so their public headers, private implementation files, and inter-layer
+dependency rules line up with the current submodule split.
 For layers that cross a real C boundary, the repository provides narrow `.h`
 headers alongside the C++ interface when needed:
 

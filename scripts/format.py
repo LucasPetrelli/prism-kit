@@ -19,6 +19,7 @@ DEFAULT_SOURCE_DIRS = (
 SOURCE_EXTENSIONS = {".c", ".cc", ".cpp", ".cxx", ".h", ".hh", ".hpp"}
 IGNORED_PARTS = {".venv", "build", "__cmake_systeminformation"}
 WINDOWS_CLANG_FORMAT = Path(r"C:\Program Files\LLVM\bin\clang-format.exe")
+SUBMODULE_SOURCE_DIRS = {"bal", "oshal"}
 
 
 def parse_args() -> argparse.Namespace:
@@ -100,9 +101,29 @@ def is_ignored(path: Path) -> bool:
     return any(part in IGNORED_PARTS for part in path.parts)
 
 
+def missing_target_message(root: Path, target: Path) -> str:
+    try:
+        relative_target = target.relative_to(root)
+    except ValueError:
+        return f"Path '{target}' does not exist."
+
+    if not relative_target.parts:
+        return f"Path '{target}' does not exist."
+
+    top_level = relative_target.parts[0]
+    if top_level in SUBMODULE_SOURCE_DIRS and (root / ".gitmodules").is_file():
+        return (
+            f"Path '{relative_target.as_posix()}' does not exist. "
+            f"The '{top_level}' submodule is missing or not initialized. "
+            "Run 'git submodule update --init --recursive' from the repository root and retry."
+        )
+
+    return f"Path '{target}' does not exist."
+
+
 def iter_source_files(root: Path, target: Path) -> list[Path]:
     if not target.exists():
-        raise SystemExit(f"Path '{target}' does not exist.")
+        raise SystemExit(missing_target_message(root, target))
 
     if is_ignored(target):
         return []

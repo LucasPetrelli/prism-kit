@@ -1,0 +1,6 @@
+[submodule "bal"]
+	path = bal
+	url = ../bal-repo
+[submodule "oshal"]
+	path = oshal
+	url = ../oshal-repo

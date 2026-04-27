@@ -22,6 +22,7 @@ GCC_ONLY_PATTERNS = (
     r"\s+--param=\S+",
     r"\s+-fno-defer-pop",
 )
+REQUIRED_SUBMODULES = ("bal", "oshal")
 
 
 def parse_args() -> argparse.Namespace:
@@ -105,6 +106,22 @@ def resolve_toolchain_root() -> Path:
         )
 
     return toolchain_root
+
+
+def ensure_required_submodules(root: Path) -> None:
+    missing_submodules = [
+        name
+        for name in REQUIRED_SUBMODULES
+        if not (root / name / "CMakeLists.txt").is_file()
+    ]
+    if not missing_submodules:
+        return
+
+    missing_list = ", ".join(f"'{name}'" for name in missing_submodules)
+    raise SystemExit(
+        f"Required submodule(s) {missing_list} are missing or not initialized.\n"
+        "Run 'git submodule update --init --recursive' from the repository root, then rerun this script."
+    )
 
 
 def remove_build_directory(root: Path) -> None:
@@ -213,6 +230,7 @@ def main() -> int:
     args = parse_args()
     root = repo_root()
     python_exe = ensure_repo_python(root)
+    ensure_required_submodules(root)
     toolchain_root = resolve_toolchain_root()
     extra_conf_files: list[Path] = []
     if args.no_opt:

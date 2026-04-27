@@ -11,6 +11,14 @@ project(sentient_mask)
 # while the root app target owns only the thin composition glue that wires APP
 # and BAL into the OSHAL-owned handoff hook.
 
+foreach(required_submodule IN ITEMS oshal bal)
+	if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${required_submodule}/CMakeLists.txt")
+		message(FATAL_ERROR
+			"Required submodule '${required_submodule}' is missing or not initialized. "
+			"Run 'git submodule update --init --recursive' from the repository root and retry.")
+	endif()
+endforeach()
+
 target_sources(app PRIVATE src/boot_handoff_zephyr.cpp)
 
 add_subdirectory(oshal)

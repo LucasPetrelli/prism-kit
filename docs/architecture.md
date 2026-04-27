@@ -105,5 +105,6 @@ target.
     `src/boot_handoff_zephyr.cpp` composition file and links against both lower
     layer libraries.
 
-That split matches the longer-term goal of extracting `oshal/` and `bal/` into
-reusable submodules without pretending they are already independent repositories.
+That split now matches the current repository shape: `oshal/` and `bal/` are
+consumed as reusable submodules while the Zephyr app, repository-level
+composition glue, and product-specific APP code remain in the superproject.
