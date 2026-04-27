@@ -232,6 +232,15 @@ That means the current repo supports two realistic paths.
 
 The code structure in this repo is intentionally independent from that decision.
 
+The repository also carries project-local helper scripts that fit the shared
+Copilot skill contract.
+
+- `python scripts/build.py` builds the firmware from the project root.
+- `python scripts/flash.py` flashes the newest Zephyr artifact with J-Link by
+	default, or a user-supplied artifact path.
+- `python scripts/smoke_test.py` waits for the USB CDC ACM debug console and
+	verifies that the firmware is still emitting the expected runtime markers.
+
 ## Getting Started
 
 These commands assume you start in the repository root.
@@ -257,6 +266,35 @@ source .venv/Scripts/activate
 ```bash
 pip install --upgrade pip west jsonschema pyelftools
 ```
+
+To use the CDC ACM smoke-test helper, also install `pyserial` in the same
+environment:
+
+```bash
+pip install pyserial
+```
+
+### 3. Smoke-test the debug console
+
+After flashing the firmware, you can verify that the USB CDC ACM debug UART is
+alive with:
+
+```bash
+python scripts/smoke_test.py
+```
+
+The default smoke test waits for the port whose USB product string matches
+`XIAO SAMD21 Debug Console`, then requires at least one
+`Task app_main runtime:` line before passing. If you start it immediately after
+flashing or resetting the board, it will usually also observe the Zephyr boot
+banner and the `DebugPort online ...` startup line.
+
+Useful overrides:
+
+- `python scripts/smoke_test.py --list-ports`
+- `python scripts/smoke_test.py --port COM7`
+- `python scripts/smoke_test.py --require "DebugPort online on"`
+- `python scripts/smoke_test.py --no-default-requirements --require "*** Booting Zephyr OS build"`
 
 The extra Python packages are required by Zephyr's board discovery and ELF
 introspection scripts during configuration and build.
