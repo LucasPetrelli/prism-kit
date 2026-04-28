@@ -1,9 +1,16 @@
 # Architecture Notes
 
 This document complements the repository README with a tighter view of the
-layering rules and the boot path that phase 2 implements.
+layering rules and the boot path used by the current HW-first implementation.
 
 ## Layer Ownership
+
+### Prism Contract
+
+Prism Kit owns the logical strip-control contract exposed from `include/prism/`.
+That contract is repo-owned rather than BAL-owned so multiple backends can
+implement the same interface without teaching BAL about runtime modes or host
+simulation concerns.
 
 ### OSHAL
 
@@ -36,8 +43,10 @@ pixel views, and the board-specific GRB ordering policy for that strip.
 ### APP
 
 APP must not include Zephyr headers or know devicetree aliases. It talks to BAL
-for board objects and OSHAL for execution services. APP does not talk directly
-to PWM or any other transport backend.
+for the current HW backend implementation and OSHAL for execution services.
+Steady-state APP logic talks to the Prism Kit strip contract rather than to BAL
+strip objects directly. APP also owns backend selection in `app/CMakeLists.txt`
+and starts backend-specific runtime helpers such as the current `app_hw` task.
 
 ## Boot Flow
 
@@ -61,8 +70,13 @@ Zephyr startup
                         +--> initialize board LED object(s)
                         +--> initialize WS2812 strip object(s)
                         +--> launch APP task through OSHAL
+                            |
+                            +--> APP initializes selected Prism backend
                                 |
-                            +--> Zephyr schedules strip color-cycle demo
+                                +--> HW backend starts app_hw task
+                                    |
+                                    +--> app::run publishes committed frames
+                                    +--> app_hw applies them to BAL strip
 ```
 
 ## Why OSHAL Uses APPLICATION-Level SYS_INIT
@@ -102,9 +116,15 @@ target.
 - `bal_implementation` owns board policy and links against
     `oshal_implementation`.
 - Zephyr's root `app` target owns product sources plus the thin
-    `src/boot_handoff_zephyr.cpp` composition file and links against both lower
+    `src/boot_handoff_zephyr.cpp` composition file, selects the Prism Kit
+    backend source set in `app/CMakeLists.txt`, and links against both lower
     layer libraries.
 
 That split now matches the current repository shape: `oshal/` and `bal/` are
 consumed as reusable submodules while the Zephyr app, repository-level
 composition glue, and product-specific APP code remain in the superproject.
+
+The current `HW` backend adds one more APP-owned layer inside that build shape.
+`app::run()` uses the repo-owned strip contract, while the selected backend
+implementation starts `app_hw` as a second OSHAL-managed task and keeps all
+BAL strip mutations inside that dedicated task.

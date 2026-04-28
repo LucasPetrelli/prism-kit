@@ -1,13 +1,22 @@
 # Prism Kit
 
-This repository is a Zephyr-first firmware workspace for developing a WS2812
-driver on the Seeed XIAO SAMD21. The current implementation keeps the
-application independent from Zephyr and board details while driving a 7-pixel
-WS2812 strip over a PWM-sequence-backed OSHAL transport.
+This repository is a workspace for developing tools that control and animate
+RGB LED strips.
+
+The repository is intended to work in two modes.
+
+- as an embedded component mounted into a hardware implementation,
+- and as a future standalone tool with a GUI-backed simulation or visualization
+	target.
+
+The current implementation is HW-first. It targets the Seeed XIAO SAMD21 under
+Zephyr and drives a 7-pixel WS2812 strip over a PWM-sequence-backed OSHAL
+transport while keeping the steady-state application loop on a repo-owned
+Prism Kit strip contract.
 
 ## Current Status
 
-Phase 2 is implemented.
+The initial HW backend split is implemented.
 
 - The repository is wired as a Zephyr application with a reproducible `west.yml`.
 - Zephyr C++ support is enabled, and APP now builds as C++17 behind a
@@ -34,24 +43,29 @@ Phase 2 is implemented.
 - BAL now owns a 7-pixel WS2812 strip object and logical RGB pixel views.
 - BAL now owns the board pin map that labels the SAMD21 physical resources for
 	the XIAO wiring.
-- APP depends only on BAL and OSHAL interfaces and now cycles the full strip
-	through red, blue, and green while still blinking the board status LED on
-	PA17.
+- Prism Kit now exposes a repo-owned strip contract from `include/prism/`.
+- APP now cycles the full strip through red, blue, and green through that
+	contract while still blinking the board status LED on PA17.
+- The selected APP backend is chosen in `app/CMakeLists.txt` and currently
+	defaults to `HW`.
+- The `HW` backend starts a dedicated `app_hw` task from `app::run()` and keeps
+	BAL strip access inside that task.
 - OSHAL and BAL are now mounted into this repository as dedicated Git
 	submodules at `oshal/` and `bal/` while preserving the existing layer
 	contracts and include paths.
 
 ## Design Intent
 
-The repo is structured around three layers.
+The repo is structured around four roles.
 
+- `include/prism/`: the repo-owned logical strip-control contract.
 - `oshal/`: the single Zephyr-boundary layer for GPIO, sleep/time, C++ task
 	execution, early initialization, and transport backends such as WS2812 frame
 	output, plus shared status codes.
 - `bal/`: board abstraction and ownership of board resources such as status
 	LEDs and the 7-pixel WS2812 strip.
-- `app/`: product logic that should not care about Zephyr, SAMD21 registers, or
-	board-specific pin names.
+- `app/`: product logic plus backend-specific runtime glue selected in
+	`app/CMakeLists.txt`.
 - `src/`: thin repository-level C++ composition glue that satisfies
 	OSHAL-declared handoff hooks without moving `main()` out of OSHAL.
 
@@ -62,11 +76,13 @@ shape.
 - `oshal/` is intended to carry the reusable Zephyr and SAMD21-facing runtime
 	contracts and backends.
 - `bal/` is intended to carry reusable Seeed XIAO board ownership and policy.
-- `app/` remains the product-specific layer for this repository.
+- `app/` remains the product-specific layer for this repository and owns the
+	selected Prism backend runtime.
 
 The dependency direction is one-way.
 
-- APP may use BAL and OSHAL.
+- APP steady-state logic uses the Prism Kit contract and OSHAL services.
+- The selected APP backend may use BAL and OSHAL.
 - BAL may use OSHAL and invoke a supplied APP entry point, but does not depend
 	on APP headers directly.
 - OSHAL interfaces never depend on BAL or APP.
@@ -82,8 +98,12 @@ replacing it.
 2. OSHAL runs a `SYS_INIT()` hook at the `APPLICATION` init level.
 3. Zephyr enters `main()` in `oshal/src/zephyr_system.c`.
 4. `main()` calls an OSHAL-declared handoff hook implemented by the repository composition layer.
-5. BAL initializes board-owned objects and then launches APP as an OSHAL task.
-6. Zephyr schedules APP after startup, and APP runs using only BAL and OSHAL interfaces.
+5. BAL initializes board-owned objects and then launches `app::run()` as an
+	OSHAL task.
+6. APP initializes the selected Prism Kit backend.
+7. The `HW` backend starts `app_hw` as a second OSHAL-managed task.
+8. APP stages logical strip updates through the Prism Kit contract, and `app_hw`
+	applies committed frames to BAL.
 
 This keeps the stage boundaries explicit without fighting Zephyr's startup
 rules.
@@ -92,10 +112,18 @@ rules.
 
 ```text
 .
+|-- include/
+|   `-- prism/
+|       `-- strip.hpp
 |-- app/
 |   |-- CMakeLists.txt
 |   |-- include/app/app.hpp
-|   `-- src/blink_app.cpp
+|   `-- src/
+|       |-- app_hw.cpp
+|       |-- blink_app.cpp
+|       |-- prism_hw_backend.cpp
+|       |-- prism_hw_backend_internal.hpp
+|       `-- task_runtime_reporter.cpp
 |-- bal/
 |   |-- CMakeLists.txt
 |   |-- include/bal/bootstrap.hpp
@@ -366,6 +394,10 @@ Internally, the build now compiles `oshal/` and `bal/` as their own static
 libraries and links them into Zephyr's `app` target. That keeps the current
 firmware build Zephyr-native while consuming BAL and OSHAL through their
 submodule mount points.
+
+The selected Prism Kit backend is chosen in `app/CMakeLists.txt` through the
+`PRISM_KIT_APP_BACKEND` cache variable. The current implementation supports the
+`HW` backend and reserves `SIM` for the future desktop-backed target.
  
 For clangd-based editor indexing, the build helper also refreshes
 `compile_commands.json` at the repository root from the Zephyr build directory.
