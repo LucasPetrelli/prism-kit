@@ -157,8 +157,7 @@ int initialize() {
     return STATUS_OK;
   }
 
-  oshal::TaskHandle const app_task = oshal::TaskHandle::current();
-  if (!app_task.is_valid()) {
+  if (!oshal::TaskHandle::current().is_valid()) {
     return STATUS_ERR_NOT_READY;
   }
 
@@ -181,9 +180,6 @@ int initialize() {
     return STATUS_ERR_DEVICE_UNAVAILABLE;
   }
 
-  static app::TaskRuntimeReporter runtime_reporter(app_task);
-  app::internal::g_prism_runtime_services.app_task = app_task;
-  app::internal::g_prism_runtime_services.runtime_reporter = &runtime_reporter;
   app::internal::g_prism_runtime_services.status_led = &status_led;
   app::internal::g_prism_runtime_services.debug_port = &oshal::debug_port;
 

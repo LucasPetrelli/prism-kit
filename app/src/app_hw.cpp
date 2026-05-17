@@ -2,7 +2,6 @@
 #include <cstddef>
 #include <cstdint>
 
-#include "app/task_runtime_reporter.hpp"
 #include "bal/led.hpp"
 #include "bal/rgb_led.hpp"
 #include "bal/ws2812_strip.hpp"
@@ -18,7 +17,6 @@ namespace {
 constexpr std::uint32_t kAppHwIdleSleepMs = 10U;
 constexpr std::size_t kAppHwTaskStackSizeBytes = 1024U;
 constexpr int kAppHwTaskPriority = 0;
-constexpr std::uint32_t kRuntimeReportFrameInterval = 5U;
 
 /*
  * app_hw is the one APP-owned execution context allowed to mutate the BAL
@@ -111,8 +109,6 @@ int run_prism_hw_task(void* context) {
   bal::Ws2812Strip& backend_strip = bal::ws2812_strip();
   bal::Led* const status_led = g_prism_runtime_services.status_led;
   oshal::DebugPort* const debug_port = g_prism_runtime_services.debug_port;
-  app::TaskRuntimeReporter* const runtime_reporter =
-    g_prism_runtime_services.runtime_reporter;
   if (!backend_strip.is_ready()) {
     return STATUS_ERR_DEVICE_UNAVAILABLE;
   }
@@ -133,8 +129,6 @@ int run_prism_hw_task(void* context) {
 
   std::uint32_t observed_generation =
     g_prism_hw_mailbox.published_generation.load(std::memory_order_acquire);
-  std::uint32_t applied_frame_count = 0U;
-  bool reported_runtime_failure = false;
 
   while (true) {
     const std::uint32_t published_generation =
@@ -153,17 +147,6 @@ int run_prism_hw_task(void* context) {
       ret = status_led->toggle();
       if (ret < 0) {
         return ret;
-      }
-
-      ++applied_frame_count;
-      if (((applied_frame_count % kRuntimeReportFrameInterval) == 0U) &&
-          (runtime_reporter != nullptr)) {
-        const int diagnostics_ret = runtime_reporter->report();
-        if ((diagnostics_ret < 0) && !reported_runtime_failure) {
-          reported_runtime_failure = true;
-          static_cast<void>(debug_port->printf(
-            "Task runtime diagnostics unavailable (%d)\n", diagnostics_ret));
-        }
       }
 
       observed_generation = published_generation;

@@ -6,7 +6,6 @@
 #include <cstddef>
 #include <cstdint>
 
-#include "app/task_runtime_reporter.hpp"
 #include "bal/led.hpp"
 #include "oshal/debug_port.hpp"
 #include "oshal/task.hpp"
@@ -45,10 +44,6 @@ struct SharedMailbox {
 
 /// @brief APP-owned execution helpers captured for the HW backend task.
 struct RuntimeServices {
-  /// @brief Handle of the APP task that owns the logical animation loop.
-  oshal::TaskHandle app_task;
-  /// @brief Runtime reporter used to sample the APP task from app_hw.
-  app::TaskRuntimeReporter* runtime_reporter = nullptr;
   /// @brief Board-owned status LED controlled by the HW executor.
   bal::Led* status_led = nullptr;
   /// @brief OSHAL debug port used by the HW executor for diagnostics.
