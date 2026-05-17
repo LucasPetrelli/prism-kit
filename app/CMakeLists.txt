@@ -6,7 +6,7 @@ set_property(CACHE PRISM_KIT_APP_BACKEND PROPERTY STRINGS HW SIM)
 target_include_directories(app PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include
                                    ${PROJECT_SOURCE_DIR}/include)
 
-target_sources(app PRIVATE src/blink_app.cpp src/task_runtime_reporter.cpp)
+target_sources(app PRIVATE src/blink_app.cpp)
 
 if(PRISM_KIT_APP_BACKEND STREQUAL "HW")
   target_sources(app PRIVATE src/prism_hw_backend.cpp src/app_hw.cpp)
