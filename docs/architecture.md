@@ -71,11 +71,11 @@ Zephyr startup
                         +--> initialize WS2812 strip object(s)
                         +--> launch APP task through OSHAL
                             |
-                            +--> APP initializes selected Prism backend
+                            +--> APP setup initializes selected Prism backend
                                 |
                                 +--> HW backend starts app_hw task
                                     |
-                                    +--> app::run publishes committed frames
+                                    +--> app::loop publishes committed frames
                                     +--> app_hw applies them to BAL strip
 ```
 
@@ -125,6 +125,7 @@ consumed as reusable submodules while the Zephyr app, repository-level
 composition glue, and product-specific APP code remain in the superproject.
 
 The current `HW` backend adds one more APP-owned layer inside that build shape.
-`app::run()` uses the repo-owned strip contract, while the selected backend
-implementation starts `app_hw` as a second OSHAL-managed task and keeps all
-BAL strip mutations inside that dedicated task.
+`app::setup()` prepares the repo-owned strip contract, while `app::loop()`
+publishes committed frames and the selected backend implementation starts
+`app_hw` as a second OSHAL-managed task that keeps all BAL strip mutations
+inside that dedicated task.

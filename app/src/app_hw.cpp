@@ -18,6 +18,15 @@ constexpr std::uint32_t kAppHwIdleSleepMs = 10U;
 constexpr std::size_t kAppHwTaskStackSizeBytes = 1024U;
 constexpr int kAppHwTaskPriority = 0;
 
+struct PrismHwTaskState {
+  bal::Ws2812Strip* backend_strip = nullptr;
+  bal::Led* status_led = nullptr;
+  oshal::DebugPort* debug_port = nullptr;
+  std::uint32_t observed_generation = 0U;
+};
+
+PrismHwTaskState g_prism_hw_task_state = {};
+
 /*
  * app_hw is the one APP-owned execution context allowed to mutate the BAL
  * strip. It polls the latest committed Prism Kit frame from the shared mailbox,
@@ -49,7 +58,8 @@ int apply_frame(const SharedFrame& frame, bal::Ws2812Strip& backend_strip) {
 oshal::TaskConfig make_app_hw_task_config() {
   oshal::TaskConfig config;
   config.name = "app_hw";
-  config.entry = run_prism_hw_task;
+  config.setup = prism_hw_task_setup;
+  config.loop = prism_hw_task_loop;
   config.context = nullptr;
   config.stack_size_bytes = kAppHwTaskStackSizeBytes;
   config.priority = kAppHwTaskPriority;
@@ -103,58 +113,68 @@ int publish_prism_hw_frame(const SharedFrame& frame) {
   return STATUS_OK;
 }
 
-int run_prism_hw_task(void* context) {
+bool prism_hw_task_setup(void* context) {
   static_cast<void>(context);
 
-  bal::Ws2812Strip& backend_strip = bal::ws2812_strip();
-  bal::Led* const status_led = g_prism_runtime_services.status_led;
-  oshal::DebugPort* const debug_port = g_prism_runtime_services.debug_port;
-  if (!backend_strip.is_ready()) {
-    return STATUS_ERR_DEVICE_UNAVAILABLE;
+  g_prism_hw_task_state.backend_strip = &bal::ws2812_strip();
+  g_prism_hw_task_state.status_led = g_prism_runtime_services.status_led;
+  g_prism_hw_task_state.debug_port = g_prism_runtime_services.debug_port;
+
+  if ((g_prism_hw_task_state.backend_strip == nullptr) ||
+      !g_prism_hw_task_state.backend_strip->is_ready()) {
+    return false;
   }
 
-  if ((status_led == nullptr) || !status_led->is_ready()) {
-    return STATUS_ERR_DEVICE_UNAVAILABLE;
+  if ((g_prism_hw_task_state.status_led == nullptr) ||
+      !g_prism_hw_task_state.status_led->is_ready()) {
+    return false;
   }
 
-  if ((debug_port == nullptr) || !debug_port->is_ready()) {
-    return STATUS_ERR_DEVICE_UNAVAILABLE;
+  if ((g_prism_hw_task_state.debug_port == nullptr) ||
+      !g_prism_hw_task_state.debug_port->is_ready()) {
+    return false;
   }
 
-  int ret = debug_port->printf("DebugPort online on %s, strip on %s\n",
-                               debug_port->name(), backend_strip.name());
-  if (ret < 0) {
-    return ret;
+  if (g_prism_hw_task_state.debug_port->printf(
+        "DebugPort online on %s, strip on %s\n",
+        g_prism_hw_task_state.debug_port->name(),
+        g_prism_hw_task_state.backend_strip->name()) < 0) {
+    return false;
   }
 
-  std::uint32_t observed_generation =
+  g_prism_hw_task_state.observed_generation =
     g_prism_hw_mailbox.published_generation.load(std::memory_order_acquire);
+  return true;
+}
 
-  while (true) {
-    const std::uint32_t published_generation =
-      g_prism_hw_mailbox.published_generation.load(std::memory_order_acquire);
-    if (published_generation != observed_generation) {
-      const std::uint8_t published_frame_index =
-        g_prism_hw_mailbox.published_frame_index.load(
-          std::memory_order_acquire);
-      const SharedFrame frame =
-        g_prism_hw_mailbox.frames[published_frame_index];
-      const int apply_ret = apply_frame(frame, backend_strip);
-      if (apply_ret < 0) {
-        return apply_ret;
-      }
+bool prism_hw_task_loop(void* context) {
+  static_cast<void>(context);
 
-      ret = status_led->toggle();
-      if (ret < 0) {
-        return ret;
-      }
+  if ((g_prism_hw_task_state.backend_strip == nullptr) ||
+      (g_prism_hw_task_state.status_led == nullptr)) {
+    return false;
+  }
 
-      observed_generation = published_generation;
-      continue;
+  const std::uint32_t published_generation =
+    g_prism_hw_mailbox.published_generation.load(std::memory_order_acquire);
+  if (published_generation != g_prism_hw_task_state.observed_generation) {
+    const std::uint8_t published_frame_index =
+      g_prism_hw_mailbox.published_frame_index.load(std::memory_order_acquire);
+    const SharedFrame frame = g_prism_hw_mailbox.frames[published_frame_index];
+    if (apply_frame(frame, *g_prism_hw_task_state.backend_strip) < 0) {
+      return false;
     }
 
-    oshal::sleep_ms(kAppHwIdleSleepMs);
+    if (g_prism_hw_task_state.status_led->toggle() < 0) {
+      return false;
+    }
+
+    g_prism_hw_task_state.observed_generation = published_generation;
+    return true;
   }
+
+  oshal::sleep_ms(kAppHwIdleSleepMs);
+  return true;
 }
 
 }  // namespace app::internal

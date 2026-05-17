@@ -74,11 +74,12 @@ The steady-state execution path is intentionally narrow:
 - `oshal/src/zephyr_system.c` validates board prerequisites and calls
   `oshal_main_handoff()` from `main()`.
 - `src/boot_handoff_zephyr.cpp` bridges that C-shaped handoff into
-  `bal::run_bootstrap(app::run)`.
+  `bal::run_bootstrap(app::setup, app::loop)`.
 - `bal/src/bootstrap.cpp` confirms OSHAL startup succeeded, initializes BAL
   resources, and creates the `app_main` task.
-- `app/src/blink_app.cpp` initializes Prism, fills the logical strip with the
-  next color, calls `show()`, and sleeps.
+- `app/src/blink_app.cpp` initializes Prism during `app::setup()`, then
+  `app::loop()` fills the logical strip with the next color, calls `show()`,
+  and sleeps.
 - `app/src/prism_hw_backend.cpp` stages frames in repo-owned Prism types.
 - `app/src/app_hw.cpp` consumes committed frames, writes them into the BAL
   strip, flushes the physical LEDs, and toggles the board status LED.

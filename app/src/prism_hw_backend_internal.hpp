@@ -29,7 +29,7 @@ struct SharedFrame {
   std::array<prism::RgbColor, kPrismHwMailboxFrameCapacity> colors = {};
 };
 
-/// @brief Double-buffered mailbox shared between app::run() and app_hw.
+/// @brief Double-buffered mailbox shared between app::loop() and app_hw.
 /// @note The producer always writes the inactive frame slot before publishing
 ///     the frame index and generation counters. The consumer polls the
 ///     generation counter and then reads the published slot.
@@ -68,11 +68,17 @@ int ensure_prism_hw_started();
 ///     failure.
 int publish_prism_hw_frame(const SharedFrame& frame);
 
-/// @brief Task entry that applies committed Prism Kit frames to BAL.
-/// @param context Optional task context. The current HW backend does not use it.
-/// @return STATUS_OK on success, or a negative project-defined status code when
-///     the HW executor cannot continue.
-int run_prism_hw_task(void* context);
+/// @brief Task setup callback that prepares the Prism Kit HW executor.
+/// @param context Optional task context. The current HW backend does not use
+/// it.
+/// @return True when the HW executor loop may begin, otherwise false.
+bool prism_hw_task_setup(void* context);
+
+/// @brief Task loop callback that applies committed Prism Kit frames to BAL.
+/// @param context Optional task context. The current HW backend does not use
+/// it.
+/// @return True to keep the HW executor running, otherwise false.
+bool prism_hw_task_loop(void* context);
 
 }  // namespace app::internal
 
