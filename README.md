@@ -38,7 +38,7 @@ python scripts/flash.py
 # Flash a specific artifact.
 python scripts/flash.py build/zephyr/zephyr.elf
 
-# Verify the USB CDC ACM console and expected runtime marker.
+# Verify the USB CDC ACM debug and command ports and their expected markers.
 python scripts/smoke_test.py
 
 # Smoke-test helpers.
@@ -53,9 +53,9 @@ Notes:
   refreshes the root `compile_commands.json`.
 - `scripts/flash.py` uses SEGGER J-Link by default and resolves the newest
   supported artifact under `build/zephyr`.
-- `scripts/smoke_test.py` looks for the `Prism Kit Debug Console` CDC ACM port
-  and, by default, requires the `DebugPort online on` banner emitted by
-  `app_hw`.
+- `scripts/smoke_test.py` discovers the Prism Kit CDC ACM ports and, by
+  default, requires separate `DebugPort online on` and `CommandPort online on`
+  banners so the debug and command channels can be distinguished.
 
 ## Architecture Summary
 
@@ -132,8 +132,9 @@ so this project normally lives beside `zephyr/` inside the workspace.
 ### Board and Runtime Configuration
 
 - The active Zephyr board target is `seeeduino_xiao`.
-- `boards/seeeduino_xiao.overlay` routes the console to USB CDC ACM and enables
-  the PA8 `TCC0/WO[0]` PWM output used by the WS2812 transport.
+- `boards/seeeduino_xiao.overlay` routes the default debug console to one USB
+  CDC ACM instance, exposes a second CDC ACM command channel, and enables the
+  PA8 `TCC0/WO[0]` PWM output used by the WS2812 transport.
 - BAL maps the current XIAO wiring as status LED on PA17 and WS2812 output on
   PA8 / `TCC0_WO0`.
 - `prj.conf` enables C++17, USB CDC ACM console support, `printk`, and the

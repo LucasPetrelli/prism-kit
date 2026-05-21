@@ -8,6 +8,7 @@
 
 #include "bal/led.hpp"
 #include "oshal/debug_port.hpp"
+#include "oshal/serial_port.hpp"
 #include "oshal/task.hpp"
 #include "prism/strip.hpp"
 
@@ -48,6 +49,9 @@ struct RuntimeServices {
   bal::Led* status_led = nullptr;
   /// @brief OSHAL debug port used by the HW executor for diagnostics.
   oshal::DebugPort* debug_port = nullptr;
+  /// @brief Optional OSHAL command/data serial port exposed for non-debug
+  /// diagnostics and future control traffic.
+  oshal::SerialPort* command_port = nullptr;
 };
 
 /// @brief Shared Prism Kit HW mailbox instance owned by APP.

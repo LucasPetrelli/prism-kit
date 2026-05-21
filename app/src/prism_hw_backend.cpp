@@ -4,6 +4,7 @@
 #include "bal/led.hpp"
 #include "bal/ws2812_strip.hpp"
 #include "oshal/debug_port.hpp"
+#include "oshal/serial_port.hpp"
 #include "oshal/status.h"
 #include "oshal/time.hpp"
 #include "prism/strip.hpp"
@@ -175,6 +176,10 @@ int initialize() {
     return STATUS_ERR_DEVICE_UNAVAILABLE;
   }
 
+  if ((oshal::command_port != nullptr) && !oshal::command_port->is_ready()) {
+    return STATUS_ERR_DEVICE_UNAVAILABLE;
+  }
+
   const std::size_t led_count = backend_strip.led_count();
   if (led_count > app::internal::kPrismHwMailboxFrameCapacity) {
     return STATUS_ERR_DEVICE_UNAVAILABLE;
@@ -182,6 +187,7 @@ int initialize() {
 
   app::internal::g_prism_runtime_services.status_led = &status_led;
   app::internal::g_prism_runtime_services.debug_port = &oshal::debug_port;
+  app::internal::g_prism_runtime_services.command_port = oshal::command_port;
 
   /* Start the HW executor before publishing any committed strip frame. */
   const int start_ret = app::internal::ensure_prism_hw_started();

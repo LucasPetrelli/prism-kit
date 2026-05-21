@@ -1,14 +1,17 @@
 #include <atomic>
 #include <cstddef>
 #include <cstdint>
+#include <cstdio>
 
 #include "bal/led.hpp"
 #include "bal/rgb_led.hpp"
 #include "bal/ws2812_strip.hpp"
 #include "oshal/debug_port.hpp"
+#include "oshal/serial_port.hpp"
 #include "oshal/status.h"
 #include "oshal/time.hpp"
 #include "prism_hw_backend_internal.hpp"
+
 
 namespace app::internal {
 
@@ -22,7 +25,9 @@ struct PrismHwTaskState {
   bal::Ws2812Strip* backend_strip = nullptr;
   bal::Led* status_led = nullptr;
   oshal::DebugPort* debug_port = nullptr;
+  oshal::SerialPort* command_port = nullptr;
   std::uint32_t observed_generation = 0U;
+  bool command_port_announced = false;
 };
 
 PrismHwTaskState g_prism_hw_task_state = {};
@@ -53,6 +58,24 @@ int apply_frame(const SharedFrame& frame, bal::Ws2812Strip& backend_strip) {
   }
 
   return backend_strip.show();
+}
+
+bool announce_command_port(PrismHwTaskState* state) {
+  if (state->command_port == nullptr) {
+    return true;
+  }
+
+  char command_banner[96];
+  const int command_banner_length =
+    std::snprintf(command_banner, sizeof(command_banner),
+                  "CommandPort online on %s\n", state->command_port->name());
+  if (command_banner_length < 0) {
+    return false;
+  }
+
+  return state->command_port->write(
+           command_banner, static_cast<std::size_t>(command_banner_length)) >=
+         0;
 }
 
 oshal::TaskConfig make_app_hw_task_config() {
@@ -119,6 +142,7 @@ bool prism_hw_task_setup(void* context) {
   g_prism_hw_task_state.backend_strip = &bal::ws2812_strip();
   g_prism_hw_task_state.status_led = g_prism_runtime_services.status_led;
   g_prism_hw_task_state.debug_port = g_prism_runtime_services.debug_port;
+  g_prism_hw_task_state.command_port = g_prism_runtime_services.command_port;
 
   if ((g_prism_hw_task_state.backend_strip == nullptr) ||
       !g_prism_hw_task_state.backend_strip->is_ready()) {
@@ -132,6 +156,11 @@ bool prism_hw_task_setup(void* context) {
 
   if ((g_prism_hw_task_state.debug_port == nullptr) ||
       !g_prism_hw_task_state.debug_port->is_ready()) {
+    return false;
+  }
+
+  if ((g_prism_hw_task_state.command_port != nullptr) &&
+      !g_prism_hw_task_state.command_port->is_ready()) {
     return false;
   }
 
@@ -171,6 +200,15 @@ bool prism_hw_task_loop(void* context) {
 
     g_prism_hw_task_state.observed_generation = published_generation;
     return true;
+  }
+
+  if ((g_prism_hw_task_state.command_port != nullptr) &&
+      !g_prism_hw_task_state.command_port_announced) {
+    if (!announce_command_port(&g_prism_hw_task_state)) {
+      g_prism_hw_task_state.debug_port->printf(
+        "CommandPort banner write failed\n");
+    }
+    g_prism_hw_task_state.command_port_announced = true;
   }
 
   oshal::sleep_ms(kAppHwIdleSleepMs);

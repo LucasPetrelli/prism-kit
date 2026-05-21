@@ -2,6 +2,8 @@
 
 / {
 	chosen {
+		oshal,command-uart = &cdc_acm_uart1;
+		oshal,debug-uart = &cdc_acm_uart0;
 		zephyr,console = &cdc_acm_uart0;
 	};
 };
@@ -21,6 +23,12 @@
 &zephyr_udc0 {
 	cdc_acm_uart0: cdc_acm_uart0 {
 		compatible = "zephyr,cdc-acm-uart";
+		label = "Prism Kit Debug Console";
+	};
+
+	cdc_acm_uart1: cdc_acm_uart1 {
+		compatible = "zephyr,cdc-acm-uart";
+		label = "Prism Kit Command Port";
 	};
 };
 
