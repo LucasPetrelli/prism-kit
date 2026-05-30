@@ -19,4 +19,4 @@ endif()
 
 # Link APP against the reusable lower layers instead of treating them as source
 # buckets inside the Zephyr app target.
-target_link_libraries(app PRIVATE bal_implementation oshal_implementation)
+target_link_libraries(app PRIVATE bal_implementation oshal_implementation protocol_implementation)

@@ -23,4 +23,5 @@ target_sources(app PRIVATE src/boot_handoff_zephyr.cpp)
 
 add_subdirectory(oshal)
 add_subdirectory(bal)
+add_subdirectory(protocol)
 add_subdirectory(app)
