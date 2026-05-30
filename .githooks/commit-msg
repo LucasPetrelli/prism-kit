@@ -1,0 +1,23 @@
+#!/bin/sh
+
+set -e
+
+# commit-msg hook: append submodule change summary to commit messages.
+#
+# When a commit stages submodule reference updates (e.g. oshal, bal),
+# this hook appends the output of `git submodule summary --cached` to the
+# end of the commit message body so reviewers can see what new commits
+# are brought in.
+#
+# If no submodule changes are staged, the message is left untouched.
+
+commit_msg_file="$1"
+
+repo_root=$(git rev-parse --show-toplevel)
+cd "$repo_root"
+
+summary=$(git submodule summary --cached 2>/dev/null)
+
+if [ -n "$summary" ]; then
+    printf "\n%s\n" "$summary" >> "$commit_msg_file"
+fi
