@@ -32,10 +32,20 @@ using StreamWriter = bool (*)(const uint8_t* data, uint32_t length);
 using FrameHandler = void (*)(void* context, const uint8_t* data,
                               uint16_t length);
 
+/// @brief Callback that returns a free-running monotonic timestamp.
+/// @return Current timestamp in an unspecified scale (e.g. milliseconds or
+///         hardware ticks).  Must be monotonic so that subtraction-based
+///         delta checks work correctly across wraparound.
+using TimestampCallback = uint32_t (*)();
+
 /// @brief Configuration for a Protocol instance.
 struct ProtocolConfig {
   StreamReader read;   ///< Non-blocking stream read callback.
   StreamWriter write;  ///< Non-blocking stream write callback.
+  TimestampCallback timestamp{nullptr};  ///< Optional timestamp source for
+                                         ///< frame timeout.
+  uint32_t frame_timeout{0};  ///< Max ticks between sync and full frame
+                              ///< reception.  0 disables the timeout.
 };
 
 /// @brief TLV protocol engine with sync-byte framing and XOR checksum.
@@ -54,6 +64,12 @@ struct ProtocolConfig {
 ///                          the frame immediately and reset the parser.
 /// If any state detects an error (bad length, checksum mismatch), the
 /// parser discards the partial frame and returns to kWaitingForSync.
+///
+/// ## Frame Timeout
+/// When a timestamp callback and a non-zero frame_timeout are configured,
+/// the parser records the timestamp when it first sees a sync byte.  If a
+/// complete frame is not received within `frame_timeout` ticks, the parser
+/// resets to kWaitingForSync on the next call to run().
 ///
 /// ## Wire Format
 ///
@@ -154,6 +170,8 @@ class Protocol {
   // --- Configuration ---
   StreamReader read_{nullptr};
   StreamWriter write_{nullptr};
+  TimestampCallback timestamp_{nullptr};
+  uint32_t frame_timeout_{0};
 
   // --- Handler table ---
   std::array<HandlerEntry, kMaxHandlers> handlers_{};
@@ -167,6 +185,7 @@ class Protocol {
 
   // --- RX parser state ---
   State state_{State::kWaitingForSync};
+  uint32_t frame_start_ts_{0};  ///< Timestamp when sync was last detected.
   uint8_t rx_buffer_[kRxBufferSize]{};
   uint16_t rx_index_{0};
   uint16_t rx_data_length_{0};

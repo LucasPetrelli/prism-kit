@@ -39,7 +39,10 @@ FrameHeader Frame::parse_header(const uint8_t* wire_data) {
 // ============================================================================
 
 Protocol::Protocol(const ProtocolConfig& config)
-    : read_(config.read), write_(config.write) {
+    : read_(config.read),
+      write_(config.write),
+      timestamp_(config.timestamp),
+      frame_timeout_(config.frame_timeout) {
   // Tag 0x0000 (kLoopback) is always registered as the first handler entry.
   handlers_[0] = {Tag::kLoopback, &Protocol::loopback_impl_, this};
   handler_count_ = 1;
@@ -124,6 +127,15 @@ void Protocol::run() {
   }
 
   // ── RX phase: parse incoming bytes ──
+
+  // Check frame timeout before processing bytes.
+  if (frame_timeout_ > 0 && timestamp_ && state_ != State::kWaitingForSync) {
+    uint32_t now = timestamp_();
+    if (now - frame_start_ts_ > frame_timeout_) {
+      reset_parser();
+    }
+  }
+
   uint8_t raw;
   while (read_raw_byte(raw)) {
     switch (state_) {
@@ -131,6 +143,9 @@ void Protocol::run() {
       case State::kWaitingForSync:
         if (raw == kSyncByte) {
           reset_parser();
+          if (timestamp_) {
+            frame_start_ts_ = timestamp_();
+          }
           state_ = State::kReadingHeader;
         }
         // Discard everything else while searching for sync.
@@ -305,6 +320,7 @@ void Protocol::reset_parser() {
   rx_index_ = 0;
   rx_data_length_ = 0;
   rx_tag_ = 0;
+  frame_start_ts_ = 0;
 }
 
 void Protocol::dispatch_frame() {

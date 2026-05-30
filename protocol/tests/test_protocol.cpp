@@ -211,6 +211,26 @@ class ProtocolTest : public ::testing::Test {
   /// Stored Protocol pointer for verifying handler context.
   static Protocol* stored_proto_;
 
+  // --- Timestamp / timeout support ---
+  static uint32_t fake_timestamp_;
+
+  /// @brief Timestamp callback that returns the injectable fake_timestamp_.
+  static uint32_t timestamp_callback() { return fake_timestamp_; }
+
+  /// Create a Protocol with feed-based RX and timeout support.
+  Protocol& make_protocol_with_timeout(uint32_t frame_timeout) {
+    instance_ = this;
+    fake_timestamp_ = 0;
+    ProtocolConfig cfg{};
+    cfg.write = write_callback;
+    cfg.read = nullptr;
+    cfg.timestamp = timestamp_callback;
+    cfg.frame_timeout = frame_timeout;
+    proto_.emplace(cfg);
+    stored_proto_ = &proto_.value();
+    return proto_.value();
+  }
+
   // Captured TX output.
   std::vector<uint8_t> tx_data_;
 
@@ -225,6 +245,7 @@ class ProtocolTest : public ::testing::Test {
 
 ProtocolTest* ProtocolTest::instance_ = nullptr;
 Protocol* ProtocolTest::stored_proto_ = nullptr;
+uint32_t ProtocolTest::fake_timestamp_ = 0;
 
 // ============================================================================
 // Constructor
@@ -726,6 +747,127 @@ TEST_F(ProtocolTest, Edge_HeaderBytesWithSpecialValues) {
   ASSERT_EQ(handler_data_.size(), sizeof(payload));
   EXPECT_EQ(handler_data_[0], 0x12);
   EXPECT_EQ(handler_data_[1], 0x34);
+}
+
+// ============================================================================
+// Frame timeout
+// ============================================================================
+
+TEST_F(ProtocolTest, Timeout_DisabledWhenZero) {
+  // timeout = 0 means no timeout; frame completes normally.
+  auto& proto = make_protocol_with_timeout(0);
+  constexpr Tag kTag{0x0200};
+  EXPECT_TRUE(proto.add_handler(kTag, handler_callback));
+
+  // Advance the clock far into the future before feeding.
+  fake_timestamp_ = 10'000;
+
+  const uint8_t payload[] = {0x42};
+  auto wire = make_wire(kTag, payload, sizeof(payload));
+  feed_and_run(proto, wire);
+
+  EXPECT_TRUE(handler_called_);
+}
+
+TEST_F(ProtocolTest, Timeout_CompletesBeforeDeadline) {
+  auto& proto = make_protocol_with_timeout(100);
+  constexpr Tag kTag{0x0201};
+  EXPECT_TRUE(proto.add_handler(kTag, handler_callback));
+
+  // Timestamp advances a little between sync and frame completion.
+  fake_timestamp_ = 10;
+  // Feed partial: sync byte + header (5 bytes) in one go.
+  // This transitions to ReadingHeader → ReadingData.
+  const uint8_t payload[] = {0x01, 0x02};
+  auto wire = make_wire(kTag, payload, sizeof(payload));
+
+  // Feed the whole frame; timestamps pick up on sync then after each byte.
+  // The clock advances once at sync time; rest is within the same run() call
+  // so the timeout check happens at the top of the next run().
+  feed_and_run(proto, wire);
+
+  EXPECT_TRUE(handler_called_);
+  ASSERT_EQ(handler_data_.size(), sizeof(payload));
+}
+
+TEST_F(ProtocolTest, Timeout_ResetsOnExpiry) {
+  auto& proto = make_protocol_with_timeout(50);
+  constexpr Tag kTag{0x0202};
+  EXPECT_TRUE(proto.add_handler(kTag, handler_callback));
+
+  // Feed only the sync byte — parser moves to kReadingHeader.
+  std::vector<uint8_t> partial;
+  partial.push_back(kSyncByte);
+  proto.feed(partial.data(), static_cast<uint32_t>(partial.size()));
+  fake_timestamp_ = 0;
+  proto.run();  // sees sync, records frame_start_ts_ = 0, state → ReadingHeader
+
+  // Advance clock past the timeout and call run() again.
+  // Parser should reset to kWaitingForSync.
+  fake_timestamp_ = 100;
+  proto.run();
+
+  // Now feed a complete frame — it should be parsed normally since the
+  // stale partial frame was discarded.
+  const uint8_t payload[] = {0xAB};
+  auto wire = make_wire(kTag, payload, sizeof(payload));
+  feed_and_run(proto, wire);
+
+  EXPECT_TRUE(handler_called_);
+  ASSERT_EQ(handler_data_.size(), sizeof(payload));
+  EXPECT_EQ(handler_data_[0], 0xAB);
+}
+
+TEST_F(ProtocolTest, Timeout_ResetsOnlyWhenExpired) {
+  auto& proto = make_protocol_with_timeout(100);
+  constexpr Tag kTag{0x0203};
+  EXPECT_TRUE(proto.add_handler(kTag, handler_callback));
+
+  // Feed partial frame (sync byte only).
+  std::vector<uint8_t> partial;
+  partial.push_back(kSyncByte);
+  proto.feed(partial.data(), static_cast<uint32_t>(partial.size()));
+  fake_timestamp_ = 0;
+  proto.run();
+
+  // Advance clock but stay within the timeout window.
+  fake_timestamp_ = 50;
+  proto.run();  // should NOT reset — still within timeout
+
+  // Feed the rest of the frame.
+  const uint8_t payload[] = {0xCD};
+  auto wire = make_wire(kTag, payload, sizeof(payload));
+  // Remove the sync byte since it was already consumed above.
+  proto.feed(wire.data() + 1, static_cast<uint32_t>(wire.size() - 1));
+  fake_timestamp_ = 60;
+  proto.run();
+
+  EXPECT_TRUE(handler_called_);
+  ASSERT_EQ(handler_data_.size(), sizeof(payload));
+  EXPECT_EQ(handler_data_[0], 0xCD);
+}
+
+TEST_F(ProtocolTest, Timeout_NoTimestampCallbackDisablesTimeout) {
+  // When timestamp callback is null, timeout value is ignored.
+  instance_ = this;
+  ProtocolConfig cfg{};
+  cfg.write = write_callback;
+  cfg.read = nullptr;
+  cfg.timestamp = nullptr;  // no clock
+  cfg.frame_timeout = 10;   // non-zero, but should be ignored
+  Protocol proto{cfg};
+  stored_proto_ = &proto;
+
+  constexpr Tag kTag{0x0204};
+  EXPECT_TRUE(proto.add_handler(kTag, handler_callback));
+
+  // Feed a complete frame — should be received normally.
+  const uint8_t payload[] = {0xEF};
+  auto wire = make_wire(kTag, payload, sizeof(payload));
+  proto.feed(wire.data(), static_cast<uint32_t>(wire.size()));
+  proto.run();
+
+  EXPECT_TRUE(handler_called_);
 }
 
 }  // namespace
