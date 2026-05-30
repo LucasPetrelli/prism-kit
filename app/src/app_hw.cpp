@@ -8,52 +8,8 @@
 #include "oshal/status.h"
 #include "oshal/time.hpp"
 #include "prism_hw_executor.hpp"
-#include "prism_hw_mailbox.hpp"
 
 namespace app::internal {
-
-/* ========================================================================
- * PrismHwMailbox
- * ======================================================================== */
-
-PrismHwMailbox& PrismHwMailboxInstance() {
-  static PrismHwMailbox mailbox;
-  return mailbox;
-}
-
-int PrismHwMailbox::Publish(const SharedFrame& frame) {
-  if (frame.led_count > kFrameCapacity) {
-    return STATUS_ERR_INVALID_ARGUMENT;
-  }
-
-  const std::uint8_t next_frame_index = static_cast<std::uint8_t>(
-    (published_frame_index_.load(std::memory_order_relaxed) ^ 1U) & 0x1U);
-  const std::uint32_t next_generation =
-    published_generation_.load(std::memory_order_relaxed) + 1U;
-
-  frames_[next_frame_index] = frame;
-  published_frame_index_.store(next_frame_index, std::memory_order_release);
-  published_generation_.store(next_generation, std::memory_order_release);
-  return STATUS_OK;
-}
-
-bool PrismHwMailbox::Poll(SharedFrame& out_frame,
-                          std::uint32_t last_seen_generation) const {
-  const std::uint32_t published_generation =
-    published_generation_.load(std::memory_order_acquire);
-  if (published_generation == last_seen_generation) {
-    return false;
-  }
-
-  const std::uint8_t published_frame_index =
-    published_frame_index_.load(std::memory_order_acquire);
-  out_frame = frames_[published_frame_index];
-  return true;
-}
-
-std::uint32_t PrismHwMailbox::SnapshotGeneration() const {
-  return published_generation_.load(std::memory_order_acquire);
-}
 
 /* ========================================================================
  * PrismHwExecutor
@@ -100,7 +56,7 @@ int PrismHwExecutor::PublishFrame(const SharedFrame& frame) {
     return exit_code;
   }
 
-  return PrismHwMailboxInstance().Publish(frame);
+  return mailbox_.Send(&frame);
 }
 
 bool PrismHwExecutor::IsRunning() const { return task_.is_valid(); }
@@ -125,7 +81,6 @@ bool PrismHwExecutor::Setup() {
    * is_ready() checks are unnecessary.
    */
   backend_strip_ = &bal::ws2812_strip();
-  observed_generation_ = PrismHwMailboxInstance().SnapshotGeneration();
 
   if (!PrintStartupBanners()) {
     return false;
@@ -153,7 +108,7 @@ bool PrismHwExecutor::Loop() {
 
 bool PrismHwExecutor::TryApplyLatest() {
   SharedFrame frame;
-  if (!PrismHwMailboxInstance().Poll(frame, observed_generation_)) {
+  if (!mailbox_.Receive(&frame)) {
     return true;  // no new frame — not an error
   }
 
@@ -161,8 +116,6 @@ bool PrismHwExecutor::TryApplyLatest() {
     return false;
   }
 
-  // Poll copies the frame but does not track generation — advance it here.
-  observed_generation_ = PrismHwMailboxInstance().SnapshotGeneration();
   return true;
 }
 

@@ -4,6 +4,7 @@
 #include "bal/led.hpp"
 #include "bal/ws2812_strip.hpp"
 #include "oshal/debug_port.hpp"
+#include "oshal/mailbox.hpp"
 #include "oshal/serial_port.hpp"
 #include "oshal/task.hpp"
 #include "prism_hw_mailbox.hpp"
@@ -16,7 +17,7 @@ namespace app::internal {
 /// `Configure()` injects the runtime service pointers (validated by the
 /// caller), and `Start()` creates the Zephyr-backed `app_hw` task.
 ///
-/// Once running, the task consumes committed frames from `PrismHwMailbox`,
+/// Once running, the task consumes committed frames from the OSHAL mailbox,
 /// applies them to the BAL-owned WS2812 strip, and blinks the board status
 /// LED at a steady 0.5 Hz.
 class PrismHwExecutor {
@@ -77,8 +78,7 @@ class PrismHwExecutor {
   /// @return True to keep running, false on fatal error.
   static bool LoopCallback(void* context);
 
-  /// @brief One-shot task setup: capture BAL singletons, print banners,
-  ///     snapshot mailbox generation.
+  /// @brief One-shot task setup: capture BAL singletons and print banners.
   /// @return True on success.
   bool Setup();
 
@@ -104,11 +104,13 @@ class PrismHwExecutor {
   /// @return false only on fatal hardware error from the LED driver.
   bool BlinkStatusLed();
 
+  /// @brief OSHAL-backed mailbox for frame delivery from APP to app_hw.
+  oshal::Mailbox<sizeof(SharedFrame), 1U> mailbox_;
+
   bal::Ws2812Strip* backend_strip_ = nullptr;
   bal::Led* status_led_ = nullptr;
   oshal::DebugPort* debug_port_ = nullptr;
   oshal::SerialPort* command_port_ = nullptr;
-  std::uint32_t observed_generation_ = 0U;
   std::uint32_t blink_tick_ = 0U;
   oshal::TaskHandle task_;
 };
