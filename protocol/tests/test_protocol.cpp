@@ -13,46 +13,35 @@ namespace protocol {
 namespace {
 
 // ============================================================================
-// Helpers — construct escaped wire-format bytes
+// Helpers — construct wire-format bytes
 // ============================================================================
 
-/// Append a single byte to the vector, escaping if needed.
-inline void push_escaped(std::vector<uint8_t>& buf, uint8_t b) {
-  if (b == kSyncByte || b == kEscapeByte) {
-    buf.push_back(kEscapeByte);
-    buf.push_back(static_cast<uint8_t>(b ^ kEscapeXor));
-  } else {
-    buf.push_back(b);
-  }
-}
-
 /// Build a complete frame on the wire:
-///   sync | escaped tag(2 LE) | escaped length(2 LE) | escaped data | escaped
-///   checksum
+///   sync | tag(2 LE) | length(2 LE) | data | checksum
 inline std::vector<uint8_t> make_wire(Tag tag, const uint8_t* data = nullptr,
                                       uint16_t length = 0) {
   std::vector<uint8_t> buf;
-  buf.reserve(1 + kHeaderSize * 2 + length * 2 + 2);
+  buf.reserve(1 + kHeaderSize + length + 1);
 
-  // Sync byte (never escaped).
+  // Sync byte.
   buf.push_back(kSyncByte);
 
   const uint16_t tag_val = static_cast<uint16_t>(tag);
 
-  // Header: tag LE (2) + length LE (2), escaped.
-  push_escaped(buf, static_cast<uint8_t>(tag_val & 0xFF));
-  push_escaped(buf, static_cast<uint8_t>((tag_val >> 8) & 0xFF));
-  push_escaped(buf, static_cast<uint8_t>(length & 0xFF));
-  push_escaped(buf, static_cast<uint8_t>((length >> 8) & 0xFF));
+  // Header: tag LE (2) + length LE (2).
+  buf.push_back(static_cast<uint8_t>(tag_val & 0xFF));
+  buf.push_back(static_cast<uint8_t>((tag_val >> 8) & 0xFF));
+  buf.push_back(static_cast<uint8_t>(length & 0xFF));
+  buf.push_back(static_cast<uint8_t>((length >> 8) & 0xFF));
 
-  // Data, escaped.
+  // Data.
   if (data && length > 0) {
     for (uint16_t i = 0; i < length; ++i) {
-      push_escaped(buf, data[i]);
+      buf.push_back(data[i]);
     }
   }
 
-  // Checksum: XOR of unescaped header + data, then escaped.
+  // Checksum: XOR of header + data.
   uint8_t cs = 0;
   cs ^= static_cast<uint8_t>(tag_val & 0xFF);
   cs ^= static_cast<uint8_t>((tag_val >> 8) & 0xFF);
@@ -63,7 +52,7 @@ inline std::vector<uint8_t> make_wire(Tag tag, const uint8_t* data = nullptr,
       cs ^= data[i];
     }
   }
-  push_escaped(buf, cs);
+  buf.push_back(cs);
 
   return buf;
 }
@@ -88,13 +77,13 @@ inline std::vector<uint8_t> make_wire_bad_length(Tag tag) {
   const uint16_t tag_val = static_cast<uint16_t>(tag);
   constexpr uint16_t bad_len = kMaxFrameDataLength + 1;
 
-  push_escaped(buf, static_cast<uint8_t>(tag_val & 0xFF));
-  push_escaped(buf, static_cast<uint8_t>((tag_val >> 8) & 0xFF));
-  push_escaped(buf, static_cast<uint8_t>(bad_len & 0xFF));
-  push_escaped(buf, static_cast<uint8_t>((bad_len >> 8) & 0xFF));
+  buf.push_back(static_cast<uint8_t>(tag_val & 0xFF));
+  buf.push_back(static_cast<uint8_t>((tag_val >> 8) & 0xFF));
+  buf.push_back(static_cast<uint8_t>(bad_len & 0xFF));
+  buf.push_back(static_cast<uint8_t>((bad_len >> 8) & 0xFF));
 
   // One byte of "data" plus checksum (invalid but enough to observe reset).
-  push_escaped(buf, 0x00);
+  buf.push_back(0x00);
 
   uint8_t cs = 0;
   cs ^= static_cast<uint8_t>(tag_val & 0xFF);
@@ -102,7 +91,7 @@ inline std::vector<uint8_t> make_wire_bad_length(Tag tag) {
   cs ^= static_cast<uint8_t>(bad_len & 0xFF);
   cs ^= static_cast<uint8_t>((bad_len >> 8) & 0xFF);
   cs ^= 0x00;
-  push_escaped(buf, cs);
+  buf.push_back(cs);
 
   return buf;
 }
@@ -485,94 +474,6 @@ TEST_F(ProtocolTest, Rx_ChecksumMismatch) {
   EXPECT_FALSE(handler_called_);
 }
 
-TEST_F(ProtocolTest, Rx_EscapedSyncByte) {
-  auto& proto = make_protocol();
-  constexpr Tag kTag{0x0103};
-  EXPECT_TRUE(proto.add_handler(kTag, handler_callback));
-
-  // Payload contains kSyncByte (0xAA), which must be escaped.
-  const uint8_t payload[] = {0xAA, 0x01, 0xAA, 0x02};
-  auto wire = make_wire(kTag, payload, sizeof(payload));
-  feed_and_run(proto, wire);
-
-  EXPECT_TRUE(handler_called_);
-  ASSERT_EQ(handler_data_.size(), sizeof(payload));
-  EXPECT_EQ(handler_data_[0], 0xAA);
-  EXPECT_EQ(handler_data_[2], 0xAA);
-}
-
-TEST_F(ProtocolTest, Rx_EscapedEscapeByte) {
-  auto& proto = make_protocol();
-  constexpr Tag kTag{0x0104};
-  EXPECT_TRUE(proto.add_handler(kTag, handler_callback));
-
-  // Payload contains kEscapeByte (0xBB), which must be escaped.
-  const uint8_t payload[] = {0xBB, 0x01, 0xBB, 0x02};
-  auto wire = make_wire(kTag, payload, sizeof(payload));
-  feed_and_run(proto, wire);
-
-  EXPECT_TRUE(handler_called_);
-  ASSERT_EQ(handler_data_.size(), sizeof(payload));
-  EXPECT_EQ(handler_data_[0], 0xBB);
-  EXPECT_EQ(handler_data_[2], 0xBB);
-}
-
-TEST_F(ProtocolTest, Rx_UnexpectedSyncResync) {
-  auto& proto = make_protocol();
-  constexpr Tag kTag{0x0105};
-  EXPECT_TRUE(proto.add_handler(kTag, handler_callback));
-
-  // Build a frame but insert a raw sync byte in the middle of the data.
-  const uint8_t payload_a[] = {0x11, 0x22};
-  auto wire = make_wire(kTag, payload_a, sizeof(payload_a));
-  // Replace an escaped byte in the data portion with a raw sync byte
-  // to force a mid-frame resync. Find the data start (byte 5) and corrupt it.
-  // Byte 5 (0-indexed) is the first data byte (sync=0, escaped header=4 bytes).
-  // Actually we need to be more careful. Let's construct manually.
-  //
-  // Build: sync | header(4 escaped) | data_start | 0xAA(raw) | rest...
-  // This will cause the parser to resync when it hits the raw 0xAA.
-
-  std::vector<uint8_t> corrupt;
-  corrupt.push_back(kSyncByte);  // sync
-
-  const uint16_t tv = static_cast<uint16_t>(kTag);
-  push_escaped(corrupt, static_cast<uint8_t>(tv & 0xFF));
-  push_escaped(corrupt, static_cast<uint8_t>((tv >> 8) & 0xFF));
-
-  const uint16_t len = 5;
-  push_escaped(corrupt, static_cast<uint8_t>(len & 0xFF));
-  push_escaped(corrupt, static_cast<uint8_t>((len >> 8) & 0xFF));
-
-  // First data byte — OK.
-  push_escaped(corrupt, 0x11);
-  // Raw sync byte mid-data (unescaped!) — triggers resync.
-  corrupt.push_back(kSyncByte);
-  // Rest of the data.
-  push_escaped(corrupt, 0x22);
-  push_escaped(corrupt, 0x33);
-  push_escaped(corrupt, 0x44);
-
-  // Checksum (matching the original 5 bytes: 0x11, 0xAA, 0x22, 0x33, 0x44).
-  uint8_t cs = 0;
-  cs ^= static_cast<uint8_t>(tv & 0xFF);
-  cs ^= static_cast<uint8_t>((tv >> 8) & 0xFF);
-  cs ^= static_cast<uint8_t>(len & 0xFF);
-  cs ^= static_cast<uint8_t>((len >> 8) & 0xFF);
-  cs ^= 0x11;
-  cs ^= 0xAA;
-  cs ^= 0x22;
-  cs ^= 0x33;
-  cs ^= 0x44;
-  push_escaped(corrupt, cs);
-
-  feed_and_run(proto, corrupt);
-
-  // Handler should NOT be called — the parser resyncs on the raw 0xAA
-  // and the partial frame is discarded.
-  EXPECT_FALSE(handler_called_);
-}
-
 TEST_F(ProtocolTest, Rx_MultipleFrames) {
   auto& proto = make_protocol();
   constexpr Tag kTag{0x0106};
@@ -809,10 +710,11 @@ TEST_F(ProtocolTest, Edge_EmptyFeed) {
   // Should not crash — nothing dispatched.
 }
 
-TEST_F(ProtocolTest, Edge_HeaderBytesNeedEscaping) {
+TEST_F(ProtocolTest, Edge_HeaderBytesWithSpecialValues) {
   auto& proto = make_protocol();
 
-  // Use a tag value that contains 0xAA or 0xBB to test header escaping.
+  // Use a tag value that contains 0xAA and 0xBB to verify round-trip
+  // without any byte-stuffing.
   constexpr Tag kTag{0xAABB};
   EXPECT_TRUE(proto.add_handler(kTag, handler_callback));
 

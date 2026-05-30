@@ -15,30 +15,13 @@ Each frame on the wire has the following layout:
 | Tag      | 2              | Command tag, little-endian                     |
 | Length   | 2              | Data payload length in bytes, little-endian    |
 | Data     | Length         | Payload (may be zero bytes)                    |
-| Checksum | 1              | XOR of unescaped Tag + Length + Data           |
-
-### Escaping
-
-Within the Tag, Length, Data, and Checksum fields, two byte values are
-reserved and must be escaped on the wire:
-
-| Original | Wire Encoding | Notes                        |
-| -------- | ------------- | ---------------------------- |
-| `0xAA`   | `0xBB 0xAB`  | Sync byte                    |
-| `0xBB`   | `0xBB 0xBA`  | Escape byte                  |
-
-General rule: any `0xAA` or `0xBB` in the payload (after the sync byte but
-before the end of the frame) is transmitted as `0xBB` followed by
-`original ^ 0x01`. The leading sync byte is never escaped.
-
-The receiver reverses the process: a `0xBB` byte signals that the next byte
-must be XORed with `0x01` to recover the original value.
+| Checksum | 1              | XOR of Tag + Length + Data                   |
 
 ### Checksum
 
-The checksum is the XOR of all **unescaped** bytes in the Tag (2 bytes),
-Length (2 bytes), and Data (Length bytes). The checksum byte itself is
-transmitted escaped if necessary.
+The checksum is the XOR of all bytes in the Tag (2 bytes),
+Length (2 bytes), and Data (Length bytes). The checksum byte is transmitted
+as-is.
 
 If the checksum does not match on reception, the frame is discarded and the
 parser re-synchronises.
@@ -48,8 +31,6 @@ parser re-synchronises.
 | Symbol                | Value   | Description                       |
 | --------------------- | ------- | --------------------------------- |
 | `kSyncByte`           | `0xAA`  | Frame start marker                |
-| `kEscapeByte`         | `0xBB`  | Escape prefix                     |
-| `kEscapeXor`          | `0x01`  | XOR mask for escaped bytes        |
 | `kHeaderSize`         | 4       | Tag + Length                      |
 | `kChecksumSize`       | 1       |                                   |
 | `kMaxFrameDataLength` | 256     | Max data payload bytes            |
@@ -115,29 +96,23 @@ Protocol proto(cfg);
 
 ```
 kWaitingForSync ──[0xAA]──▶ kReadingHeader ──[4 bytes]──▶ kReadingData
-      ▲                         │      ▲                    │
-      │                         │      │                    │
-      └────[error / resync]─────┘      │                    │
-                                       │              [length bytes]
-                                       │                    │
-                              kDispatching ◀──[OK]── kReadingChecksum
+      ▲                                                     │
+      │                                                     │
+      └──────────[error]────────────────────────────────────┘
+                                                            │
+                                                      [length bytes]
+                                                            │
+                                                   kDispatching ◀──[OK]── kReadingChecksum
 ```
 
 - **kWaitingForSync**: scan for `0xAA`. All other bytes are discarded.
-- **kReadingHeader**: accumulate 4 header bytes (unescaped). Validate
+- **kReadingHeader**: accumulate 4 header bytes. Validate
   `length ≤ kMaxFrameDataLength`. If invalid, reset.
-- **kReadingData**: accumulate `length` data bytes (unescaped).
+- **kReadingData**: accumulate `length` data bytes.
 - **kReadingChecksum**: read 1 checksum byte. If it matches the computed
   XOR, transition to dispatching; otherwise reset.
 - **kDispatching**: find a registered handler for the tag and invoke it.
-  If the tag is `kLoopback` and loopback is enabled, echo the frame back.
-
-### Resynchronisation
-
-If `0xAA` (sync byte) appears mid-frame (during header, data, or checksum
-reading), the parser resets to `kReadingHeader` and treats it as the start
-of a new frame. This allows recovery after a byte slip without waiting for
-a timeout.
+  If the tag is `kLoopback`, echo the frame back.
 
 ## Thread Safety
 

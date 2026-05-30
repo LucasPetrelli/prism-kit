@@ -5,18 +5,10 @@
 
 #include "tags.hpp"
 
-
 namespace protocol {
 
 /// @brief Sync byte that marks the start of every frame on the wire.
 constexpr uint8_t kSyncByte = 0xAA;
-
-/// @brief Escape byte used to stuff special bytes that appear in the payload.
-constexpr uint8_t kEscapeByte = 0xBB;
-
-/// @brief XOR mask applied to a byte when it is escaped.
-/// On the wire: kEscapeByte followed by (original ^ kEscapeXor).
-constexpr uint8_t kEscapeXor = 0x01;
 
 /// @brief Wire-level header size in bytes (tag + length, little-endian).
 constexpr size_t kHeaderSize = 4;

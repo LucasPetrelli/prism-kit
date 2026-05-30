@@ -139,8 +139,7 @@ void Protocol::run() {
       // ---------------------------------------------------------------
       case State::kReadingHeader: {
         uint8_t byte;
-        DecodeResult dr = consume_escaped_byte(raw, byte);
-        if (dr != DecodeResult::kByte) break;
+        consume_byte(raw, byte);
 
         rx_buffer_[rx_index_] = byte;
         ++rx_index_;
@@ -167,8 +166,7 @@ void Protocol::run() {
       // ---------------------------------------------------------------
       case State::kReadingData: {
         uint8_t byte;
-        DecodeResult dr = consume_escaped_byte(raw, byte);
-        if (dr != DecodeResult::kByte) break;
+        consume_byte(raw, byte);
 
         rx_buffer_[kHeaderSize + rx_index_] = byte;
         ++rx_index_;
@@ -182,8 +180,7 @@ void Protocol::run() {
       // ---------------------------------------------------------------
       case State::kReadingChecksum: {
         uint8_t received_checksum;
-        DecodeResult dr = consume_escaped_byte(raw, received_checksum);
-        if (dr != DecodeResult::kByte) break;
+        consume_byte(raw, received_checksum);
 
         uint8_t expected = compute_checksum(
           rx_buffer_, rx_buffer_ + kHeaderSize, rx_data_length_);
@@ -258,38 +255,31 @@ bool Protocol::write_frame_wire(const uint8_t* header, const uint8_t* data,
     return ok;
   };
 
-  // Emit one unescaped byte into the chunk, escaping if needed.
+  // Emit one raw byte into the chunk.
   auto emit = [&](uint8_t b) -> bool {
-    // 2 = worst-case expansion (escape prefix + escaped byte)
-    if (fill + 2 > kChunkSize) {
+    if (fill + 1 > kChunkSize) {
       if (!flush()) return false;
     }
-    if (b == kSyncByte || b == kEscapeByte) {
-      chunk[fill++] = kEscapeByte;
-      chunk[fill++] = static_cast<uint8_t>(b ^ kEscapeXor);
-    } else {
-      chunk[fill++] = b;
-    }
+    chunk[fill++] = b;
     return true;
   };
 
-  // 1. Sync byte (never escaped).
-  if (fill + 1 > kChunkSize && !flush()) return false;
-  chunk[fill++] = kSyncByte;
+  // 1. Sync byte.
+  if (!emit(kSyncByte)) return false;
 
-  // 2. Header: 4 bytes (tag LE, length LE), escaped.
+  // 2. Header: 4 bytes (tag LE, length LE).
   for (size_t i = 0; i < kHeaderSize; ++i) {
     if (!emit(header[i])) return false;
   }
 
-  // 3. Data: data_length bytes, escaped.
+  // 3. Data: data_length bytes.
   if (data && data_length > 0) {
     for (uint16_t i = 0; i < data_length; ++i) {
       if (!emit(data[i])) return false;
     }
   }
 
-  // 4. Checksum: XOR of unescaped header + data, escaped.
+  // 4. Checksum: XOR of header + data.
   uint8_t checksum = compute_checksum(header, data, data_length);
   if (!emit(checksum)) return false;
 
@@ -314,7 +304,6 @@ void Protocol::reset_parser() {
   state_ = State::kWaitingForSync;
   rx_index_ = 0;
   rx_data_length_ = 0;
-  rx_escaped_ = false;
   rx_tag_ = 0;
 }
 
@@ -331,23 +320,7 @@ void Protocol::dispatch_frame() {
   // No handler registered for this tag — frame is silently dropped.
 }
 
-Protocol::DecodeResult Protocol::consume_escaped_byte(uint8_t raw,
-                                                      uint8_t& out) {
-  if (!rx_escaped_ && raw == kSyncByte) {
-    // Unexpected sync mid-frame — discard partial frame and resync.
-    rx_index_ = 0;
-    rx_escaped_ = false;
-    state_ = State::kReadingHeader;
-    return DecodeResult::kResync;
-  }
-  if (!rx_escaped_ && raw == kEscapeByte) {
-    rx_escaped_ = true;
-    return DecodeResult::kNeedMore;
-  }
-  out = rx_escaped_ ? static_cast<uint8_t>(raw ^ kEscapeXor) : raw;
-  rx_escaped_ = false;
-  return DecodeResult::kByte;
-}
+void Protocol::consume_byte(uint8_t raw, uint8_t& out) { out = raw; }
 
 void Protocol::loopback_impl_(void* context, const uint8_t* data,
                               uint16_t length) {
