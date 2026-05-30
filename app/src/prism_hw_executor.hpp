@@ -4,7 +4,8 @@
 #include "bal/led.hpp"
 #include "bal/ws2812_strip.hpp"
 #include "oshal/debug_port.hpp"
-#include "oshal/mailbox.hpp"
+#include "oshal/event.hpp"
+#include "oshal/event_mailbox.hpp"
 #include "oshal/serial_port.hpp"
 #include "oshal/task.hpp"
 #include "prism_hw_mailbox.hpp"
@@ -86,7 +87,11 @@ class PrismHwExecutor {
   /// @return True to keep running, false on fatal error.
   bool Loop();
 
-  /// @brief Poll the mailbox and apply any new frame to the strip.
+  /// @brief Drain all pending frames from the mailbox and apply them to
+  ///     the strip.
+  ///
+  /// The mailbox auto-clears the frame event when the last message is
+  /// consumed, so no explicit event acknowledge is needed here.
   /// @return false only on fatal hardware error.
   bool TryApplyLatest();
 
@@ -104,8 +109,14 @@ class PrismHwExecutor {
   /// @return false only on fatal hardware error from the LED driver.
   bool BlinkStatusLed();
 
+  /// @brief Event bitmask posted when a frame enters the mailbox.
+  static constexpr std::uint32_t kFrameEventMask = oshal::UserEvent(0);
+
   /// @brief OSHAL-backed mailbox for frame delivery from APP to app_hw.
-  oshal::Mailbox<sizeof(SharedFrame), 1U> mailbox_;
+  /// @note Posts kFrameEventMask to @ref frame_event_ on successful Send.
+  oshal::Event frame_event_;
+  oshal::EventMailbox<sizeof(SharedFrame), 1U> mailbox_{frame_event_,
+                                                        kFrameEventMask};
 
   bal::Ws2812Strip* backend_strip_ = nullptr;
   bal::Led* status_led_ = nullptr;

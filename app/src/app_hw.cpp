@@ -6,7 +6,6 @@
 #include "oshal/debug_port.hpp"
 #include "oshal/serial_port.hpp"
 #include "oshal/status.h"
-#include "oshal/time.hpp"
 #include "prism_hw_executor.hpp"
 
 namespace app::internal {
@@ -94,6 +93,8 @@ bool PrismHwExecutor::Loop() {
     return false;
   }
 
+  frame_event_.WaitAny(kFrameEventMask, kIdleSleepMs);
+
   if (!TryApplyLatest()) {
     return false;
   }
@@ -102,18 +103,15 @@ bool PrismHwExecutor::Loop() {
     return false;
   }
 
-  oshal::sleep_ms(kIdleSleepMs);
   return true;
 }
 
 bool PrismHwExecutor::TryApplyLatest() {
   SharedFrame frame;
-  if (!mailbox_.Receive(&frame)) {
-    return true;  // no new frame — not an error
-  }
-
-  if (ApplyFrame(frame) < 0) {
-    return false;
+  while (mailbox_.Receive(&frame)) {
+    if (ApplyFrame(frame) < 0) {
+      return false;
+    }
   }
 
   return true;
