@@ -87,6 +87,40 @@ The steady-state execution path is intentionally narrow:
 This keeps APP free of Zephyr headers and devicetree details while preserving a
 clear boot chain from Zephyr to OSHAL to BAL to APP.
 
+### HW Backend
+
+The HW backend (`app/src/`) owns the translation from logical Prism Kit
+strip operations to physical WS2812 mutations. It is split into two classes
+that share a lock-free SPSC mailbox:
+
+```
+┌──────────────────────────────┐     ┌──────────────────────────────┐
+│  prism_hw_backend.cpp        │     │  app_hw.cpp                  │
+│  (APP task — producer)       │     │  (app_hw task — consumer)    │
+│                              │     │                              │
+│  HardwareStrip::show()       │     │  PrismHwExecutor::Loop()     │
+│    → Executor().PublishFrame │     │    → TryApplyLatest()        │
+│         │                    │     │         │                    │
+│         ├── task guard       │     │         └→ Mailbox().Poll()  │
+│         └→ Mailbox().Publish │     │    → BlinkStatusLed()        │
+│                              │     │                              │
+│  prism::initialize()         │     │  PrismHwExecutor::Setup()    │
+│    → Executor().Configure()  │     │    → PrintStartupBanners()   │
+│    → Executor().Start()      │     │                              │
+└──────────────────────────────┘     └──────────────────────────────┘
+
+  Both access PrismHwMailbox() and PrismHwExecutor() via functions
+```
+
+| Class | Responsibility | Replaces |
+|-------|---------------|----------|
+| `PrismHwMailbox` | Lock-free SPSC double-buffered frame delivery. `Publish()` (release semantics) and `Poll()` (acquire semantics). | `SharedMailbox`, `g_prism_hw_mailbox`, `publish_prism_hw_frame()` |
+| `PrismHwExecutor` | Owns the app_hw task lifecycle and runtime: frame application, status-LED blink, startup banners. `Configure()` receives the former `RuntimeServices` pointers; `Start()` creates the task; `PublishFrame()` guards + delegates to the mailbox. | `RuntimeServices`, `PrismHwTaskState`, `g_prism_hw_task`, `ensure_prism_hw_started()`, all task callbacks and anon-ns helpers |
+
+`SharedFrame` remains a POD struct — it is the data payload, not behaviour.
+The internal header (`prism_hw_backend_internal.hpp`) declares both classes
+and their accessor functions; implementations live in `app_hw.cpp`.
+
 ## Setup/configuration Info
 
 ### Prerequisites

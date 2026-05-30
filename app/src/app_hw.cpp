@@ -1,63 +1,178 @@
-#include <atomic>
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
 
-#include "bal/led.hpp"
-#include "bal/rgb_led.hpp"
 #include "bal/ws2812_strip.hpp"
 #include "oshal/debug_port.hpp"
 #include "oshal/serial_port.hpp"
 #include "oshal/status.h"
 #include "oshal/time.hpp"
-#include "prism_hw_backend_internal.hpp"
+#include "prism_hw_executor.hpp"
+#include "prism_hw_mailbox.hpp"
 
 namespace app::internal {
 
-namespace {
+/* ========================================================================
+ * PrismHwMailbox
+ * ======================================================================== */
 
-constexpr std::uint32_t kAppHwIdleSleepMs = 10U;
-constexpr std::size_t kAppHwTaskStackSizeBytes = 1024U;
-constexpr int kAppHwTaskPriority = 0;
+PrismHwMailbox& PrismHwMailboxInstance() {
+  static PrismHwMailbox mailbox;
+  return mailbox;
+}
 
-/// @brief Desired status-LED half-period in milliseconds.
-/// @note 1000 ms half-period → toggle every 1 s → 0.5 Hz blink
-///     (one complete on/off cycle every 2 s).
-constexpr std::uint32_t kBlinkHalfPeriodMs = 1000U;
+int PrismHwMailbox::Publish(const SharedFrame& frame) {
+  if (frame.led_count > kFrameCapacity) {
+    return STATUS_ERR_INVALID_ARGUMENT;
+  }
 
-/// @brief Loop ticks between status-LED toggles, derived from the half-period.
-/// @note This couples to @ref kAppHwIdleSleepMs so the blink rate stays
-///     correct when the sleep interval changes.
-constexpr std::uint32_t kBlinkHalfPeriodTicks =
-  kBlinkHalfPeriodMs / kAppHwIdleSleepMs;
+  const std::uint8_t next_frame_index = static_cast<std::uint8_t>(
+    (published_frame_index_.load(std::memory_order_relaxed) ^ 1U) & 0x1U);
+  const std::uint32_t next_generation =
+    published_generation_.load(std::memory_order_relaxed) + 1U;
 
-static_assert((kBlinkHalfPeriodMs % kAppHwIdleSleepMs) == 0U,
-              "Blink half-period must be an exact multiple of the idle sleep "
-              "interval.");
+  frames_[next_frame_index] = frame;
+  published_frame_index_.store(next_frame_index, std::memory_order_release);
+  published_generation_.store(next_generation, std::memory_order_release);
+  return STATUS_OK;
+}
 
-struct PrismHwTaskState {
-  bal::Ws2812Strip* backend_strip = nullptr;
-  bal::Led* status_led = nullptr;
-  oshal::DebugPort* debug_port = nullptr;
-  oshal::SerialPort* command_port = nullptr;
-  std::uint32_t observed_generation = 0U;
-  std::uint32_t blink_tick = 0U;
-};
+bool PrismHwMailbox::Poll(SharedFrame& out_frame,
+                          std::uint32_t last_seen_generation) const {
+  const std::uint32_t published_generation =
+    published_generation_.load(std::memory_order_acquire);
+  if (published_generation == last_seen_generation) {
+    return false;
+  }
 
-PrismHwTaskState g_prism_hw_task_state = {};
+  const std::uint8_t published_frame_index =
+    published_frame_index_.load(std::memory_order_acquire);
+  out_frame = frames_[published_frame_index];
+  return true;
+}
 
-/*
- * Translate one committed Prism Kit frame into BAL strip mutations and flush
- * the result to the physical strip.  app_hw is the only APP-owned execution
- * context allowed to touch the BAL strip.
- */
-int apply_frame(const SharedFrame& frame, bal::Ws2812Strip& backend_strip) {
-  if (frame.led_count > backend_strip.led_count()) {
+std::uint32_t PrismHwMailbox::SnapshotGeneration() const {
+  return published_generation_.load(std::memory_order_acquire);
+}
+
+/* ========================================================================
+ * PrismHwExecutor
+ * ======================================================================== */
+
+PrismHwExecutor& PrismHwExecutorInstance() {
+  static PrismHwExecutor executor;
+  return executor;
+}
+
+void PrismHwExecutor::Configure(bal::Led* status_led,
+                                oshal::DebugPort* debug_port,
+                                oshal::SerialPort* command_port) {
+  status_led_ = status_led;
+  debug_port_ = debug_port;
+  command_port_ = command_port;
+}
+
+int PrismHwExecutor::Start() {
+  if (task_.is_valid()) {
+    return STATUS_OK;
+  }
+
+  oshal::TaskConfig config;
+  config.name = "app_hw";
+  config.setup = SetupCallback;
+  config.loop = LoopCallback;
+  config.context = this;
+  config.stack_size_bytes = kTaskStackSizeBytes;
+  config.priority = kTaskPriority;
+  return oshal::TaskHandle::create(task_, config);
+}
+
+int PrismHwExecutor::PublishFrame(const SharedFrame& frame) {
+  if (!task_.is_valid()) {
+    return STATUS_ERR_NOT_READY;
+  }
+
+  if (task_.has_exited()) {
+    int exit_code = STATUS_ERR_BACKEND;
+    if (task_.exit_code(&exit_code) < 0) {
+      return STATUS_ERR_BACKEND;
+    }
+    return exit_code;
+  }
+
+  return PrismHwMailboxInstance().Publish(frame);
+}
+
+bool PrismHwExecutor::IsRunning() const { return task_.is_valid(); }
+
+bool PrismHwExecutor::SetupCallback(void* context) {
+  auto* self = static_cast<PrismHwExecutor*>(context);
+  return (self != nullptr) && self->Setup();
+}
+
+bool PrismHwExecutor::LoopCallback(void* context) {
+  auto* self = static_cast<PrismHwExecutor*>(context);
+  if (self == nullptr) {
+    return false;
+  }
+  return self->Loop();
+}
+
+bool PrismHwExecutor::Setup() {
+  /*
+   * Capture pointers from the configure() injection and the BAL singleton.
+   * prism::initialize() already validated every resource — duplicate
+   * is_ready() checks are unnecessary.
+   */
+  backend_strip_ = &bal::ws2812_strip();
+  observed_generation_ = PrismHwMailboxInstance().SnapshotGeneration();
+
+  if (!PrintStartupBanners()) {
+    return false;
+  }
+
+  return true;
+}
+
+bool PrismHwExecutor::Loop() {
+  if ((backend_strip_ == nullptr) || (status_led_ == nullptr)) {
+    return false;
+  }
+
+  if (!TryApplyLatest()) {
+    return false;
+  }
+
+  if (!BlinkStatusLed()) {
+    return false;
+  }
+
+  oshal::sleep_ms(kIdleSleepMs);
+  return true;
+}
+
+bool PrismHwExecutor::TryApplyLatest() {
+  SharedFrame frame;
+  if (!PrismHwMailboxInstance().Poll(frame, observed_generation_)) {
+    return true;  // no new frame — not an error
+  }
+
+  if (ApplyFrame(frame) < 0) {
+    return false;
+  }
+
+  // Poll copies the frame but does not track generation — advance it here.
+  observed_generation_ = PrismHwMailboxInstance().SnapshotGeneration();
+  return true;
+}
+
+int PrismHwExecutor::ApplyFrame(const SharedFrame& frame) {
+  if (frame.led_count > backend_strip_->led_count()) {
     return STATUS_ERR_INVALID_ARGUMENT;
   }
 
   for (std::size_t index = 0; index < frame.led_count; ++index) {
-    bal::Ws2812Led* const pixel = backend_strip.led(index);
+    bal::Ws2812Led* const pixel = backend_strip_->led(index);
     if ((pixel == nullptr) || !pixel->is_ready()) {
       return STATUS_ERR_DEVICE_UNAVAILABLE;
     }
@@ -70,32 +185,26 @@ int apply_frame(const SharedFrame& frame, bal::Ws2812Strip& backend_strip) {
     }
   }
 
-  return backend_strip.show();
+  return backend_strip_->show();
 }
 
-/*
- * Print startup banners on the debug port and optional command port.
- * Called once from prism_hw_task_setup().
- */
-bool print_startup_banners(PrismHwTaskState& state) {
-  if (state.debug_port->printf("DebugPort online on %s, strip on %s\n",
-                               state.debug_port->name(),
-                               state.backend_strip->name()) < 0) {
+bool PrismHwExecutor::PrintStartupBanners() {
+  if (debug_port_->printf("DebugPort online on %s, strip on %s\n",
+                          debug_port_->name(), backend_strip_->name()) < 0) {
     return false;
   }
 
-  if (state.command_port != nullptr) {
+  if (command_port_ != nullptr) {
     char command_banner[96];
     const int command_banner_length =
       std::snprintf(command_banner, sizeof(command_banner),
-                    "CommandPort online on %s\n", state.command_port->name());
+                    "CommandPort online on %s\n", command_port_->name());
     if (command_banner_length < 0) {
       return false;
     }
 
-    if (state.command_port->write(
-          command_banner, static_cast<std::size_t>(command_banner_length)) <
-        0) {
+    if (command_port_->write(command_banner, static_cast<std::size_t>(
+                                               command_banner_length)) < 0) {
       return false;
     }
   }
@@ -103,142 +212,14 @@ bool print_startup_banners(PrismHwTaskState& state) {
   return true;
 }
 
-/*
- * Poll the shared mailbox for a new committed frame.  When a new generation is
- * observed the frame is copied out and applied to the physical strip.
- * Returns false only when apply_frame() reports a fatal hardware error.
- */
-bool try_apply_latest_frame(PrismHwTaskState& state) {
-  const std::uint32_t published_generation =
-    g_prism_hw_mailbox.published_generation.load(std::memory_order_acquire);
-  if (published_generation == state.observed_generation) {
+bool PrismHwExecutor::BlinkStatusLed() {
+  ++blink_tick_;
+  if (blink_tick_ < kBlinkHalfPeriodTicks) {
     return true;
   }
 
-  const std::uint8_t published_frame_index =
-    g_prism_hw_mailbox.published_frame_index.load(std::memory_order_acquire);
-  const SharedFrame frame = g_prism_hw_mailbox.frames[published_frame_index];
-  if (apply_frame(frame, *state.backend_strip) < 0) {
-    return false;
-  }
-
-  state.observed_generation = published_generation;
-  return true;
-}
-
-/*
- * Toggle the status LED at a steady 0.5 Hz (toggle every 1 s, one complete
- * on/off cycle every 2 s).  The half-period is measured in 10 ms loop ticks
- * derived from kBlinkHalfPeriodMs.
- * Returns false only when the LED toggle reports a fatal hardware error.
- */
-bool blink_status_led(PrismHwTaskState& state) {
-  ++state.blink_tick;
-  if (state.blink_tick < kBlinkHalfPeriodTicks) {
-    return true;
-  }
-
-  state.blink_tick = 0U;
-  return state.status_led->toggle() >= 0;
-}
-
-oshal::TaskConfig make_app_hw_task_config() {
-  oshal::TaskConfig config;
-  config.name = "app_hw";
-  config.setup = prism_hw_task_setup;
-  config.loop = prism_hw_task_loop;
-  config.context = nullptr;
-  config.stack_size_bytes = kAppHwTaskStackSizeBytes;
-  config.priority = kAppHwTaskPriority;
-  return config;
-}
-
-}  // namespace
-
-SharedMailbox g_prism_hw_mailbox = {};
-oshal::TaskHandle g_prism_hw_task;
-RuntimeServices g_prism_runtime_services = {};
-
-int ensure_prism_hw_started() {
-  if (g_prism_hw_task.is_valid()) {
-    return STATUS_OK;
-  }
-
-  return oshal::TaskHandle::create(g_prism_hw_task, make_app_hw_task_config());
-}
-
-int publish_prism_hw_frame(const SharedFrame& frame) {
-  if (!g_prism_hw_task.is_valid()) {
-    return STATUS_ERR_NOT_READY;
-  }
-
-  if (g_prism_hw_task.has_exited()) {
-    int exit_code = STATUS_ERR_BACKEND;
-    if (g_prism_hw_task.exit_code(&exit_code) < 0) {
-      return STATUS_ERR_BACKEND;
-    }
-
-    return exit_code;
-  }
-
-  if (frame.led_count > kPrismHwMailboxFrameCapacity) {
-    return STATUS_ERR_INVALID_ARGUMENT;
-  }
-
-  const std::uint8_t next_frame_index = static_cast<std::uint8_t>(
-    (g_prism_hw_mailbox.published_frame_index.load(std::memory_order_relaxed) ^
-     1U) &
-    0x1U);
-  const std::uint32_t next_generation =
-    g_prism_hw_mailbox.published_generation.load(std::memory_order_relaxed) +
-    1U;
-  g_prism_hw_mailbox.frames[next_frame_index] = frame;
-  g_prism_hw_mailbox.published_frame_index.store(next_frame_index,
-                                                 std::memory_order_release);
-  g_prism_hw_mailbox.published_generation.store(next_generation,
-                                                std::memory_order_release);
-  return STATUS_OK;
-}
-
-bool prism_hw_task_setup(void* context) {
-  static_cast<void>(context);
-
-  /*
-   * Capture pointers from RuntimeServices.  prism::initialize() already
-   * validated every resource — duplicate is_ready() checks are unnecessary.
-   */
-  g_prism_hw_task_state.backend_strip = &bal::ws2812_strip();
-  g_prism_hw_task_state.status_led = g_prism_runtime_services.status_led;
-  g_prism_hw_task_state.debug_port = g_prism_runtime_services.debug_port;
-  g_prism_hw_task_state.command_port = g_prism_runtime_services.command_port;
-
-  if (!print_startup_banners(g_prism_hw_task_state)) {
-    return false;
-  }
-
-  g_prism_hw_task_state.observed_generation =
-    g_prism_hw_mailbox.published_generation.load(std::memory_order_acquire);
-  return true;
-}
-
-bool prism_hw_task_loop(void* context) {
-  static_cast<void>(context);
-
-  if ((g_prism_hw_task_state.backend_strip == nullptr) ||
-      (g_prism_hw_task_state.status_led == nullptr)) {
-    return false;
-  }
-
-  if (!try_apply_latest_frame(g_prism_hw_task_state)) {
-    return false;
-  }
-
-  if (!blink_status_led(g_prism_hw_task_state)) {
-    return false;
-  }
-
-  oshal::sleep_ms(kAppHwIdleSleepMs);
-  return true;
+  blink_tick_ = 0U;
+  return status_led_->toggle() >= 0;
 }
 
 }  // namespace app::internal

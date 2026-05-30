@@ -9,7 +9,8 @@
 #include "oshal/time.hpp"
 #include "prism/strip.hpp"
 #include "prism/time.hpp"
-#include "prism_hw_backend_internal.hpp"
+#include "prism_hw_executor.hpp"
+#include "prism_hw_mailbox.hpp"
 
 namespace {
 
@@ -93,7 +94,8 @@ class HardwareStrip : public prism::Strip {
     }
 
     staged_frame_.led_count = led_count_;
-    return app::internal::publish_prism_hw_frame(staged_frame_);
+    return app::internal::PrismHwExecutorInstance().PublishFrame(
+      staged_frame_);
   }
 
   int set_led_color(std::size_t index, const prism::RgbColor& color) {
@@ -185,12 +187,11 @@ int initialize() {
     return STATUS_ERR_DEVICE_UNAVAILABLE;
   }
 
-  app::internal::g_prism_runtime_services.status_led = &status_led;
-  app::internal::g_prism_runtime_services.debug_port = &oshal::debug_port;
-  app::internal::g_prism_runtime_services.command_port = oshal::command_port;
+  app::internal::PrismHwExecutorInstance().Configure(
+    &status_led, &oshal::debug_port, oshal::command_port);
 
   /* Start the HW executor before publishing any committed strip frame. */
-  const int start_ret = app::internal::ensure_prism_hw_started();
+  const int start_ret = app::internal::PrismHwExecutorInstance().Start();
   if (start_ret < 0) {
     return start_ret;
   }
