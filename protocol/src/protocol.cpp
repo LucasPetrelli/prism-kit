@@ -1,5 +1,7 @@
 #include "protocol.hpp"
 
+#include <cstdarg>
+#include <cstdio>
 #include <cstring>
 
 namespace protocol {
@@ -41,6 +43,7 @@ FrameHeader Frame::parse_header(const uint8_t* wire_data) {
 Protocol::Protocol(const ProtocolConfig& config)
     : read_(config.read),
       write_(config.write),
+      debug_(config.debug),
       timestamp_(config.timestamp),
       frame_timeout_(config.frame_timeout) {
   // Tag 0x0000 (kLoopback) is always registered as the first handler entry.
@@ -91,20 +94,6 @@ bool Protocol::send(const Frame& frame) {
   }
   tx_data_ = tx_data_buffer_;
   return true;
-}
-
-// ============================================================================
-// Protocol — feed
-// ============================================================================
-
-void Protocol::feed(const uint8_t* data, uint32_t length) {
-  // Treat null data with nonzero length as a caller error — drop the feed.
-  if (!data) {
-    length = 0;
-  }
-  fed_data_ = data;
-  fed_length_ = length;
-  fed_offset_ = 0;
 }
 
 // ============================================================================
@@ -211,12 +200,6 @@ void Protocol::run() {
       }
     }
   }
-
-  // Clear fed data after processing; feed() must be called again for new
-  // push-based data.
-  fed_data_ = nullptr;
-  fed_length_ = 0;
-  fed_offset_ = 0;
 }
 
 // ============================================================================
@@ -224,12 +207,6 @@ void Protocol::run() {
 // ============================================================================
 
 bool Protocol::read_raw_byte(uint8_t& out) {
-  // Consume push-fed data first.
-  if (fed_data_ && fed_offset_ < fed_length_) {
-    out = fed_data_[fed_offset_];
-    ++fed_offset_;
-    return true;
-  }
   // Serve from the read-ahead cache when possible.
   if (readahead_idx_ < readahead_cnt_) {
     out = readahead_[readahead_idx_];
@@ -242,6 +219,7 @@ bool Protocol::read_raw_byte(uint8_t& out) {
     readahead_cnt_ =
       (n > sizeof(readahead_)) ? sizeof(readahead_) : static_cast<uint8_t>(n);
     if (readahead_cnt_ > 0) {
+      debug_log(readahead_, readahead_cnt_, "Rx %u bytes:", readahead_cnt_);
       readahead_idx_ = 1;
       out = readahead_[0];
       return true;
@@ -350,6 +328,70 @@ void Protocol::loopback_impl_(void* context, const uint8_t* data,
     std::memcpy(self->tx_data_buffer_, data, length);
   }
   self->tx_data_ = self->tx_data_buffer_;
+}
+
+// ============================================================================
+// Protocol — debug_log
+// ============================================================================
+
+void Protocol::debug_log(const char* fmt, ...) const {
+  std::va_list args;
+  va_start(args, fmt);
+  debug_log_impl(nullptr, 0, fmt, args);
+  va_end(args);
+}
+
+void Protocol::debug_log(const uint8_t* data, uint32_t length, const char* fmt,
+                         ...) const {
+  std::va_list args;
+  va_start(args, fmt);
+  debug_log_impl(data, length, fmt, args);
+  va_end(args);
+}
+
+void Protocol::debug_log_impl(const uint8_t* data, uint32_t length,
+                              const char* fmt, std::va_list args) const {
+  if (!debug_) {
+    return;
+  }
+
+  // Format the header: "[PROTO] <message>"
+  char buf[128];
+  const int header_len = std::vsnprintf(buf, sizeof(buf), fmt, args);
+  if (header_len < 0) {
+    return;
+  }
+
+  debug_("[PROTO] %s", buf);
+
+  if (!data || length == 0U) {
+    return;
+  }
+
+  // Hexdump: up to 16 bytes per line.
+  char line[64];
+  constexpr uint32_t kLineCapacity = sizeof(line) - 1U;
+  for (uint32_t offset = 0U; offset < length; offset += 16U) {
+    uint32_t pos = 0U;
+    const uint32_t remain = length - offset;
+    const uint32_t chunk = remain < 16U ? remain : 16U;
+    for (uint32_t i = 0U; i < chunk; ++i) {
+      if (i > 0U && pos < kLineCapacity) {
+        line[pos++] = ' ';
+      }
+      if (pos >= kLineCapacity) {
+        break;  // Line full — truncate this row.
+      }
+      const int wrote = std::snprintf(&line[pos], kLineCapacity - pos + 1U,
+                                      "%02X", data[offset + i]);
+      pos += static_cast<uint32_t>(wrote > 0 ? wrote : 0);
+      if (pos > kLineCapacity) {
+        pos = kLineCapacity;
+      }
+    }
+    line[pos] = '\0';
+    debug_("%s", line);
+  }
 }
 
 }  // namespace protocol

@@ -1,3 +1,4 @@
+#include <cstdarg>
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
@@ -93,6 +94,11 @@ bool PrismHwExecutor::Loop() {
     return false;
   }
 
+  /* Run the protocol engine — reads from the command port via the
+   * StreamReader callback and transmits any queued outbound frames
+   * (e.g. loopback echoes). */
+  protocol_.run();
+
   frame_event_.WaitAny(kFrameEventMask, kIdleSleepMs);
 
   if (!TryApplyLatest()) {
@@ -154,8 +160,9 @@ bool PrismHwExecutor::PrintStartupBanners() {
       return false;
     }
 
-    if (command_port_->write(command_banner, static_cast<std::size_t>(
-                                               command_banner_length)) < 0) {
+    if (command_port_->write(
+          reinterpret_cast<const std::uint8_t*>(command_banner),
+          static_cast<std::size_t>(command_banner_length)) < 0) {
       return false;
     }
   }
@@ -171,6 +178,41 @@ bool PrismHwExecutor::BlinkStatusLed() {
 
   blink_tick_ = 0U;
   return status_led_->toggle() >= 0;
+}
+
+uint32_t PrismHwExecutor::CommandPortRead(uint8_t* buffer, uint32_t length) {
+  auto& exec = PrismHwExecutorInstance();
+  auto* port = exec.command_port_;
+  if (port == nullptr) {
+    return 0U;
+  }
+
+  const int ret = port->read(buffer, static_cast<std::size_t>(length));
+  return ret < 0 ? 0U : static_cast<uint32_t>(ret);
+}
+
+bool PrismHwExecutor::CommandPortWrite(const uint8_t* data, uint32_t length) {
+  auto& exec = PrismHwExecutorInstance();
+  auto* port = exec.command_port_;
+  if (port == nullptr) {
+    return false;
+  }
+
+  return port->write(data, static_cast<std::size_t>(length)) >= 0;
+}
+
+int PrismHwExecutor::DebugPortPrintf(const char* fmt, ...) {
+  auto& exec = PrismHwExecutorInstance();
+  auto* dbg = exec.debug_port_;
+  if (dbg == nullptr) {
+    return -1;
+  }
+
+  std::va_list args;
+  va_start(args, fmt);
+  const int ret = dbg->vprintf(fmt, args);
+  va_end(args);
+  return ret;
 }
 
 }  // namespace app::internal

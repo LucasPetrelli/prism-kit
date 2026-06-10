@@ -17,6 +17,7 @@ DEFAULT_PORT_MATCH_TOKENS = ("Prism Kit",)
 DEFAULT_DEBUG_MARKER = "DebugPort online on"
 DEFAULT_COMMAND_MARKER = "CommandPort online on"
 DEFAULT_OPTIONAL_MARKERS = ("Booting Zephyr OS build",)
+DEFAULT_LOOPBACK_PAYLOAD = bytes.fromhex("01020304")
 
 
 @dataclass(frozen=True)
@@ -343,10 +344,8 @@ def capture_console(
 
             if (
                 "debug" in role_ports
-                and (
-                    "command" not in role_ports
-                    or role_ports["debug"] != role_ports["command"]
-                )
+                and "command" in role_ports
+                and role_ports["debug"] != role_ports["command"]
                 and seen_required.issuperset(required_markers)
             ):
                 return captured_lines, seen_required, seen_optional, role_ports
@@ -368,6 +367,136 @@ def print_captured_lines(captured_lines: dict[str, list[str]], stream: Any) -> N
     for device, lines in captured_lines.items():
         for line in lines:
             print(f"[{device}] {line}", file=stream)
+
+
+# ── Protocol wire-format helpers (for loopback testing) ──────────────────
+
+SYNC_BYTE = 0xAA
+TAG_LOOPBACK = 0x0000
+
+
+def build_loopback_frame(payload: bytes) -> bytes:
+    """Build a complete protocol wire frame for the loopback tag.
+
+    Wire format: sync(1) | tag(2 LE) | length(2 LE) | data(N) | checksum(1)
+    Checksum is XOR of tag + length + data bytes.
+    """
+    length = len(payload)
+    header = TAG_LOOPBACK.to_bytes(2, "little") + length.to_bytes(2, "little")
+
+    cs = 0
+    for b in header:
+        cs ^= b
+    for b in payload:
+        cs ^= b
+
+    return bytes([SYNC_BYTE]) + header + payload + bytes([cs])
+
+
+def parse_wire_frame(data: bytes) -> dict | None:
+    """Try to parse a single protocol wire frame from *data*.
+
+    Returns a dict with keys 'tag', 'payload', 'checksum_ok' on success,
+    or None if the frame is too short or the sync byte is wrong.
+    """
+    if len(data) < 8:
+        return None
+    if data[0] != SYNC_BYTE:
+        return None
+
+    tag = int.from_bytes(data[1:3], "little")
+    length = int.from_bytes(data[3:5], "little")
+
+    frame_size = 5 + length + 1  # sync + header + data + checksum
+    if len(data) < frame_size:
+        return None
+
+    payload = data[5 : 5 + length]
+    received_cs = data[5 + length]
+
+    # Compute expected checksum
+    expected_cs = 0
+    for b in data[1 : 5 + length]:
+        expected_cs ^= b
+
+    return {
+        "tag": tag,
+        "payload": payload,
+        "checksum_ok": received_cs == expected_cs,
+    }
+
+
+def run_loopback_test(
+    serial_module: Any,
+    command_device: str,
+    baudrate: int,
+    payload: bytes,
+    timeout: float = 5.0,
+) -> bool:
+    """Send a loopback frame and verify the echo response."""
+    frame = build_loopback_frame(payload)
+
+    with serial_module.Serial(
+        command_device, baudrate=baudrate, timeout=0.1, write_timeout=1.0
+    ) as port:
+        # Flush any stale data.
+        port.reset_input_buffer()
+        port.reset_output_buffer()
+
+        # Send the loopback frame.
+        port.write(frame)
+
+        # Read back bytes until we accumulate enough for a complete frame
+        # plus echo, or until the timeout expires.
+        deadline = time.monotonic() + timeout
+        accumulated = bytearray()
+        result: dict | None = None
+
+        while time.monotonic() < deadline:
+            chunk = port.read(64)
+            if chunk:
+                accumulated.extend(chunk)
+
+            result = parse_wire_frame(bytes(accumulated))
+            if result is not None:
+                break
+
+        if result is None:
+            print(
+                f"Loopback FAIL — no valid frame received within {timeout:.1f}s.",
+                file=sys.stderr,
+            )
+            if accumulated:
+                print(
+                    f"  Raw bytes received: {accumulated.hex()}",
+                    file=sys.stderr,
+                )
+            return False
+
+        if result["tag"] != TAG_LOOPBACK:
+            print(
+                f"Loopback FAIL — unexpected tag 0x{result['tag']:04X} "
+                f"(expected 0x{TAG_LOOPBACK:04X}).",
+                file=sys.stderr,
+            )
+            return False
+
+        if not result["checksum_ok"]:
+            print(
+                "Loopback FAIL — checksum mismatch on received frame.", file=sys.stderr
+            )
+            return False
+
+        if result["payload"] != payload:
+            print(
+                f"Loopback FAIL — payload mismatch. "
+                f"Sent {payload.hex()}, received {result['payload'].hex()}.",
+                file=sys.stderr,
+            )
+            return False
+
+    print("Loopback OK")
+    return True
 
 
 def main() -> int:
@@ -424,6 +553,8 @@ def main() -> int:
         missing_roles: list[str] = []
         if "debug" not in role_ports:
             missing_roles.append("debug")
+        if "command" not in role_ports:
+            missing_roles.append("command")
         if missing_roles:
             print(
                 "Smoke test failed. Missing required port role markers:\n"
@@ -453,6 +584,40 @@ def main() -> int:
         for marker in DEFAULT_OPTIONAL_MARKERS:
             if marker in seen_optional:
                 print(f"- {marker}")
+
+    command_device = role_ports.get("command")
+    if not command_device:
+        command_device = next(
+            (
+                p.device
+                for p in ports
+                if p.serial_number and p.device != role_ports.get("debug")
+            ),
+            None,
+        )
+
+    if not command_device:
+        print(
+            "Smoke test failed — no command port identified for loopback test.",
+            file=sys.stderr,
+        )
+        if args.no_default_requirements:
+            print(
+                "Note: use --command-port to specify the command port explicitly.",
+                file=sys.stderr,
+            )
+        return 1
+
+    print(
+        f"Sending loopback ({DEFAULT_LOOPBACK_PAYLOAD.hex()}) on "
+        f"{command_device} ..."
+    )
+    if not run_loopback_test(
+        serial, command_device, args.baudrate, DEFAULT_LOOPBACK_PAYLOAD
+    ):
+        print("Smoke test failed — loopback test did not succeed.", file=sys.stderr)
+        return 1
+
     return 0
 
 

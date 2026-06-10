@@ -9,6 +9,7 @@
 #include "oshal/serial_port.hpp"
 #include "oshal/task.hpp"
 #include "prism_hw_mailbox.hpp"
+#include "protocol.hpp"
 
 namespace app::internal {
 
@@ -109,6 +110,27 @@ class PrismHwExecutor {
   /// @return false only on fatal hardware error from the LED driver.
   bool BlinkStatusLed();
 
+  /// @brief Protocol StreamReader adapter — reads from the command port.
+  /// @param buffer Destination buffer.
+  /// @param length Maximum bytes to read.
+  /// @return Number of bytes actually read (0 if none available).
+  /// @note Returns 0 when command_port_ is null (not yet configured or
+  ///     absent).
+  static uint32_t CommandPortRead(std::uint8_t* buffer, uint32_t length);
+
+  /// @brief Protocol StreamWriter adapter — writes to the command port.
+  /// @param data   Data to write.
+  /// @param length Number of bytes to write.
+  /// @return true when all bytes were accepted by the transport.
+  /// @note Returns false when command_port_ is null.
+  static bool CommandPortWrite(const std::uint8_t* data, uint32_t length);
+
+  /// @brief Protocol DebugPrintf adapter — forwards to the debug port.
+  /// @param fmt  Printf-style format string.
+  /// @param ...  Variable arguments.
+  /// @return Number of characters printed, or a negative value on error.
+  static int DebugPortPrintf(const char* fmt, ...);
+
   /// @brief Event bitmask posted when a frame enters the mailbox.
   static constexpr std::uint32_t kFrameEventMask = oshal::UserEvent(0);
 
@@ -123,7 +145,18 @@ class PrismHwExecutor {
   oshal::DebugPort* debug_port_ = nullptr;
   oshal::SerialPort* command_port_ = nullptr;
   std::uint32_t blink_tick_ = 0U;
+  bool debug_banner_printed_ = false;
+  bool command_banner_printed_ = false;
   oshal::TaskHandle task_;
+
+  /// @brief Protocol engine for command-port RX/TX.
+  /// @note Constructed eagerly with singleton-accessor adapters. The
+  ///     adapters return 0/false until Configure() sets command_port_, so
+  ///     the protocol is effectively idle before the task starts.
+  /// @note RX uses feed() from Loop() rather than the StreamReader
+  ///     callback, giving the task explicit control over poll timing.
+  protocol::Protocol protocol_{protocol::ProtocolConfig{
+    CommandPortRead, CommandPortWrite, DebugPortPrintf}};
 };
 
 /// @brief Accessor for the process-wide PrismHwExecutor singleton.

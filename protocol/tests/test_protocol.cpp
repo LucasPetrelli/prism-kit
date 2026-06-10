@@ -145,22 +145,9 @@ class ProtocolTest : public ::testing::Test {
     self.handler_data_.assign(data, data + length);
   }
 
-  /// Create a Protocol with write capture enabled.
-  /// RX is handled via feed(); the stream reader is unused.
-  /// The Protocol lives in proto_ so stored_proto_ remains valid.
+  /// Create a Protocol with write capture and StreamReader-based RX.
+  /// Call set_reader_data() first to stage the wire bytes, then run().
   Protocol& make_protocol() {
-    instance_ = this;
-    ProtocolConfig cfg{};
-    cfg.write = write_callback;
-    cfg.read = nullptr;  // use feed() for RX
-    proto_.emplace(cfg);
-    stored_proto_ = &proto_.value();
-    return proto_.value();
-  }
-
-  /// Create a Protocol that reads from the StreamReader callback instead
-  /// of feed().  Call set_reader_data() first to stage the wire bytes.
-  Protocol& make_protocol_with_reader() {
     instance_ = this;
     ProtocolConfig cfg{};
     cfg.write = write_callback;
@@ -185,15 +172,12 @@ class ProtocolTest : public ::testing::Test {
     reader_offset_ = 0;
   }
 
-  /// Feed wire bytes and run the protocol.
-  /// When expect_tx is true, calls run() twice so that frames queued
-  /// by a handler (e.g. loopback echo) are transmitted on the second pass.
-  void feed_and_run(Protocol& proto, const std::vector<uint8_t>& wire,
-                    bool expect_tx = false) {
-    proto.feed(wire.data(), static_cast<uint32_t>(wire.size()));
+  /// Run the protocol through the StreamReader path and optionally
+  /// flush a queued TX frame (e.g. loopback echo) on a second pass.
+  void reader_run(Protocol& proto, bool flush_tx = false) {
     proto.run();
-    if (expect_tx) {
-      proto.run();  // Flush TX queued by the dispatched handler.
+    if (flush_tx) {
+      proto.run();
     }
   }
 
@@ -217,13 +201,13 @@ class ProtocolTest : public ::testing::Test {
   /// @brief Timestamp callback that returns the injectable fake_timestamp_.
   static uint32_t timestamp_callback() { return fake_timestamp_; }
 
-  /// Create a Protocol with feed-based RX and timeout support.
+  /// Create a Protocol with StreamReader-based RX and timeout support.
   Protocol& make_protocol_with_timeout(uint32_t frame_timeout) {
     instance_ = this;
     fake_timestamp_ = 0;
     ProtocolConfig cfg{};
     cfg.write = write_callback;
-    cfg.read = nullptr;
+    cfg.read = read_callback;
     cfg.timestamp = timestamp_callback;
     cfg.frame_timeout = frame_timeout;
     proto_.emplace(cfg);
@@ -257,7 +241,8 @@ TEST_F(ProtocolTest, Constructor_DefaultConfig) {
   // Verify by sending a loopback frame.
   const uint8_t payload[] = {0x01, 0x02, 0x03};
   auto wire = make_wire(Tag::kLoopback, payload, sizeof(payload));
-  feed_and_run(proto, wire, /*expect_tx=*/true);
+  set_reader_data(wire);
+  reader_run(proto, /*flush_tx=*/true);
 
   // Loopback should have echoed the data back via write_callback.
   auto expected = make_wire(Tag::kLoopback, payload, sizeof(payload));
@@ -294,7 +279,7 @@ TEST_F(ProtocolTest, Constructor_BothNull) {
   // Should not crash; loopback handler still registered.
   const uint8_t payload[] = {0x42};
   auto wire = make_wire(Tag::kLoopback, payload, sizeof(payload));
-  proto.feed(wire.data(), static_cast<uint32_t>(wire.size()));
+  set_reader_data(wire);
   proto.run();
   // Nothing to assert — just must not crash / hang.
 }
@@ -312,7 +297,8 @@ TEST_F(ProtocolTest, AddHandler_Success) {
   // Send a frame with that tag; handler should be invoked.
   const uint8_t payload[] = {0xDE, 0xAD};
   auto wire = make_wire(kTag, payload, sizeof(payload));
-  feed_and_run(proto, wire);
+  set_reader_data(wire);
+  reader_run(proto);
 
   EXPECT_TRUE(handler_called_);
   ASSERT_EQ(handler_data_.size(), sizeof(payload));
@@ -460,7 +446,8 @@ TEST_F(ProtocolTest, Rx_MinimalFrame) {
 
   // Zero-length frame.
   auto wire = make_wire(kTag, nullptr, 0);
-  feed_and_run(proto, wire);
+  set_reader_data(wire);
+  reader_run(proto);
 
   EXPECT_TRUE(handler_called_);
   EXPECT_TRUE(handler_data_.empty());
@@ -473,7 +460,8 @@ TEST_F(ProtocolTest, Rx_FrameWithData) {
 
   const uint8_t payload[] = {0xAA, 0xBB, 0xCC, 0xDD, 0xEE};
   auto wire = make_wire(kTag, payload, sizeof(payload));
-  feed_and_run(proto, wire);
+  set_reader_data(wire);
+  reader_run(proto);
 
   EXPECT_TRUE(handler_called_);
   ASSERT_EQ(handler_data_.size(), sizeof(payload));
@@ -489,7 +477,8 @@ TEST_F(ProtocolTest, Rx_ChecksumMismatch) {
 
   const uint8_t payload[] = {0x11, 0x22};
   auto wire = make_wire_bad_checksum(kTag, payload, sizeof(payload));
-  feed_and_run(proto, wire);
+  set_reader_data(wire);
+  reader_run(proto);
 
   // Handler should NOT be called because checksum was wrong.
   EXPECT_FALSE(handler_called_);
@@ -511,7 +500,7 @@ TEST_F(ProtocolTest, Rx_MultipleFrames) {
   combined.insert(combined.end(), w1.begin(), w1.end());
   combined.insert(combined.end(), w2.begin(), w2.end());
 
-  proto.feed(combined.data(), static_cast<uint32_t>(combined.size()));
+  set_reader_data(combined);
   proto.run();
 
   // Handler called once for the first frame.
@@ -535,7 +524,8 @@ TEST_F(ProtocolTest, Rx_GarbageBeforeSync) {
   auto frame = make_wire(kTag, payload, sizeof(payload));
   wire.insert(wire.end(), frame.begin(), frame.end());
 
-  feed_and_run(proto, wire);
+  set_reader_data(wire);
+  reader_run(proto);
 
   EXPECT_TRUE(handler_called_);
   ASSERT_EQ(handler_data_.size(), sizeof(payload));
@@ -549,7 +539,8 @@ TEST_F(ProtocolTest, Rx_LengthExceedsMax) {
   EXPECT_TRUE(proto.add_handler(kTag, handler_callback));
 
   auto wire = make_wire_bad_length(kTag);
-  feed_and_run(proto, wire);
+  set_reader_data(wire);
+  reader_run(proto);
 
   // Handler should NOT be called — parser resets on bad length.
   EXPECT_FALSE(handler_called_);
@@ -560,7 +551,7 @@ TEST_F(ProtocolTest, Rx_LengthExceedsMax) {
 // ============================================================================
 
 TEST_F(ProtocolTest, Rx_StreamReader_Basic) {
-  auto& proto = make_protocol_with_reader();
+  auto& proto = make_protocol();
   constexpr Tag kTag{0x0110};
   EXPECT_TRUE(proto.add_handler(kTag, handler_callback));
 
@@ -578,7 +569,7 @@ TEST_F(ProtocolTest, Rx_StreamReader_Basic) {
 }
 
 TEST_F(ProtocolTest, Rx_StreamReader_MultipleFrames) {
-  auto& proto = make_protocol_with_reader();
+  auto& proto = make_protocol();
   constexpr Tag kTag{0x0111};
   EXPECT_TRUE(proto.add_handler(kTag, handler_callback));
 
@@ -600,7 +591,7 @@ TEST_F(ProtocolTest, Rx_StreamReader_MultipleFrames) {
 }
 
 TEST_F(ProtocolTest, Rx_StreamReader_NoData) {
-  auto& proto = make_protocol_with_reader();
+  auto& proto = make_protocol();
   constexpr Tag kTag{0x0112};
   EXPECT_TRUE(proto.add_handler(kTag, handler_callback));
 
@@ -612,7 +603,7 @@ TEST_F(ProtocolTest, Rx_StreamReader_NoData) {
 }
 
 TEST_F(ProtocolTest, Rx_StreamReader_LargeReadAhead) {
-  auto& proto = make_protocol_with_reader();
+  auto& proto = make_protocol();
   constexpr Tag kTag{0x0113};
   EXPECT_TRUE(proto.add_handler(kTag, handler_callback));
 
@@ -645,7 +636,8 @@ TEST_F(ProtocolTest, Loopback_EchoesBack) {
 
   const uint8_t payload[] = {0xAB, 0xCD, 0xEF};
   auto wire = make_wire(Tag::kLoopback, payload, sizeof(payload));
-  feed_and_run(proto, wire, /*expect_tx=*/true);
+  set_reader_data(wire);
+  reader_run(proto, /*flush_tx=*/true);
 
   // The loopback handler echoes the data back via the write callback.
   auto expected = make_wire(Tag::kLoopback, payload, sizeof(payload));
@@ -661,11 +653,12 @@ TEST_F(ProtocolTest, Loopback_AfterUserFrame) {
   ASSERT_TRUE(user_frame.is_valid());
   EXPECT_TRUE(proto.send(user_frame));
 
-  // Feed a loopback frame and run.  TX phase sends the user frame first,
-  // then RX dispatches the loopback (TX is now free), which queues an echo.
+  // Feed a loopback frame via StreamReader.  TX phase sends the user
+  // frame first, then RX dispatches the loopback (TX is now free),
+  // which queues an echo.
   const uint8_t loop_data[] = {0x88};
   auto loop_wire = make_wire(Tag::kLoopback, loop_data, sizeof(loop_data));
-  proto.feed(loop_wire.data(), static_cast<uint32_t>(loop_wire.size()));
+  set_reader_data(loop_wire);
   proto.run();  // TX user frame + RX loopback → echo queued
 
   // First TX output: the user frame.
@@ -696,7 +689,8 @@ TEST_F(ProtocolTest, Edge_MaxPayloadLength) {
 
   auto wire =
     make_wire(kTag, payload.data(), static_cast<uint16_t>(payload.size()));
-  feed_and_run(proto, wire);
+  set_reader_data(wire);
+  reader_run(proto);
 
   EXPECT_TRUE(handler_called_);
   ASSERT_EQ(handler_data_.size(), payload.size());
@@ -705,28 +699,22 @@ TEST_F(ProtocolTest, Edge_MaxPayloadLength) {
   }
 }
 
-TEST_F(ProtocolTest, Edge_NullFeed) {
+TEST_F(ProtocolTest, Edge_NoReaderData) {
   auto& proto = make_protocol();
   constexpr Tag kTag{0x010A};
   EXPECT_TRUE(proto.add_handler(kTag, handler_callback));
 
-  // feed(nullptr, 0) should be a no-op.
-  proto.feed(nullptr, 0);
-  proto.run();
-  EXPECT_FALSE(handler_called_);
-
-  // feed(nullptr, non-zero) should also be safe.
-  proto.feed(nullptr, 10);
+  // Empty reader buffer — read_callback returns 0.
+  set_reader_data({});
   proto.run();
   EXPECT_FALSE(handler_called_);
 }
 
-TEST_F(ProtocolTest, Edge_EmptyFeed) {
+TEST_F(ProtocolTest, Edge_ZeroLengthReaderData) {
   auto& proto = make_protocol();
 
-  // Feed with valid pointer but zero length.
-  const uint8_t dummy = 0;
-  proto.feed(&dummy, 0);
+  // Empty reader buffer — read_callback returns 0.
+  set_reader_data({});
   proto.run();
   // Should not crash — nothing dispatched.
 }
@@ -741,7 +729,8 @@ TEST_F(ProtocolTest, Edge_HeaderBytesWithSpecialValues) {
 
   const uint8_t payload[] = {0x12, 0x34};
   auto wire = make_wire(kTag, payload, sizeof(payload));
-  feed_and_run(proto, wire);
+  set_reader_data(wire);
+  reader_run(proto);
 
   EXPECT_TRUE(handler_called_);
   ASSERT_EQ(handler_data_.size(), sizeof(payload));
@@ -764,7 +753,8 @@ TEST_F(ProtocolTest, Timeout_DisabledWhenZero) {
 
   const uint8_t payload[] = {0x42};
   auto wire = make_wire(kTag, payload, sizeof(payload));
-  feed_and_run(proto, wire);
+  set_reader_data(wire);
+  reader_run(proto);
 
   EXPECT_TRUE(handler_called_);
 }
@@ -784,7 +774,8 @@ TEST_F(ProtocolTest, Timeout_CompletesBeforeDeadline) {
   // Feed the whole frame; timestamps pick up on sync then after each byte.
   // The clock advances once at sync time; rest is within the same run() call
   // so the timeout check happens at the top of the next run().
-  feed_and_run(proto, wire);
+  set_reader_data(wire);
+  reader_run(proto);
 
   EXPECT_TRUE(handler_called_);
   ASSERT_EQ(handler_data_.size(), sizeof(payload));
@@ -795,10 +786,10 @@ TEST_F(ProtocolTest, Timeout_ResetsOnExpiry) {
   constexpr Tag kTag{0x0202};
   EXPECT_TRUE(proto.add_handler(kTag, handler_callback));
 
-  // Feed only the sync byte — parser moves to kReadingHeader.
+  // Feed only the sync byte via reader — parser moves to kReadingHeader.
   std::vector<uint8_t> partial;
   partial.push_back(kSyncByte);
-  proto.feed(partial.data(), static_cast<uint32_t>(partial.size()));
+  set_reader_data(partial);
   fake_timestamp_ = 0;
   proto.run();  // sees sync, records frame_start_ts_ = 0, state → ReadingHeader
 
@@ -811,7 +802,8 @@ TEST_F(ProtocolTest, Timeout_ResetsOnExpiry) {
   // stale partial frame was discarded.
   const uint8_t payload[] = {0xAB};
   auto wire = make_wire(kTag, payload, sizeof(payload));
-  feed_and_run(proto, wire);
+  set_reader_data(wire);
+  reader_run(proto);
 
   EXPECT_TRUE(handler_called_);
   ASSERT_EQ(handler_data_.size(), sizeof(payload));
@@ -823,10 +815,10 @@ TEST_F(ProtocolTest, Timeout_ResetsOnlyWhenExpired) {
   constexpr Tag kTag{0x0203};
   EXPECT_TRUE(proto.add_handler(kTag, handler_callback));
 
-  // Feed partial frame (sync byte only).
+  // Feed partial frame (sync byte only) via reader.
   std::vector<uint8_t> partial;
   partial.push_back(kSyncByte);
-  proto.feed(partial.data(), static_cast<uint32_t>(partial.size()));
+  set_reader_data(partial);
   fake_timestamp_ = 0;
   proto.run();
 
@@ -834,11 +826,12 @@ TEST_F(ProtocolTest, Timeout_ResetsOnlyWhenExpired) {
   fake_timestamp_ = 50;
   proto.run();  // should NOT reset — still within timeout
 
-  // Feed the rest of the frame.
+  // Feed the rest of the frame via reader (skip sync byte already consumed).
+  // Rebuild reader data with the remaining bytes.
   const uint8_t payload[] = {0xCD};
   auto wire = make_wire(kTag, payload, sizeof(payload));
-  // Remove the sync byte since it was already consumed above.
-  proto.feed(wire.data() + 1, static_cast<uint32_t>(wire.size() - 1));
+  reader_data_.assign(wire.data() + 1, wire.data() + wire.size());
+  reader_offset_ = 0;
   fake_timestamp_ = 60;
   proto.run();
 
@@ -852,7 +845,7 @@ TEST_F(ProtocolTest, Timeout_NoTimestampCallbackDisablesTimeout) {
   instance_ = this;
   ProtocolConfig cfg{};
   cfg.write = write_callback;
-  cfg.read = nullptr;
+  cfg.read = read_callback;
   cfg.timestamp = nullptr;  // no clock
   cfg.frame_timeout = 10;   // non-zero, but should be ignored
   Protocol proto{cfg};
@@ -861,10 +854,10 @@ TEST_F(ProtocolTest, Timeout_NoTimestampCallbackDisablesTimeout) {
   constexpr Tag kTag{0x0204};
   EXPECT_TRUE(proto.add_handler(kTag, handler_callback));
 
-  // Feed a complete frame — should be received normally.
+  // Feed a complete frame via reader — should be received normally.
   const uint8_t payload[] = {0xEF};
   auto wire = make_wire(kTag, payload, sizeof(payload));
-  proto.feed(wire.data(), static_cast<uint32_t>(wire.size()));
+  set_reader_data(wire);
   proto.run();
 
   EXPECT_TRUE(handler_called_);

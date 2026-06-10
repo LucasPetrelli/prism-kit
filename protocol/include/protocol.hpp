@@ -1,6 +1,7 @@
 #pragma once
 
 #include <array>
+#include <cstdarg>
 #include <cstddef>
 #include <cstdint>
 
@@ -38,10 +39,18 @@ using FrameHandler = void (*)(void* context, const uint8_t* data,
 ///         delta checks work correctly across wraparound.
 using TimestampCallback = uint32_t (*)();
 
+/// @brief Optional debug-printf callback.  Protocol uses this to dump
+///     diagnostic information (hexdumps, parser state) during development.
+/// @param fmt  Printf-style format string.
+/// @param ...  Variable arguments matching the format string.
+/// @return Number of characters printed, or a negative value on error.
+using DebugPrintf = int (*)(const char* fmt, ...);
+
 /// @brief Configuration for a Protocol instance.
 struct ProtocolConfig {
-  StreamReader read;   ///< Non-blocking stream read callback.
-  StreamWriter write;  ///< Non-blocking stream write callback.
+  StreamReader read;           ///< Non-blocking stream read callback.
+  StreamWriter write;          ///< Non-blocking stream write callback.
+  DebugPrintf debug{nullptr};  ///< Optional debug-printf sink.
   TimestampCallback timestamp{nullptr};  ///< Optional timestamp source for
                                          ///< frame timeout.
   uint32_t frame_timeout{0};  ///< Max ticks between sync and full frame
@@ -110,12 +119,20 @@ class Protocol {
   /// outgoing frame. Call this periodically from the main task loop.
   void run();
 
-  /// @brief Feed received bytes directly into the protocol parser.
-  /// @param data   Pointer to received bytes.
-  /// @param length Number of bytes received.
-  /// @note Use this instead of the StreamReader callback for push-based
-  ///       data delivery. Bytes are consumed on the next call to run().
-  void feed(const uint8_t* data, uint32_t length);
+  /// @brief Print a diagnostic message through the debug callback.
+  /// @param fmt  Printf-style format string.
+  /// @param ...  Format arguments.
+  /// @note Prepends "[PROTO] " to every message.
+  void debug_log(const char* fmt, ...) const;
+
+  /// @brief Print a diagnostic message with an optional hexdump.
+  /// @param data    Data to hexdump (nullptr to skip).
+  /// @param length  Number of bytes to hexdump.
+  /// @param fmt     Printf-style format string.
+  /// @param ...     Format arguments.
+  /// @note Prepends "[PROTO] " to every message.
+  void debug_log(const uint8_t* data, uint32_t length, const char* fmt,
+                 ...) const;
 
  private:
   enum class State : uint8_t {
@@ -167,9 +184,14 @@ class Protocol {
   /// @param out  Set to raw.
   static void consume_byte(uint8_t raw, uint8_t& out);
 
+  /// @brief Shared implementation for debug_log() overloads.
+  void debug_log_impl(const uint8_t* data, uint32_t length, const char* fmt,
+                      std::va_list args) const;
+
   // --- Configuration ---
   StreamReader read_{nullptr};
   StreamWriter write_{nullptr};
+  DebugPrintf debug_{nullptr};
   TimestampCallback timestamp_{nullptr};
   uint32_t frame_timeout_{0};
 
@@ -198,11 +220,6 @@ class Protocol {
   const uint8_t* tx_data_{nullptr};
   uint16_t tx_length_{0};
   uint16_t tx_tag_{0};
-
-  // --- Fed data ---
-  const uint8_t* fed_data_{nullptr};
-  uint32_t fed_length_{0};
-  uint32_t fed_offset_{0};
 };
 
 }  // namespace protocol
