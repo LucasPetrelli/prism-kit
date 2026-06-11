@@ -151,22 +151,6 @@ bool PrismHwExecutor::PrintStartupBanners() {
     return false;
   }
 
-  if (command_port_ != nullptr) {
-    char command_banner[96];
-    const int command_banner_length =
-      std::snprintf(command_banner, sizeof(command_banner),
-                    "CommandPort online on %s\n", command_port_->name());
-    if (command_banner_length < 0) {
-      return false;
-    }
-
-    if (command_port_->write(
-          reinterpret_cast<const std::uint8_t*>(command_banner),
-          static_cast<std::size_t>(command_banner_length)) < 0) {
-      return false;
-    }
-  }
-
   return true;
 }
 

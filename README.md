@@ -54,8 +54,9 @@ Notes:
 - `scripts/flash.py` uses SEGGER J-Link by default and resolves the newest
   supported artifact under `build/zephyr`.
 - `scripts/smoke_test.py` discovers the Prism Kit CDC ACM ports and, by
-  default, requires separate `DebugPort online on` and `CommandPort online on`
-  banners so the debug and command channels can be distinguished.
+  default, waits for `Task app_hw runtime:` and `Task app_main runtime:`
+  markers on the debug channel before running a loopback test on the command
+  channel. The command port is resolved as the other CDC ACM port.
 
 ## Architecture Summary
 

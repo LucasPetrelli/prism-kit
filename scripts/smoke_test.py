@@ -41,9 +41,12 @@ DEFAULT_BAUDRATE = 115200
 DEFAULT_WAIT_FOR_PORT_SECONDS = 10.0
 DEFAULT_CAPTURE_TIMEOUT_SECONDS = 12.0
 DEFAULT_PORT_MATCH_TOKENS = ("Prism Kit",)
-DEFAULT_DEBUG_MARKER = "DebugPort online on"
-DEFAULT_COMMAND_MARKER = "CommandPort online on"
+DEFAULT_DEBUG_MARKER = "Task app_hw runtime:"
 DEFAULT_OPTIONAL_MARKERS = ("Booting Zephyr OS build",)
+DEFAULT_REQUIRED_MARKERS = (
+    "Task app_hw runtime:",
+    "Task app_main runtime:",
+)
 DEFAULT_LOOPBACK_PAYLOAD = bytes.fromhex("01020304")
 
 
@@ -106,7 +109,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--no-default-requirements",
         action="store_true",
-        help="Do not require the built-in prism-kit debug/command markers.",
+        help="Do not require the built-in prism-kit debug marker.",
     )
     parser.add_argument(
         "--list-ports",
@@ -175,7 +178,13 @@ class SmokeTest:
 
         self._report_success()
 
-        if not self._run_loopback():
+        loopback_ok = self._run_loopback()
+
+        # Always dump the debug console content at the end — it may
+        # contain clues about why the loopback test succeeded or failed.
+        self._dump_debug_console()
+
+        if not loopback_ok:
             return 1
 
         return 0
@@ -227,6 +236,8 @@ class SmokeTest:
 
     def _capture_console(self) -> None:
         required_markers = [str(m) for m in self.args.require]
+        if not self.args.no_default_requirements:
+            required_markers.extend(DEFAULT_REQUIRED_MARKERS)
         (
             self.captured_lines,
             self.seen_required,
@@ -242,9 +253,7 @@ class SmokeTest:
             debug_marker=(
                 DEFAULT_DEBUG_MARKER if not self.args.no_default_requirements else ""
             ),
-            command_marker=(
-                DEFAULT_COMMAND_MARKER if not self.args.no_default_requirements else ""
-            ),
+            command_marker="",
             quiet=self.args.quiet,
         )
 
@@ -275,35 +284,22 @@ class SmokeTest:
     # ── Phase: validate port roles ─────────────────────────────────
 
     def _validate_roles(self) -> bool:
+        """Validate that the debug port was identified.
+
+        The command port is resolved later by exclusion (the non-debug port)
+        rather than by a dedicated banner.
+        """
         if self.args.no_default_requirements:
             return True
 
-        missing_roles: list[str] = []
         if "debug" not in self.role_ports:
-            missing_roles.append("debug")
-        if "command" not in self.role_ports:
-            missing_roles.append("command")
-        if missing_roles:
             print(
-                "Smoke test failed. Missing required port role markers:\n"
-                + "\n".join(f"- {role}" for role in missing_roles),
+                "Smoke test failed. Debug port marker was not observed.",
                 file=sys.stderr,
             )
             if any(self.captured_lines.values()):
                 print("Captured console output:", file=sys.stderr)
                 print_captured_lines(self.captured_lines, sys.stderr)
-            return False
-
-        if (
-            "command" in self.role_ports
-            and self.role_ports["debug"] == self.role_ports["command"]
-        ):
-            print(
-                "Smoke test failed. Debug and command markers were observed on "
-                "the same serial port.",
-                file=sys.stderr,
-            )
-            print_captured_lines(self.captured_lines, sys.stderr)
             return False
 
         return True
@@ -338,6 +334,21 @@ class SmokeTest:
             ),
             None,
         )
+
+    # ── Phase: dump debug console ──────────────────────────────────
+
+    def _dump_debug_console(self) -> None:
+        """Print the captured debug port output for diagnostics."""
+        debug_device = self.role_ports.get("debug")
+        if debug_device is None:
+            return
+        lines = self.captured_lines.get(debug_device)
+        if not lines:
+            print("Debug console: (no output captured)")
+            return
+        print("Debug console output:")
+        for line in lines:
+            print(f"  {line}")
 
     # ── Phase: run loopback test ───────────────────────────────────
 
