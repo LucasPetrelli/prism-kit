@@ -12,6 +12,7 @@ __cmake_systeminformation/
 # Local Python tooling.
 .venv/
 __pycache__/
+*.egg-info/
 
 # Editor and user-local build cache files.
 .vscode/*

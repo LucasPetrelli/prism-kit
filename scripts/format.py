@@ -1,4 +1,16 @@
 #!/usr/bin/env python3
+# /// script
+# requires-python = ">=3.10"
+# dependencies = []
+# ///
+
+"""Format repo C and C++ sources with the repo clang-format policy.
+
+Usage::
+
+    uv run format
+    uv run format --check
+"""
 
 from __future__ import annotations
 
@@ -7,7 +19,6 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
-
 
 DEFAULT_SOURCE_DIRS = (
     "app",

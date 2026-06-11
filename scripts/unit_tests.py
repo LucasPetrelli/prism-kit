@@ -1,9 +1,14 @@
 #!/usr/bin/env python3
+# /// script
+# requires-python = ">=3.10"
+# dependencies = []
+# ///
+
 """
 Compile and run the protocol unit-tests outside of the Zephyr build system.
 
-Usage:
-  python scripts/unit-tests.py [--build-dir PATH] [test args...]
+Usage::
+    uv run unit-tests [--build-dir PATH] [--clean] [test args...]
 
 The protocol module has no Zephyr dependencies so the tests compile with
 just a host g++ (or clang++) and CMake.  GoogleTest is fetched automatically

@@ -1,0 +1,38 @@
+[project]
+name = "prism-kit"
+version = "0.1.0"
+description = "Prism Kit firmware development tooling"
+requires-python = ">=3.10"
+dependencies = [
+    # Zephyr build prerequisites (from zephyr/scripts/requirements-base.txt)
+    "anytree",
+    "canopen",
+    "jsonschema",
+    "packaging",
+    "patool>=2.0.0",
+    "psutil>=5.6.6",
+    "pyelftools>=0.29",
+    "pykwalify",
+    "pylink-square",
+    "pyserial",
+    "PyYAML>=6.0",
+    "requests>=2.32.4",
+    "reuse",
+    "semver",
+    "tqdm>=4.67.1",
+    "west",
+]
+
+[project.scripts]
+build = "scripts.build:main"
+flash = "scripts.flash:main"
+format = "scripts.format:main"
+smoke-test = "scripts.smoke_test:main"
+unit-tests = "scripts.unit_tests:main"
+
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["scripts*"]

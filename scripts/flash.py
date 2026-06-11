@@ -1,4 +1,16 @@
 #!/usr/bin/env python3
+# /// script
+# requires-python = ">=3.10"
+# dependencies = []
+# ///
+
+"""Flash the newest Zephyr artifact to the XIAO SAMD21 with SEGGER J-Link.
+
+Usage::
+
+    uv run flash
+    uv run flash path/to/zephyr.elf --dry-run
+"""
 
 from __future__ import annotations
 
@@ -10,7 +22,6 @@ import subprocess
 import sys
 import tempfile
 from typing import Iterable
-
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 BUILD_DIR = REPO_ROOT / "build" / "zephyr"

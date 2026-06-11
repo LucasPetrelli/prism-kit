@@ -1,4 +1,17 @@
 #!/usr/bin/env python3
+# /// script
+# requires-python = ">=3.10"
+# dependencies = []
+# ///
+
+"""Build the prism-kit firmware via ``west build``.
+
+Usage::
+
+    uv run build
+    uv run build --no-opt
+    uv run build --debug-opt
+"""
 
 from __future__ import annotations
 
@@ -11,7 +24,6 @@ import re
 import shutil
 import subprocess
 import sys
-
 
 DEFAULT_TOOLCHAIN_ROOT = Path(
     r"C:\Program Files (x86)\Arm GNU Toolchain arm-none-eabi\14.2 rel1"
@@ -47,66 +59,57 @@ def repo_root() -> Path:
     return Path(__file__).resolve().parent.parent
 
 
-def repo_python_executable(root: Path) -> Path:
-    return root / ".venv" / "Scripts" / "python.exe"
-
-
-def candidate_python_executables(root: Path) -> tuple[Path, ...]:
-    candidates: list[Path] = [
-        repo_python_executable(root),
-        root.parent / ".venv" / "Scripts" / "python.exe",
-    ]
-
-    for sibling in sorted(root.parent.iterdir()):
-        if not sibling.is_dir() or sibling == root:
-            continue
-        candidates.append(sibling / ".venv" / "Scripts" / "python.exe")
-
-    unique_candidates: list[Path] = []
-    seen_candidates: set[Path] = set()
-    for candidate in candidates:
-        if candidate in seen_candidates:
-            continue
-        seen_candidates.add(candidate)
-        unique_candidates.append(candidate)
-
-    return tuple(unique_candidates)
-
-
-def python_supports_west(python_executable: Path) -> bool:
-    if not python_executable.is_file():
+def _python_has_west(python_exe: Path) -> bool:
+    """Return True if *python_exe* can import the ``west`` module."""
+    try:
+        result = subprocess.run(
+            [str(python_exe), "-m", "west", "--version"],
+            check=False,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            timeout=10,
+        )
+        return result.returncode == 0
+    except (OSError, subprocess.TimeoutExpired):
         return False
 
-    completed = subprocess.run(
-        [str(python_executable), "-m", "west", "--version"],
-        check=False,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-    )
-    return completed.returncode == 0
 
+def resolve_python_with_west(root: Path) -> Path:
+    """Return a Python executable that has ``west`` available.
 
-def ensure_repo_python(root: Path) -> Path:
-    current_python = Path(sys.executable).resolve()
-    for candidate in candidate_python_executables(root):
-        if not python_supports_west(candidate):
-            continue
+    Tries, in order:
+    1. The current interpreter (covers ``uv run build`` with west in venv).
+    2. The base interpreter outside the venv (covers system-wide ``west``).
+    3. The parent Zephyr workspace venv (``<root>/../.venv/Scripts/python.exe``).
+    """
+    candidates: list[Path] = [
+        Path(sys.executable).resolve(),
+    ]
 
-        resolved_candidate = candidate.resolve()
-        if current_python == resolved_candidate:
-            return current_python
+    # If we're inside a venv, the base interpreter may have west installed.
+    base = Path(sys.base_exec_prefix).resolve()
+    base_python = base / "python.exe" if os.name == "nt" else base / "bin" / "python3"
+    if base_python != candidates[0] and base_python.is_file():
+        candidates.append(base_python)
 
-        completed = subprocess.run(
-            [str(resolved_candidate), __file__, *sys.argv[1:]], check=False
-        )
-        raise SystemExit(completed.returncode)
+    candidates.append(root.parent / ".venv" / "Scripts" / "python.exe")
 
-    if python_supports_west(current_python):
-        return current_python
+    for candidate in candidates:
+        if candidate.is_file() and _python_has_west(candidate):
+            resolved = candidate.resolve()
+            if resolved == Path(sys.executable).resolve():
+                return resolved
+            # Re-execute with the candidate that has west.
+            completed = subprocess.run(
+                [str(resolved), __file__, *sys.argv[1:]], check=False
+            )
+            raise SystemExit(completed.returncode)
 
     raise SystemExit(
-        "Could not find a Python environment with the 'west' module installed. "
-        "Create a repo-local .venv or install west into a workspace Python environment, then rerun this script."
+        "The 'west' module was not found in the current Python environment or "
+        "in the parent workspace venv.\n"
+        "  Install it with:  uv tool install west\n"
+        "  Or run:           uv pip install west"
     )
 
 
@@ -273,7 +276,7 @@ def sanitize_compile_database(root: Path) -> None:
 def main() -> int:
     args = parse_args()
     root = repo_root()
-    python_exe = ensure_repo_python(root)
+    python_exe = resolve_python_with_west(root)
     ensure_required_submodules(root)
     toolchain_root = resolve_toolchain_root()
     extra_conf_files: list[Path] = []

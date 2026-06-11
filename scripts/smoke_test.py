@@ -8,9 +8,9 @@
 
 Usage::
 
-    uv run scripts/smoke_test.py
-    uv run scripts/smoke_test.py --port COM7 --command-port COM8
-    uv run scripts/smoke_test.py --list-ports
+    uv run smoke-test
+    uv run smoke-test --port COM7 --command-port COM8
+    uv run smoke-test --list-ports
 """
 
 from __future__ import annotations
@@ -19,8 +19,15 @@ import argparse
 from pathlib import Path
 import sys
 
-from modules import protocol  # type: ignore[import-unused]  # uv run adds scripts/ to sys.path
-from modules.serial_utils import (
+# Ensure the repo root is on sys.path so package imports resolve correctly
+# both when running directly (uv run scripts/smoke_test.py) and via entry
+# points (uv run smoke-test).
+_REPO_ROOT = str(Path(__file__).resolve().parent.parent)
+if _REPO_ROOT not in sys.path:
+    sys.path.insert(0, _REPO_ROOT)
+
+from scripts.modules import protocol
+from scripts.modules.serial_utils import (
     PortInfo,
     as_port_info,
     capture_console,
@@ -197,7 +204,7 @@ class SmokeTest:
     def _run_list_ports(self) -> None:
         assert self.list_ports is not None  # guarded by _import_serial
         visible = [as_port_info(p) for p in self.list_ports.comports()]
-        from modules.serial_utils import list_visible_ports
+        from scripts.modules.serial_utils import list_visible_ports
 
         list_visible_ports(visible)
 
@@ -232,8 +239,12 @@ class SmokeTest:
             capture_timeout=self.args.capture_timeout,
             required_markers=required_markers,
             optional_markers=DEFAULT_OPTIONAL_MARKERS,
-            debug_marker=DEFAULT_DEBUG_MARKER if not self.args.no_default_requirements else "",
-            command_marker=DEFAULT_COMMAND_MARKER if not self.args.no_default_requirements else "",
+            debug_marker=(
+                DEFAULT_DEBUG_MARKER if not self.args.no_default_requirements else ""
+            ),
+            command_marker=(
+                DEFAULT_COMMAND_MARKER if not self.args.no_default_requirements else ""
+            ),
             quiet=self.args.quiet,
         )
 
