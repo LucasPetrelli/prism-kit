@@ -48,7 +48,8 @@ Protocol::Protocol(const ProtocolConfig& config)
       frame_timeout_(config.frame_timeout),
       verbose_(config.verbose) {
   // Tag 0x0000 (kLoopback) is always registered as the first handler entry.
-  handlers_[0] = {Tag::kLoopback, &Protocol::loopback_impl_, this};
+  handlers_[static_cast<uint8_t>(Tag::kLoopback)] = {
+    Tag::kLoopback, &Protocol::loopback_impl_, this};
   handler_count_ = 1;
 }
 
@@ -102,19 +103,11 @@ bool Protocol::send(const Frame& frame) {
 // ============================================================================
 
 void Protocol::run() {
-  // ── TX phase: transmit pending frame ──
-  if (tx_data_) {
-    uint8_t header[4];
-    header[0] = static_cast<uint8_t>(tx_tag_ & 0xFF);
-    header[1] = static_cast<uint8_t>((tx_tag_ >> 8) & 0xFF);
-    header[2] = static_cast<uint8_t>(tx_length_ & 0xFF);
-    header[3] = static_cast<uint8_t>((tx_length_ >> 8) & 0xFF);
-
-    if (write_frame_wire(header, tx_data_, tx_length_)) {
-      tx_data_ = nullptr;
-    }
-    // If write fails, retry on the next run() call.
-  }
+  // Attempt transmission of any pending frame before processing new
+  // incoming data (gives a failed write from a previous run() a chance
+  // to retry) and again afterwards (to immediately send any frames
+  // queued by a handler during dispatch).
+  tx_phase();
 
   // ── RX phase: parse incoming bytes ──
 
@@ -209,6 +202,9 @@ void Protocol::run() {
       }
     }
   }
+
+  // Transmit any frame that was queued by a handler during dispatch.
+  tx_phase();
 }
 
 // ============================================================================
@@ -325,6 +321,21 @@ void Protocol::dispatch_frame() {
 }
 
 void Protocol::consume_byte(uint8_t raw, uint8_t& out) { out = raw; }
+
+void Protocol::tx_phase() {
+  if (tx_data_) {
+    uint8_t header[4];
+    header[0] = static_cast<uint8_t>(tx_tag_ & 0xFF);
+    header[1] = static_cast<uint8_t>((tx_tag_ >> 8) & 0xFF);
+    header[2] = static_cast<uint8_t>(tx_length_ & 0xFF);
+    header[3] = static_cast<uint8_t>((tx_length_ >> 8) & 0xFF);
+
+    if (write_frame_wire(header, tx_data_, tx_length_)) {
+      tx_data_ = nullptr;
+    }
+    // If write fails, retry on the next call.
+  }
+}
 
 void Protocol::loopback_impl_(void* context, const uint8_t* data,
                               uint16_t length) {

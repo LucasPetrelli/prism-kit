@@ -134,6 +134,10 @@ class PrismHwExecutor {
   /// @brief Event bitmask posted when a frame enters the mailbox.
   static constexpr std::uint32_t kFrameEventMask = oshal::UserEvent(0);
 
+  /// @brief Event bitmask posted when UART data arrives on the
+  ///     command port.
+  static constexpr std::uint32_t kCommandRxEventMask = oshal::UserEvent(1);
+
   /// @brief OSHAL-backed mailbox for frame delivery from APP to app_hw.
   /// @note Posts kFrameEventMask to @ref frame_event_ on successful Send.
   oshal::Event frame_event_;
@@ -153,8 +157,8 @@ class PrismHwExecutor {
   /// @note Constructed eagerly with singleton-accessor adapters. The
   ///     adapters return 0/false until Configure() sets command_port_, so
   ///     the protocol is effectively idle before the task starts.
-  /// @note RX uses feed() from Loop() rather than the StreamReader
-  ///     callback, giving the task explicit control over poll timing.
+  /// @note RX runs inside Loop() after the UART RX event wakes the task,
+  ///     rather than polling unconditionally every iteration.
   protocol::Protocol protocol_{protocol::ProtocolConfig{
     CommandPortRead, CommandPortWrite, DebugPortPrintf}};
 };

@@ -653,23 +653,27 @@ TEST_F(ProtocolTest, Loopback_AfterUserFrame) {
   ASSERT_TRUE(user_frame.is_valid());
   EXPECT_TRUE(proto.send(user_frame));
 
-  // Feed a loopback frame via StreamReader.  TX phase sends the user
-  // frame first, then RX dispatches the loopback (TX is now free),
-  // which queues an echo.
+  // Feed a loopback frame via StreamReader.  The first tx_phase() sends
+  // the pending user frame, then RX dispatches the loopback (TX is now
+  // free), which queues an echo that is immediately flushed by the
+  // second tx_phase().
   const uint8_t loop_data[] = {0x88};
   auto loop_wire = make_wire(Tag::kLoopback, loop_data, sizeof(loop_data));
   set_reader_data(loop_wire);
-  proto.run();  // TX user frame + RX loopback → echo queued
+  proto.run();  // tx → rx loopback → echo → tx (all in one call)
 
-  // First TX output: the user frame.
+  // Both frames are transmitted in a single run() call.
   auto expected_user = make_wire(Tag::kUserMin, user_data, sizeof(user_data));
-  expect_tx_bytes(expected_user);
+  auto expected_loop = make_wire(Tag::kLoopback, loop_data, sizeof(loop_data));
+  std::vector<uint8_t> expected;
+  expected.insert(expected.end(), expected_user.begin(), expected_user.end());
+  expected.insert(expected.end(), expected_loop.begin(), expected_loop.end());
+  expect_tx_bytes(expected);
 
-  // Second run() flushes the loopback echo.
+  // Second run() has nothing to do — no pending TX, no reader data.
   tx_data_.clear();
   proto.run();
-  auto expected_loop = make_wire(Tag::kLoopback, loop_data, sizeof(loop_data));
-  expect_tx_bytes(expected_loop);
+  EXPECT_TRUE(tx_data_.empty());
 }
 
 // ============================================================================

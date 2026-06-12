@@ -89,6 +89,15 @@ bool PrismHwExecutor::Setup() {
    */
   backend_strip_ = &bal::ws2812_strip();
 
+  /*
+   * Wire the command port to post to frame_event_ when UART data arrives.
+   * The task sleeps in WaitAny until either frame_event_ or UART data
+   * fires, then dispatches only the relevant handler.
+   */
+  if (command_port_ != nullptr) {
+    command_port_->set_rx_event(&frame_event_, kCommandRxEventMask);
+  }
+
   if (!PrintStartupBanners()) {
     return false;
   }
@@ -101,15 +110,26 @@ bool PrismHwExecutor::Loop() {
     return false;
   }
 
-  /* Run the protocol engine — reads from the command port via the
-   * StreamReader callback and transmits any queued outbound frames
-   * (e.g. loopback echoes). */
-  protocol_.run();
+  /*
+   * Block until a frame arrives from APP, UART data arrives on the
+   * command port, or the idle tick fires (for blink timing).
+   * Matching events are atomically cleared on successful return.
+   */
+  const uint32_t events =
+    frame_event_.WaitAny(kFrameEventMask | kCommandRxEventMask, kIdleSleepMs);
 
-  frame_event_.WaitAny(kFrameEventMask, kIdleSleepMs);
+  /* Run the protocol engine — feeds RX bytes through the parser and
+   * retries any pending TX frame.  Only runs when UART data arrived. */
+  if ((events & kCommandRxEventMask) != 0U) {
+    protocol_.run();
+  }
 
-  if (!TryApplyLatest()) {
-    return false;
+  /* Drain and apply any committed frames from APP.  The EventMailbox
+   * re-posts kFrameEventMask if more frames arrive during processing. */
+  if ((events & kFrameEventMask) != 0U) {
+    if (!TryApplyLatest()) {
+      return false;
+    }
   }
 
   if (!BlinkStatusLed()) {

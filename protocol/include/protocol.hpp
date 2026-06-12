@@ -187,6 +187,12 @@ class Protocol {
   /// @param out  Set to raw.
   static void consume_byte(uint8_t raw, uint8_t& out);
 
+  /// @brief Attempt to transmit the pending outgoing frame.
+  /// If successful, clears the TX-pending flag so a new frame can be
+  /// queued.  If the transport write fails, the frame remains pending
+  /// and will be retried on the next call.
+  void tx_phase();
+
   /// @brief Shared implementation for debug_log() overloads.
   void debug_log_impl(const uint8_t* data, uint32_t length, const char* fmt,
                       std::va_list args) const;
