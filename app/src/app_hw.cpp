@@ -9,16 +9,23 @@
 #include "oshal/status.h"
 #include "prism_hw_executor.hpp"
 
+namespace {
+
+/* PrismHwExecutor singleton.  File-scope construction is safe because no
+ * OSHAL or BAL services are touched in the default constructor — the executor
+ * only stores pointer/reference members that are wired up later by
+ * Configure(). */
+app::internal::PrismHwExecutor executor;
+
+}  // namespace
+
 namespace app::internal {
 
 /* ========================================================================
  * PrismHwExecutor
  * ======================================================================== */
 
-PrismHwExecutor& PrismHwExecutorInstance() {
-  static PrismHwExecutor executor;
-  return executor;
-}
+PrismHwExecutor& PrismHwExecutorInstance() { return executor; }
 
 void PrismHwExecutor::Configure(bal::Led* status_led,
                                 oshal::DebugPort* debug_port,
