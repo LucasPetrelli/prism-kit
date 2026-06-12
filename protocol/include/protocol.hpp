@@ -55,6 +55,9 @@ struct ProtocolConfig {
                                          ///< frame timeout.
   uint32_t frame_timeout{0};  ///< Max ticks between sync and full frame
                               ///< reception.  0 disables the timeout.
+  bool verbose{false};        ///< If true, print all state-machine breadcrumbs.
+                              ///< If false, print only error conditions (bad
+                              ///< length, CRC mismatch, timeout).
 };
 
 /// @brief TLV protocol engine with sync-byte framing and XOR checksum.
@@ -188,12 +191,21 @@ class Protocol {
   void debug_log_impl(const uint8_t* data, uint32_t length, const char* fmt,
                       std::va_list args) const;
 
+  /// @brief Like debug_log() but only emits when verbose_ is true.
+  void debug_verbose(const char* fmt, ...) const;
+
+  /// @brief Like debug_log(data, len, ...) but only emits when verbose_
+  ///        is true.
+  void debug_verbose(const uint8_t* data, uint32_t length, const char* fmt,
+                     ...) const;
+
   // --- Configuration ---
   StreamReader read_{nullptr};
   StreamWriter write_{nullptr};
   DebugPrintf debug_{nullptr};
   TimestampCallback timestamp_{nullptr};
   uint32_t frame_timeout_{0};
+  bool verbose_{false};
 
   // --- Handler table ---
   std::array<HandlerEntry, kMaxHandlers> handlers_{};

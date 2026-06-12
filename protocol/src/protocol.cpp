@@ -45,7 +45,8 @@ Protocol::Protocol(const ProtocolConfig& config)
       write_(config.write),
       debug_(config.debug),
       timestamp_(config.timestamp),
-      frame_timeout_(config.frame_timeout) {
+      frame_timeout_(config.frame_timeout),
+      verbose_(config.verbose) {
   // Tag 0x0000 (kLoopback) is always registered as the first handler entry.
   handlers_[0] = {Tag::kLoopback, &Protocol::loopback_impl_, this};
   handler_count_ = 1;
@@ -121,6 +122,7 @@ void Protocol::run() {
   if (frame_timeout_ > 0 && timestamp_ && state_ != State::kWaitingForSync) {
     uint32_t now = timestamp_();
     if (now - frame_start_ts_ > frame_timeout_) {
+      debug_log("Frame timeout (%u ticks)", frame_timeout_);
       reset_parser();
     }
   }
@@ -136,6 +138,7 @@ void Protocol::run() {
             frame_start_ts_ = timestamp_();
           }
           state_ = State::kReadingHeader;
+          debug_verbose("SYNC detected");
         }
         // Discard everything else while searching for sync.
         break;
@@ -151,9 +154,12 @@ void Protocol::run() {
         if (rx_index_ >= kHeaderSize) {
           FrameHeader hdr = Frame::parse_header(rx_buffer_);
           if (hdr.length > kMaxFrameDataLength) {
+            debug_log("Bad frame length: %u (max %u)", hdr.length,
+                      kMaxFrameDataLength);
             reset_parser();
             break;
           }
+          debug_verbose("Header: tag=0x%04X len=%u", hdr.tag, hdr.length);
           rx_tag_ = hdr.tag;
           rx_data_length_ = hdr.length;
           rx_index_ = 0;
@@ -176,6 +182,7 @@ void Protocol::run() {
         ++rx_index_;
 
         if (rx_index_ >= rx_data_length_) {
+          debug_verbose("Data complete: %u bytes", rx_data_length_);
           state_ = State::kReadingChecksum;
         }
         break;
@@ -190,10 +197,12 @@ void Protocol::run() {
           rx_buffer_, rx_buffer_ + kHeaderSize, rx_data_length_);
 
         if (received_checksum == expected) {
+          debug_verbose("CRC OK");
           dispatch_frame();
           reset_parser();
         } else {
-          // Checksum mismatch — discard frame and resync.
+          debug_log("CRC mismatch: got 0x%02X expected 0x%02X",
+                    received_checksum, expected);
           reset_parser();
         }
         break;
@@ -219,7 +228,7 @@ bool Protocol::read_raw_byte(uint8_t& out) {
     readahead_cnt_ =
       (n > sizeof(readahead_)) ? sizeof(readahead_) : static_cast<uint8_t>(n);
     if (readahead_cnt_ > 0) {
-      debug_log(readahead_, readahead_cnt_, "Rx %u bytes:", readahead_cnt_);
+      debug_verbose(readahead_, readahead_cnt_, "Rx %u bytes:", readahead_cnt_);
       readahead_idx_ = 1;
       out = readahead_[0];
       return true;
@@ -305,6 +314,7 @@ void Protocol::dispatch_frame() {
   // Search the handler table for a matching tag.
   for (uint8_t i = 0; i < handler_count_; ++i) {
     if (static_cast<uint16_t>(handlers_[i].tag) == rx_tag_) {
+      debug_verbose("Dispatch: tag=0x%04X", rx_tag_);
       handlers_[i].handler(handlers_[i].context, rx_buffer_ + kHeaderSize,
                            rx_data_length_);
       return;
@@ -334,20 +344,41 @@ void Protocol::loopback_impl_(void* context, const uint8_t* data,
 // Protocol — debug_log
 // ============================================================================
 
+// Helper macro to forward variadic arguments to debug_log_impl.
+// This avoids duplicating the va_list boilerplate in every overload.
+#define PROTOCOL_DEBUG_LOG_IMPL(data, length, fmt) \
+  do {                                             \
+    std::va_list args;                             \
+    va_start(args, fmt);                           \
+    debug_log_impl(data, length, fmt, args);       \
+    va_end(args);                                  \
+  } while (0)
+
 void Protocol::debug_log(const char* fmt, ...) const {
-  std::va_list args;
-  va_start(args, fmt);
-  debug_log_impl(nullptr, 0, fmt, args);
-  va_end(args);
+  PROTOCOL_DEBUG_LOG_IMPL(nullptr, 0, fmt);
 }
 
 void Protocol::debug_log(const uint8_t* data, uint32_t length, const char* fmt,
                          ...) const {
-  std::va_list args;
-  va_start(args, fmt);
-  debug_log_impl(data, length, fmt, args);
-  va_end(args);
+  PROTOCOL_DEBUG_LOG_IMPL(data, length, fmt);
 }
+
+void Protocol::debug_verbose(const char* fmt, ...) const {
+  if (!verbose_) {
+    return;
+  }
+  PROTOCOL_DEBUG_LOG_IMPL(nullptr, 0, fmt);
+}
+
+void Protocol::debug_verbose(const uint8_t* data, uint32_t length,
+                             const char* fmt, ...) const {
+  if (!verbose_) {
+    return;
+  }
+  PROTOCOL_DEBUG_LOG_IMPL(data, length, fmt);
+}
+
+#undef PROTOCOL_DEBUG_LOG_IMPL
 
 void Protocol::debug_log_impl(const uint8_t* data, uint32_t length,
                               const char* fmt, std::va_list args) const {
