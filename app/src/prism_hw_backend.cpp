@@ -7,6 +7,7 @@
 #include "oshal/serial_port.hpp"
 #include "oshal/status.h"
 #include "oshal/time.hpp"
+#include "prism/color.hpp"
 #include "prism/strip.hpp"
 #include "prism/time.hpp"
 #include "prism_hw_executor.hpp"
@@ -94,8 +95,7 @@ class HardwareStrip : public prism::Strip {
     }
 
     staged_frame_.led_count = led_count_;
-    return app::internal::PrismHwExecutorInstance().PublishFrame(
-      staged_frame_);
+    return app::internal::PrismHwExecutorInstance().PublishFrame(staged_frame_);
   }
 
   int set_led_color(std::size_t index, const prism::RgbColor& color) {

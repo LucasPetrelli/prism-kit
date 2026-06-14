@@ -2,6 +2,7 @@
 #include <cstdint>
 
 #include "app/app.hpp"
+#include "prism/color.hpp"
 #include "prism/strip.hpp"
 #include "prism/time.hpp"
 

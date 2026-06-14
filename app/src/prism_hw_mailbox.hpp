@@ -4,6 +4,7 @@
 #include <array>
 #include <cstddef>
 
+#include "prism/color.hpp"
 #include "prism/strip.hpp"
 
 namespace app::internal {

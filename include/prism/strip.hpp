@@ -4,18 +4,9 @@
 #include <cstddef>
 #include <cstdint>
 
+#include "prism/color.hpp"
+
 namespace prism {
-
-/// @brief Logical RGB color owned by Prism Kit strip interfaces.
-struct RgbColor {
-  /// @brief Red intensity component.
-  std::uint8_t red;
-  /// @brief Green intensity component.
-  std::uint8_t green;
-  /// @brief Blue intensity component.
-  std::uint8_t blue;
-};
-
 /// @brief Logical RGB LED view exposed by Prism Kit.
 class StripLed {
  public:

@@ -7,6 +7,7 @@
 #include "oshal/debug_port.hpp"
 #include "oshal/serial_port.hpp"
 #include "oshal/status.h"
+#include "prism/color.hpp"
 #include "prism_hw_executor.hpp"
 
 namespace {
