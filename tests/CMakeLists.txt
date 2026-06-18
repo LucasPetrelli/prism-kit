@@ -15,6 +15,8 @@ FetchContent_MakeAvailable(googletest)
 # --- Test executable ---
 add_executable(controller_test
   controller_test.cpp
+  ../app/controller/controller.cpp
+  ../app/controller/instructions.cpp
 )
 
 target_include_directories(controller_test PRIVATE

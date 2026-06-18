@@ -13,23 +13,46 @@ namespace prism {
 /// @return Current timestamp value.
 using TimestampCallback = std::uint32_t (*)();
 
+/// @brief Tag identifying the concrete instruction type.
+enum class InstructionTag : std::uint8_t {
+  /// @brief Range-fill instruction (SetMultipleColor).
+  kSetMultipleColor,
+  /// @brief Single-pixel instruction (SetSingleColor).
+  kSetSingleColor,
+};
+
+/// @brief Half-open [start, end) pixel index range.
+struct Range {
+  /// @brief Zero-based start index (inclusive).
+  std::uint32_t start;
+  /// @brief Zero-based end index (exclusive).
+  std::uint32_t end;
+};
+
 /// @brief Polymorphic base for a single queued controller instruction.
 class ControllerInstruction {
  public:
-  ControllerInstruction(const ControllerInstruction&) = delete;
+  ControllerInstruction(const ControllerInstruction&) = default;
   ControllerInstruction& operator=(const ControllerInstruction&) = delete;
   virtual ~ControllerInstruction() = default;
 
   /// @brief Execute this instruction against its bound strip.
   virtual void Execute() = 0;
 
+  /// @brief Return the tag identifying this instruction's concrete type.
+  /// @return InstructionTag value set by the derived-class constructor.
+  InstructionTag tag() const { return tag_; }
+
  protected:
   ControllerInstruction() = default;
+  InstructionTag tag_{};
 };
 
 /// @brief Instruction that sets a range of pixels to a single preset color.
 class SetMultipleColor : public ControllerInstruction {
  public:
+  SetMultipleColor() { tag_ = InstructionTag::kSetMultipleColor; }
+
   /// @brief Execute the fill-and-show operation on the bound strip.
   void Execute() override;
 
@@ -38,12 +61,14 @@ class SetMultipleColor : public ControllerInstruction {
   /// @brief Non-owning pointer to the target strip.
   Strip* strip{nullptr};
   /// @brief Zero-based [start, end) pixel range.
-  std::uint32_t range[2]{0U, 0U};
+  Range range{0U, 0U};
 };
 
 /// @brief Instruction that sets a single pixel to a preset color.
 class SetSingleColor : public ControllerInstruction {
  public:
+  SetSingleColor() { tag_ = InstructionTag::kSetSingleColor; }
+
   /// @brief Execute the set-and-show operation on the bound strip.
   void Execute() override;
 
@@ -55,38 +80,44 @@ class SetSingleColor : public ControllerInstruction {
   std::uint32_t index{0U};
 };
 
-/// @brief Variant storage for one instruction slot.
+/// @brief Variant storage for one instruction slot with active-member tracking.
 ///
-/// Only the actively-constructed member may be accessed.  The union owns
-/// construction via the set() overloads and dispatch via execute().
-union InstructionMemorySlot {
-  /// @brief Active member: range-fill instruction.
-  SetMultipleColor setMultipleColor;
-  /// @brief Active member: single-pixel instruction.
-  SetSingleColor setSingleColor;
+/// Tracks which member is active via tag_ so that set(), execute() and
+/// the destructor always operate on the correct type.
+struct InstructionMemorySlot {
+  union {
+    /// @brief Active member: range-fill instruction.
+    SetMultipleColor setMultipleColor;
+    /// @brief Active member: single-pixel instruction.
+    SetSingleColor setSingleColor;
+  };
 
-  /// @brief Trivial default constructor — leaves memory uninitialized.
-  InstructionMemorySlot() {}
-  /// @brief Trivial destructor — caller must destroy the active member
-  ///     before the slot goes out of scope.
-  ~InstructionMemorySlot() {}
+  /// @brief Tag identifying the currently-active member.
+  InstructionTag tag_{};
+
+  /// @brief Default constructor — leaves storage uninitialised, tag is empty.
+  InstructionMemorySlot() : tag_{} {}
+
+  /// @brief Destroy the active member before the slot goes out of scope.
+  ~InstructionMemorySlot();
+
+  InstructionMemorySlot(const InstructionMemorySlot&) = delete;
+  InstructionMemorySlot& operator=(const InstructionMemorySlot&) = delete;
 
   /// @brief Activate this slot with a copy of an already-constructed
-  ///     range-fill instruction.
+  ///     instruction.  The previously-active member is destroyed first.
   /// @param instr Pointer to the source instruction.  Must not be null.
-  void set(const SetMultipleColor* instr);
+  void set(const ControllerInstruction* instr);
 
-  /// @brief Activate this slot with a copy of an already-constructed
-  ///     single-pixel instruction.
-  /// @param instr Pointer to the source instruction.  Must not be null.
-  void set(const SetSingleColor* instr);
-
-  /// @brief Execute the active instruction through the shared base class.
-  ///
-  /// Both members inherit from ControllerInstruction and share the same
-  /// vtable-pointer layout, so dispatch is safe regardless of which
-  /// member was last constructed.
+  /// @brief Execute the active instruction.
   void execute();
+
+ private:
+  /// @brief Return a base-class pointer to the active instruction.
+  ControllerInstruction* active();
+
+  /// @brief Destroy the active member and reset the tag.
+  void destroy();
 };
 
 /// @brief High-level animation controller for a Prism Kit strip.
@@ -108,15 +139,11 @@ class Controller {
   /// @param strip Non-owning pointer to the Prism Kit strip to control.
   void SetStrip(Strip* strip);
 
-  /// @brief Enqueue a preset-color instruction.
-  ///
-  /// @param color Preset color to apply.
-  /// @param index Zero-based pixel index for a single-pixel instruction, or
-  ///     the exclusive end-index for a range instruction (start = 0).
-  /// @note The Controller may internally decide whether to create a
-  ///     SetSingleColor or SetMultipleColor slot based on the value
-  ///     of @p index and any additional future API.
-  void AddInstruction(Color color, std::uint32_t index);
+  /// @brief Enqueue a fully-constructed instruction.
+  /// @param instr Non-owning pointer to the instruction to enqueue.
+  ///     Must not be null.  Ownership remains with the caller; the
+  ///     Controller copies the instruction contents into its queue.
+  void AddInstruction(ControllerInstruction* instr);
 
   /// @brief Clear all queued instructions.
   void ResetInstructions();
