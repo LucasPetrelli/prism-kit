@@ -13,7 +13,7 @@ void prism::Controller::SetTimestampCallback(TimestampCallback callback) {
   get_timestamp_ = callback;
 }
 
-void prism::Controller::AddInstruction(ControllerInstruction* instr) {
+void prism::Controller::AddInstruction(const ControllerInstruction* instr) {
   if (instruction_count_ >= kMaxInstruction) {
     return;
   }
@@ -22,7 +22,7 @@ void prism::Controller::AddInstruction(ControllerInstruction* instr) {
 
 void prism::Controller::ResetInstructions() { instruction_count_ = 0U; }
 
-void prism::Controller::Run() {
+void prism::Controller::Run() const {
   if (instruction_count_ == 0U) {
     return;
   }

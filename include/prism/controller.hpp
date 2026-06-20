@@ -37,7 +37,7 @@ class ControllerInstruction {
   virtual ~ControllerInstruction() = default;
 
   /// @brief Execute this instruction against its bound strip.
-  virtual void Execute() = 0;
+  virtual void Execute() const = 0;
 
   /// @brief Return the tag identifying this instruction's concrete type.
   /// @return InstructionTag value set by the derived-class constructor.
@@ -54,7 +54,7 @@ class SetMultipleColor : public ControllerInstruction {
   SetMultipleColor() { tag_ = InstructionTag::kSetMultipleColor; }
 
   /// @brief Execute the fill-and-show operation on the bound strip.
-  void Execute() override;
+  void Execute() const override;
 
   /// @brief Preset color to apply.
   Color color{Color::kPureRed};
@@ -70,7 +70,7 @@ class SetSingleColor : public ControllerInstruction {
   SetSingleColor() { tag_ = InstructionTag::kSetSingleColor; }
 
   /// @brief Execute the set-and-show operation on the bound strip.
-  void Execute() override;
+  void Execute() const override;
 
   /// @brief Preset color to apply.
   Color color{Color::kPureRed};
@@ -110,11 +110,14 @@ struct InstructionMemorySlot {
   void set(const ControllerInstruction* instr);
 
   /// @brief Execute the active instruction.
-  void execute();
+  void execute() const;
 
  private:
   /// @brief Return a base-class pointer to the active instruction.
   ControllerInstruction* active();
+
+  /// @brief Return a const base-class pointer to the active instruction.
+  const ControllerInstruction* active() const;
 
   /// @brief Destroy the active member and reset the tag.
   void destroy();
@@ -143,7 +146,7 @@ class Controller {
   /// @param instr Non-owning pointer to the instruction to enqueue.
   ///     Must not be null.  Ownership remains with the caller; the
   ///     Controller copies the instruction contents into its queue.
-  void AddInstruction(ControllerInstruction* instr);
+  void AddInstruction(const ControllerInstruction* instr);
 
   /// @brief Clear all queued instructions.
   void ResetInstructions();
@@ -151,7 +154,7 @@ class Controller {
   /// @brief Iterate through enqueued instructions and execute each one.
   ///
   /// @pre A valid timestamp callback must be registered before calling Run().
-  void Run();
+  void Run() const;
 
   /// @brief Register a timestamp callback for timing-aware execution.
   /// @param callback Function returning the current timestamp in milliseconds.

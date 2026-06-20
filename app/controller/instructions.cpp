@@ -35,7 +35,18 @@ prism::ControllerInstruction* prism::InstructionMemorySlot::active() {
   return nullptr;
 }
 
-void prism::InstructionMemorySlot::execute() { active()->Execute(); }
+const prism::ControllerInstruction* prism::InstructionMemorySlot::active()
+  const {
+  switch (tag_) {
+    case InstructionTag::kSetMultipleColor:
+      return &setMultipleColor;
+    case InstructionTag::kSetSingleColor:
+      return &setSingleColor;
+  }
+  return nullptr;
+}
+
+void prism::InstructionMemorySlot::execute() const { active()->Execute(); }
 
 void prism::InstructionMemorySlot::destroy() {
   if (tag_ != InstructionTag{}) {
@@ -48,7 +59,7 @@ void prism::InstructionMemorySlot::destroy() {
 // SetMultipleColor::Execute
 // ====================================================================
 
-void prism::SetMultipleColor::Execute() {
+void prism::SetMultipleColor::Execute() const {
   const RgbColor rgb = to_rgb(color);
   if (strip == nullptr) {
     return;
@@ -65,7 +76,7 @@ void prism::SetMultipleColor::Execute() {
 // SetSingleColor::Execute
 // ====================================================================
 
-void prism::SetSingleColor::Execute() {
+void prism::SetSingleColor::Execute() const {
   const RgbColor rgb = to_rgb(color);
   if (strip == nullptr) {
     return;
