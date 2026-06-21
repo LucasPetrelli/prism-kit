@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.20)
 project(protocol_test LANGUAGES CXX)
 
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 # --- GoogleTest via FetchContent ---
 include(FetchContent)
 FetchContent_Declare(

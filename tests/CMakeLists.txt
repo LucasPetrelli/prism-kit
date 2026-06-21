@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.20)
 project(controller_test LANGUAGES CXX)
 
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 # --- GoogleTest + GMock via FetchContent ---
 include(FetchContent)
 FetchContent_Declare(
