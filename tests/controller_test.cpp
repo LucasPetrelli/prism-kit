@@ -31,12 +31,12 @@ class ControllerTest : public ::testing::Test {
 /// @brief A SetSingleColor instruction writes the unpacked RgbColor to the
 ///     correct pixel and commits the frame.
 TEST_F(ControllerTest, SetSingleColorDispatchesToCorrectLed) {
-  constexpr std::size_t kTargetIndex = 3U;
+  constexpr std::uint8_t kTargetIndex = 3U;
   constexpr prism::Color kColor = prism::Color::kPureGreen;
   const prism::RgbColor kExpectedRgb = prism::to_rgb(kColor);
 
   prism::SetSingleColor instr;
-  instr.color = kColor;
+  instr.color = prism::to_rgb(kColor);
   instr.strip = &mock_strip_;
   instr.index = kTargetIndex;
 
@@ -44,7 +44,8 @@ TEST_F(ControllerTest, SetSingleColorDispatchesToCorrectLed) {
   prism::InstructionMemorySlot slot;
   slot.set(&instr);
 
-  EXPECT_CALL(*mock_strip_.mutable_led(kTargetIndex), set_color(kExpectedRgb))
+  EXPECT_CALL(*mock_strip_.mutable_led(static_cast<std::size_t>(kTargetIndex)),
+              set_color(kExpectedRgb))
     .WillOnce(testing::Return(0));
   EXPECT_CALL(mock_strip_, show()).Times(0);
 
@@ -56,7 +57,7 @@ TEST_F(ControllerTest, SetSingleColorWithNullStripIsNoop) {
   constexpr prism::Color kColor = prism::Color::kPureRed;
 
   prism::SetSingleColor instr;
-  instr.color = kColor;
+  instr.color = prism::to_rgb(kColor);
   instr.strip = nullptr;
   instr.index = 0U;
 
@@ -78,7 +79,7 @@ TEST_F(ControllerTest, SetMultipleColorFillsRange) {
   const prism::RgbColor kExpectedRgb = prism::to_rgb(kColor);
 
   prism::SetMultipleColor instr;
-  instr.color = kColor;
+  instr.color = prism::to_rgb(kColor);
   instr.strip = &mock_strip_;
   instr.range.start = 1U;
   instr.range.end = 3U;
@@ -103,19 +104,19 @@ TEST_F(ControllerTest, SetMultipleColorFillsRange) {
 /// @brief Run() iterates through all populated instruction slots.
 TEST_F(ControllerTest, RunIteratesAllSlots) {
   prism::SetSingleColor r;
-  r.color = prism::Color::kPureRed;
+  r.color = prism::to_rgb(prism::Color::kPureRed);
   r.strip = &mock_strip_;
   r.index = 0U;
   controller_.AddInstruction(&r);
 
   prism::SetSingleColor g;
-  g.color = prism::Color::kPureGreen;
+  g.color = prism::to_rgb(prism::Color::kPureGreen);
   g.strip = &mock_strip_;
   g.index = 1U;
   controller_.AddInstruction(&g);
 
   prism::SetSingleColor b;
-  b.color = prism::Color::kPureBlue;
+  b.color = prism::to_rgb(prism::Color::kPureBlue);
   b.strip = &mock_strip_;
   b.index = 2U;
   controller_.AddInstruction(&b);
@@ -135,13 +136,13 @@ TEST_F(ControllerTest, RunOnEmptyControllerIsNoop) {
 /// @brief ResetInstructions() clears the queue so Run() does nothing.
 TEST_F(ControllerTest, ResetInstructionsClearsState) {
   prism::SetSingleColor gold;
-  gold.color = prism::Color::kChristmasGold;
+  gold.color = prism::to_rgb(prism::Color::kChristmasGold);
   gold.strip = &mock_strip_;
   gold.index = 4U;
   controller_.AddInstruction(&gold);
 
   prism::SetSingleColor pink;
-  pink.color = prism::Color::kCyberpunkPink;
+  pink.color = prism::to_rgb(prism::Color::kCyberpunkPink);
   pink.strip = &mock_strip_;
   pink.index = 5U;
   controller_.AddInstruction(&pink);
@@ -163,7 +164,7 @@ TEST_F(ControllerTest, SlotExecuteDispatchesCorrectly) {
 
   // Set up a SetSingleColor instruction.
   prism::SetSingleColor single;
-  single.color = kColor;
+  single.color = prism::to_rgb(kColor);
   single.strip = &mock_strip_;
   single.index = 5U;
 
@@ -183,7 +184,7 @@ TEST_F(ControllerTest, SlotCanBeReused) {
 
   // First: SetSingleColor.
   prism::SetSingleColor single;
-  single.color = kColor;
+  single.color = prism::to_rgb(kColor);
   single.strip = &mock_strip_;
   single.index = 2U;
 
@@ -200,7 +201,7 @@ TEST_F(ControllerTest, SlotCanBeReused) {
 
   // Reuse the slot as SetMultipleColor.
   prism::SetMultipleColor multi;
-  multi.color = prism::Color::kPureBlue;
+  multi.color = prism::to_rgb(prism::Color::kPureBlue);
   multi.strip = &mock_strip_;
   multi.range.start = 0U;
   multi.range.end = 2U;

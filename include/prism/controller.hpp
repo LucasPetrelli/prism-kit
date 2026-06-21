@@ -24,9 +24,25 @@ enum class InstructionTag : std::uint8_t {
 /// @brief Half-open [start, end) pixel index range.
 struct Range {
   /// @brief Zero-based start index (inclusive).
-  std::uint32_t start;
+  std::uint8_t start;
   /// @brief Zero-based end index (exclusive).
-  std::uint32_t end;
+  std::uint8_t end;
+};
+
+/// @brief Wire-format payload for a SetMultipleColor instruction.
+struct SetMultipleColorPayload {
+  std::uint8_t r;
+  std::uint8_t g;
+  std::uint8_t b;
+  Range range;
+};
+
+/// @brief Wire-format payload for a SetSingleColor instruction.
+struct SetSingleColorPayload {
+  std::uint8_t r;
+  std::uint8_t g;
+  std::uint8_t b;
+  std::uint8_t index;
 };
 
 /// @brief Polymorphic base for a single queued controller instruction.
@@ -53,11 +69,20 @@ class SetMultipleColor : public ControllerInstruction {
  public:
   SetMultipleColor() { tag_ = InstructionTag::kSetMultipleColor; }
 
+  /// @brief Construct from a serialized wire-format payload.
+  /// @param payload Source payload to unpack.
+  explicit SetMultipleColor(const SetMultipleColorPayload& payload)
+      : color{payload.r, payload.g, payload.b},
+        strip(nullptr),
+        range(payload.range) {
+    tag_ = InstructionTag::kSetMultipleColor;
+  }
+
   /// @brief Execute the fill-and-show operation on the bound strip.
   void Execute() const override;
 
-  /// @brief Preset color to apply.
-  Color color{Color::kPureRed};
+  /// @brief RGB color to apply.
+  RgbColor color{};
   /// @brief Non-owning pointer to the target strip.
   Strip* strip{nullptr};
   /// @brief Zero-based [start, end) pixel range.
@@ -69,15 +94,24 @@ class SetSingleColor : public ControllerInstruction {
  public:
   SetSingleColor() { tag_ = InstructionTag::kSetSingleColor; }
 
+  /// @brief Construct from a serialized wire-format payload.
+  /// @param payload Source payload to unpack.
+  explicit SetSingleColor(const SetSingleColorPayload& payload)
+      : color{payload.r, payload.g, payload.b},
+        strip(nullptr),
+        index(payload.index) {
+    tag_ = InstructionTag::kSetSingleColor;
+  }
+
   /// @brief Execute the set-and-show operation on the bound strip.
   void Execute() const override;
 
-  /// @brief Preset color to apply.
-  Color color{Color::kPureRed};
+  /// @brief RGB color to apply.
+  RgbColor color{};
   /// @brief Non-owning pointer to the target strip.
   Strip* strip{nullptr};
   /// @brief Zero-based pixel index within the strip.
-  std::uint32_t index{0U};
+  std::uint8_t index{0U};
 };
 
 /// @brief Variant storage for one instruction slot with active-member tracking.

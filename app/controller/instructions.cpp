@@ -60,14 +60,13 @@ void prism::InstructionMemorySlot::destroy() {
 // ====================================================================
 
 void prism::SetMultipleColor::Execute() const {
-  const RgbColor rgb = to_rgb(color);
   if (strip == nullptr) {
     return;
   }
   for (std::uint32_t i = range.start; i < range.end; ++i) {
     StripLed* led = strip->led(i);
     if (led != nullptr) {
-      led->set_color(rgb);
+      led->set_color(color);
     }
   }
 }
@@ -77,12 +76,11 @@ void prism::SetMultipleColor::Execute() const {
 // ====================================================================
 
 void prism::SetSingleColor::Execute() const {
-  const RgbColor rgb = to_rgb(color);
   if (strip == nullptr) {
     return;
   }
   StripLed* led = strip->led(index);
   if (led != nullptr) {
-    led->set_color(rgb);
+    led->set_color(color);
   }
 }
