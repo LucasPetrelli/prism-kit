@@ -4,9 +4,14 @@ set(PRISM_KIT_APP_BACKEND "HW" CACHE STRING "Prism Kit APP backend")
 set_property(CACHE PRISM_KIT_APP_BACKEND PROPERTY STRINGS HW SIM)
 
 target_include_directories(app PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include
+                                   ${CMAKE_CURRENT_SOURCE_DIR}/src
                                    ${PROJECT_SOURCE_DIR}/include)
 
 target_sources(app PRIVATE src/blink_app.cpp
+                         src/hw/hw_task.cpp
+                         src/hw/status_led.cpp
+                         src/hw/strip_manager.cpp
+                         src/hw/command_manager.cpp
                          controller/controller.cpp
                          controller/instructions.cpp)
 

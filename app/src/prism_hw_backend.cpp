@@ -1,156 +1,21 @@
-#include <array>
 #include <cstddef>
 
 #include "bal/led.hpp"
 #include "bal/ws2812_strip.hpp"
+#include "hw/command_manager.hpp"
+#include "hw/hw_constants.hpp"
+#include "hw/hw_coordinator.hpp"
+#include "hw/shared_frame.hpp"
+#include "hw/status_led.hpp"
+#include "hw/strip_manager.hpp"
 #include "oshal/debug_port.hpp"
 #include "oshal/serial_port.hpp"
 #include "oshal/status.h"
+#include "oshal/task.hpp"
 #include "oshal/time.hpp"
 #include "prism/color.hpp"
 #include "prism/strip.hpp"
 #include "prism/time.hpp"
-#include "prism_hw_executor.hpp"
-#include "prism_hw_mailbox.hpp"
-
-namespace {
-
-/*
- * The HW backend keeps APP-facing strip state entirely inside Prism Kit types.
- * APP mutates this local staged frame through the repo-owned contract, and the
- * committed frame is copied into the shared mailbox only when show() is called.
- * That preserves the existing fill-plus-show execution model while ensuring the
- * dedicated app_hw task remains the only code path that touches BAL strip APIs.
- */
-class HardwareStrip;
-
-class HardwareStripLed : public prism::StripLed {
- public:
-  HardwareStripLed() = default;
-
-  void bind(HardwareStrip* owner, std::size_t led_index) {
-    owner_ = owner;
-    led_index_ = led_index;
-  }
-
-  bool is_ready() const override;
-  int set_color(const prism::RgbColor& color) override;
-  prism::RgbColor color() const override;
-  std::size_t index() const override { return led_index_; }
-
- private:
-  HardwareStrip* owner_ = nullptr;
-  std::size_t led_index_ = 0U;
-};
-
-class HardwareStrip : public prism::Strip {
- public:
-  HardwareStrip() {
-    for (std::size_t index = 0; index < led_views_.size(); ++index) {
-      led_views_[index].bind(this, index);
-    }
-  }
-
-  void configure(std::size_t led_count, const char* strip_name) {
-    led_count_ = led_count;
-    name_ = strip_name;
-    ready_ = true;
-  }
-
-  const char* name() const override { return name_; }
-  bool is_ready() const override { return ready_; }
-  std::size_t led_count() const override { return led_count_; }
-
-  prism::StripLed* led(std::size_t index) override {
-    if (index >= led_count_) {
-      return nullptr;
-    }
-
-    return &led_views_[index];
-  }
-
-  const prism::StripLed* led(std::size_t index) const override {
-    if (index >= led_count_) {
-      return nullptr;
-    }
-
-    return &led_views_[index];
-  }
-
-  int fill(const prism::RgbColor& color) override {
-    if (!ready_) {
-      return STATUS_ERR_NOT_READY;
-    }
-
-    for (std::size_t index = 0; index < led_count_; ++index) {
-      staged_frame_.colors[index] = color;
-    }
-
-    return STATUS_OK;
-  }
-
-  int show() override {
-    if (!ready_) {
-      return STATUS_ERR_NOT_READY;
-    }
-
-    staged_frame_.led_count = led_count_;
-    return app::internal::PrismHwExecutorInstance().PublishFrame(staged_frame_);
-  }
-
-  int set_led_color(std::size_t index, const prism::RgbColor& color) {
-    if (!ready_) {
-      return STATUS_ERR_NOT_READY;
-    }
-
-    if (index >= led_count_) {
-      return STATUS_ERR_INVALID_ARGUMENT;
-    }
-
-    staged_frame_.colors[index] = color;
-    return STATUS_OK;
-  }
-
-  prism::RgbColor led_color(std::size_t index) const {
-    if (index >= led_count_) {
-      return prism::RgbColor{};
-    }
-
-    return staged_frame_.colors[index];
-  }
-
- private:
-  bool ready_ = false;
-  std::size_t led_count_ = 0U;
-  const char* name_ = "prism_hw_strip";
-  app::internal::SharedFrame staged_frame_ = {};
-  std::array<HardwareStripLed, app::internal::kPrismHwMailboxFrameCapacity>
-    led_views_ = {};
-};
-
-HardwareStrip g_hardware_strip;
-
-bool HardwareStripLed::is_ready() const {
-  return (owner_ != nullptr) && owner_->is_ready();
-}
-
-int HardwareStripLed::set_color(const prism::RgbColor& color) {
-  if (owner_ == nullptr) {
-    return STATUS_ERR_NOT_READY;
-  }
-
-  return owner_->set_led_color(led_index_, color);
-}
-
-prism::RgbColor HardwareStripLed::color() const {
-  if (owner_ == nullptr) {
-    return prism::RgbColor{};
-  }
-
-  return owner_->led_color(led_index_);
-}
-
-}  // namespace
 
 namespace prism {
 
@@ -183,25 +48,33 @@ int initialize() {
   }
 
   const std::size_t led_count = backend_strip.led_count();
-  if (led_count > app::internal::kPrismHwMailboxFrameCapacity) {
+  if (led_count > app::hw::kSharedFrameCapacity) {
     return STATUS_ERR_DEVICE_UNAVAILABLE;
   }
 
-  app::internal::PrismHwExecutorInstance().Configure(
-    &status_led, &oshal::debug_port, oshal::command_port);
+  /* Configure the HW managers before starting the executor task.
+   * StripManager implements prism::Strip — APP code calls fill()/show()
+   * on it directly, and show() posts the committed frame to the internal
+   * mailbox for the app_hw task to drain. */
+  app::hw::StripManager::Instance().Configure(&backend_strip, led_count,
+                                              backend_strip.name());
+  app::hw::CommandManager::Instance().Configure(
+    oshal::command_port, &oshal::debug_port,
+    &app::hw::StripManager::Instance().event_group());
+  app::hw::StatusLed::Instance().Configure(&status_led,
+                                           app::hw::kTaskIdleSleepMs);
 
   /* Start the HW executor before publishing any committed strip frame. */
-  const int start_ret = app::internal::PrismHwExecutorInstance().Start();
+  const int start_ret = app::hw::StartHwExecutor();
   if (start_ret < 0) {
     return start_ret;
   }
 
-  g_hardware_strip.configure(led_count, backend_strip.name());
   initialized = true;
   return STATUS_OK;
 }
 
-Strip& strip() { return g_hardware_strip; }
+Strip& strip() { return app::hw::StripManager::Instance(); }
 
 void sleep_ms(std::uint32_t duration_ms) { oshal::sleep_ms(duration_ms); }
 
