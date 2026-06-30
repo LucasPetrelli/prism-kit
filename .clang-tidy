@@ -1,0 +1,133 @@
+# SPDX-License-Identifier: MIT
+#
+# clang-tidy configuration for the Prism Kit firmware project.
+#
+# This configuration enforces Google C++ Style naming conventions across all
+# user code.  It is designed for gradual adoption — violations emit warnings
+# (not errors) so the existing codebase can be cleaned up incrementally.
+#
+# To run:   clang-tidy -p build/ <source-file>
+# To run across the whole project:
+#   find app/src bal/src oshal/src protocol/src include -name '*.cpp' -o -name '*.hpp' \
+#     | xargs clang-tidy -p build/
+#
+# A convenience script (scripts/lint.py) wraps this invocation — see
+# "Linting" in the README.
+
+---
+Checks: >
+  -*,
+  bugprone-*,
+  clang-analyzer-*,
+  misc-*,
+  performance-*,
+  portability-*,
+  readability-*,
+  -bugprone-easily-swappable-parameters,
+  -bugprone-narrowing-conversions,
+  -bugprone-reserved-identifier,
+  -misc-include-cleaner,
+  -misc-no-recursion,
+  -misc-non-private-member-variables-in-classes,
+  -readability-convert-member-functions-to-static,
+  -readability-function-cognitive-complexity,
+  -readability-identifier-length,
+  -readability-implicit-bool-conversion,
+  -readability-magic-numbers,
+  -readability-named-parameter,
+  -readability-redundant-access-specifiers,
+  -readability-uppercase-literal-suffix,
+  -readability-use-anyofallof,
+  # Zephyr autoconf.h macros like CONFIG_PRIORITY_CEILING are not our code.
+  -bugprone-macro-parentheses,
+
+
+# Naming violations emit warnings, not errors, so the existing codebase can be
+# cleaned up incrementally.  Change to '*' once the project is fully migrated.
+# Only naming/readability violations are errors; clang-diagnostic and similar
+# cross-compiler issues are suppressed since clang-tidy runs on the host while
+# the project targets ARM GCC.
+WarningsAsErrors: 'readability-*'
+
+# Only lint project-owned headers — skip Zephyr, ARM GCC, and other
+# third-party includes.
+HeaderFilterRegex:  '.*prism-kit/(app|bal|oshal|protocol|include|src)/.*'
+
+FormatStyle:     file
+
+CheckOptions:
+  # ── Naming: Google C++ Style ────────────────────────────────────────────
+  # Functions and methods: PascalCase
+  - key: readability-identifier-naming.FunctionCase
+    value: CamelCase
+  - key: readability-identifier-naming.MethodCase
+    value: CamelCase
+  - key: readability-identifier-naming.ConstexprFunctionCase
+    value: CamelCase
+
+  # Types: PascalCase
+  - key: readability-identifier-naming.ClassCase
+    value: CamelCase
+  - key: readability-identifier-naming.StructCase
+    value: CamelCase
+  - key: readability-identifier-naming.EnumCase
+    value: CamelCase
+  - key: readability-identifier-naming.TypedefCase
+    value: CamelCase
+  - key: readability-identifier-naming.AliasCase
+    value: CamelCase
+  - key: readability-identifier-naming.TypeTemplateParameterCase
+    value: CamelCase
+
+  # Enumerators: kPascalCase
+  - key: readability-identifier-naming.EnumConstantCase
+    value: CamelCase
+  - key: readability-identifier-naming.EnumConstantPrefix
+    value: k
+
+  # Constants (namespace-scope const/constexpr): kPascalCase
+  # Note: No generic ConstantCase — that would flag local const variables.
+  - key: readability-identifier-naming.GlobalConstantCase
+    value: CamelCase
+  - key: readability-identifier-naming.GlobalConstantPrefix
+    value: k
+  - key: readability-identifier-naming.ConstantMemberCase
+    value: CamelCase
+  - key: readability-identifier-naming.ConstantMemberPrefix
+    value: k
+  - key: readability-identifier-naming.StaticConstantCase
+    value: CamelCase
+  - key: readability-identifier-naming.StaticConstantPrefix
+    value: k
+
+  # Namespaces: snake_case
+  - key: readability-identifier-naming.NamespaceCase
+    value: lower_case
+
+  # Member variables: snake_case with trailing underscore
+  - key: readability-identifier-naming.PrivateMemberCase
+    value: lower_case
+  - key: readability-identifier-naming.PrivateMemberSuffix
+    value: _
+  - key: readability-identifier-naming.ProtectedMemberCase
+    value: lower_case
+  - key: readability-identifier-naming.ProtectedMemberSuffix
+    value: _
+  - key: readability-identifier-naming.PublicMemberCase
+    value: lower_case
+  - key: readability-identifier-naming.GlobalVariableCase
+    value: lower_case
+
+  # Parameters and local variables: snake_case
+  - key: readability-identifier-naming.ParameterCase
+    value: lower_case
+  - key: readability-identifier-naming.LocalVariableCase
+    value: lower_case
+
+  # Template value parameters (e.g. MsgSize, Capacity): PascalCase,
+  # matching type template parameter convention.
+  - key: readability-identifier-naming.ValueTemplateParameterCase
+    value: CamelCase
+
+  # Macros: clang-tidy cannot check macro naming, but the project convention
+  # is SCREAMING_SNAKE_CASE (e.g. APP_HW_STRIP_MANAGER_HPP_).

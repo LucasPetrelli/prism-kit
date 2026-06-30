@@ -27,25 +27,25 @@ bool app::setup(void* context) {
   static_cast<void>(context);
 
   g_blink_app_state.color_step_count = 0U;
-  return prism::initialize() >= 0;
+  return prism::Initialize() >= 0;
 }
 
 bool app::loop(void* context) {
   static_cast<void>(context);
 
-  prism::Strip& demo_strip = prism::strip();
+  prism::Strip& demo_strip = prism::GetStrip();
   const prism::RgbColor& next_color =
     kStripColors[g_blink_app_state.color_step_count % kStripColors.size()];
 
-  if (demo_strip.fill(next_color) < 0) {
+  if (demo_strip.Fill(next_color) < 0) {
     return false;
   }
 
-  if (demo_strip.show() < 0) {
+  if (demo_strip.Show() < 0) {
     return false;
   }
 
   ++g_blink_app_state.color_step_count;
-  prism::sleep_ms(kColorStepPeriodMs);
+  prism::SleepMs(kColorStepPeriodMs);
   return true;
 }

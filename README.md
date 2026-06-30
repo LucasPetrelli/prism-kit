@@ -178,3 +178,62 @@ so this project normally lives beside `zephyr/` inside the workspace.
   `scripts/build.py --debug-opt` and `scripts/build.py --no-opt`.
 - `app/CMakeLists.txt` defaults `PRISM_KIT_APP_BACKEND` to `HW`. `SIM` is kept
   as a reserved future backend and is not implemented.
+
+## Linting
+
+The project uses **clang-tidy** with Google C++ Style naming rules enforced via
+the `readability-identifier-naming` check.  Configuration lives in
+[`.clang-tidy`](.clang-tidy).
+
+### Prerequisites
+
+- [LLVM/Clang](https://llvm.org) (clang-tidy is included in the LLVM
+  distribution).
+- The ARM GCC toolchain on PATH (so the lint script can resolve the C++ standard
+  library headers).
+- An existing build directory (run `scripts/build.py` first) — the lint script
+  reads `build/compile_commands.json` for compilation flags.
+
+### Usage
+
+```bash
+# Lint all project-owned source files.
+python scripts/lint.py
+
+# Lint a single file.
+python scripts/lint.py app/src/hw/strip_manager.cpp
+
+# Apply auto-fixes (where supported).
+python scripts/lint.py --fix
+
+# List all enabled clang-tidy checks.
+python scripts/lint.py --list-checks
+
+# Pass extra flags to clang-tidy.
+python scripts/lint.py --clang-tidy-extra='--extra-arg=-DZEPHYR_LOG_MODULE_NAME=mymod'
+```
+
+The script filters out cross-compiler flags that host clang-tidy cannot
+process (`-mthumb`, `-mfp16-format=ieee`, `-fno-reorder-functions`, etc.) and
+injects the ARM GCC C++ include paths so standard headers like `<array>` and
+`<cstdint>` resolve correctly.
+
+### Naming Rules
+
+The `.clang-tidy` configuration enforces these Google C++ Style conventions:
+
+| Category              | Convention        | Example                    |
+|-----------------------|-------------------|----------------------------|
+| Classes / Structs     | PascalCase        | `StripManager`, `RgbColor` |
+| Functions / Methods   | PascalCase        | `IsReady()`, `SetColor()`  |
+| Free functions        | PascalCase        | `Initialize()`, `Strip()`  |
+| Member variables      | snake_case + `_`  | `led_count_`, `event_group_` |
+| Constants             | `k` + PascalCase  | `kFrameEventMask`          |
+| Enumerator values     | `k` + PascalCase  | `kPureRed`, `kSetMultipleColor` |
+| Enums / Type aliases  | PascalCase        | `Color`, `InstructionTag`  |
+| Namespaces            | snake_case        | `app::hw`, `oshal::internal` |
+| Parameters / locals   | snake_case        | `led`, `color`, `set_ret`  |
+
+Most naming violations are warnings (not errors) so the codebase can be
+cleaned up incrementally.  Set `WarningsAsErrors: '*'` in `.clang-tidy`
+to treat all violations as errors once the migration is complete.

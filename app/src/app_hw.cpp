@@ -41,7 +41,7 @@ bool SetupCallback(void* context) {
    * within the task context.
    */
   auto& cmd_mgr = app::hw::CommandManager::Instance();
-  return cmd_mgr.PrintBanner(bal::ws2812_strip().name());
+  return cmd_mgr.PrintBanner(bal::GetWs2812Strip().Name());
 }
 
 /// @brief C-callable loop trampoline for oshal::TaskConfig.
@@ -59,20 +59,20 @@ bool LoopCallback(void* context) {
    * command port, or the idle tick fires (for blink timing).
    * Matching events are atomically cleared on successful return.
    */
-  const std::uint32_t events = g_hw_task.event_group().WaitAny(
-    strip_mgr.frame_event_mask() | cmd_mgr.rx_event_mask(),
+  const std::uint32_t events = g_hw_task.EventGroup().WaitAny(
+    strip_mgr.FrameEventMask() | cmd_mgr.RxEventMask(),
     app::hw::kTaskIdleSleepMs);
 
   /* Run the protocol engine — feeds RX bytes through the parser and
    * retries any pending TX frame.  Only runs when UART data arrived. */
-  if ((events & cmd_mgr.rx_event_mask()) != 0U) {
+  if ((events & cmd_mgr.RxEventMask()) != 0U) {
     cmd_mgr.Run();
   }
 
   /* Drain and apply any committed frames from APP.  The EventMailbox
    * re-posts the frame event mask if more frames arrive during
    * processing. */
-  if ((events & strip_mgr.frame_event_mask()) != 0U) {
+  if ((events & strip_mgr.FrameEventMask()) != 0U) {
     if (!strip_mgr.TryApplyLatest()) {
       return false;
     }

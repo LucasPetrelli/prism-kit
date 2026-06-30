@@ -53,11 +53,11 @@ class CommandManager {
 
   /// @brief Accessor for the stored command port pointer (may be null).
   /// @return Pointer to the command port, or nullptr.
-  oshal::SerialPort* command_port() const { return command_port_; }
+  oshal::SerialPort* CommandPort() const { return command_port_; }
 
   /// @brief Event mask to wait on for command-port RX activity.
   /// @return kCommandRxEventMask.
-  std::uint32_t rx_event_mask() const { return kCommandRxEventMask; }
+  std::uint32_t RxEventMask() const { return kCommandRxEventMask; }
 
   CommandManager() = default;
 

@@ -57,7 +57,7 @@ class ControllerInstruction {
 
   /// @brief Return the tag identifying this instruction's concrete type.
   /// @return InstructionTag value set by the derived-class constructor.
-  InstructionTag tag() const { return tag_; }
+  InstructionTag Tag() const { return tag_; }
 
  protected:
   ControllerInstruction() = default;

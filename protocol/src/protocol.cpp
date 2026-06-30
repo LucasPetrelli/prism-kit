@@ -13,7 +13,7 @@ namespace protocol {
 Frame::Frame(Tag tag, const uint8_t* data, uint16_t length)
     : tag_(tag), data_(data), length_(length) {}
 
-Frame Frame::create(Tag tag, const uint8_t* data, uint16_t length) {
+Frame Frame::Create(Tag tag, const uint8_t* data, uint16_t length) {
   if (length > kMaxFrameDataLength) {
     return Frame{};
   }
@@ -23,7 +23,7 @@ Frame Frame::create(Tag tag, const uint8_t* data, uint16_t length) {
   return Frame{tag, data, length};
 }
 
-FrameHeader Frame::parse_header(const uint8_t* wire_data) {
+FrameHeader Frame::ParseHeader(const uint8_t* wire_data) {
   FrameHeader header{};
   if (!wire_data) {
     return header;
@@ -49,7 +49,7 @@ Protocol::Protocol(const ProtocolConfig& config)
       verbose_(config.verbose) {
   // Tag 0x0000 (kLoopback) is always registered as the first handler entry.
   handlers_[static_cast<uint8_t>(Tag::kLoopback)] = {
-    Tag::kLoopback, &Protocol::loopback_impl_, this};
+    Tag::kLoopback, &Protocol::LoopbackImpl, this};
   handler_count_ = 1;
 }
 
@@ -57,7 +57,7 @@ Protocol::Protocol(const ProtocolConfig& config)
 // Protocol — handler registration
 // ============================================================================
 
-bool Protocol::add_handler(Tag tag, FrameHandler handler) {
+bool Protocol::AddHandler(Tag tag, FrameHandler handler) {
   if (!handler) {
     return false;
   }
@@ -80,19 +80,19 @@ bool Protocol::add_handler(Tag tag, FrameHandler handler) {
 // Protocol — send
 // ============================================================================
 
-bool Protocol::send(const Frame& frame) {
-  if (!frame.is_valid()) {
+bool Protocol::Send(const Frame& frame) {
+  if (!frame.IsValid()) {
     return false;
   }
   if (tx_data_) {
     return false;
   }
 
-  tx_tag_ = static_cast<uint16_t>(frame.tag());
-  tx_length_ = frame.length();
-  if (frame.data() && tx_length_ > 0) {
+  tx_tag_ = static_cast<uint16_t>(frame.GetTag());
+  tx_length_ = frame.Length();
+  if (frame.Data() && tx_length_ > 0) {
     // Copy into internal buffer so the caller can free/reuse their data.
-    std::memcpy(tx_data_buffer_, frame.data(), tx_length_);
+    std::memcpy(tx_data_buffer_, frame.Data(), tx_length_);
   }
   tx_data_ = tx_data_buffer_;
   return true;
@@ -102,12 +102,12 @@ bool Protocol::send(const Frame& frame) {
 // Protocol — run (state machine)
 // ============================================================================
 
-void Protocol::run() {
+void Protocol::Run() {
   // Attempt transmission of any pending frame before processing new
-  // incoming data (gives a failed write from a previous run() a chance
+  // incoming data (gives a failed write from a previous Run() a chance
   // to retry) and again afterwards (to immediately send any frames
   // queued by a handler during dispatch).
-  tx_phase();
+  TxPhase();
 
   // ── RX phase: parse incoming bytes ──
 
@@ -115,23 +115,23 @@ void Protocol::run() {
   if (frame_timeout_ > 0 && timestamp_ && state_ != State::kWaitingForSync) {
     uint32_t now = timestamp_();
     if (now - frame_start_ts_ > frame_timeout_) {
-      debug_log("Frame timeout (%u ticks)", frame_timeout_);
-      reset_parser();
+      DebugLog("Frame timeout (%u ticks)", frame_timeout_);
+      ResetParser();
     }
   }
 
   uint8_t raw;
-  while (read_raw_byte(raw)) {
+  while (ReadRawByte(raw)) {
     switch (state_) {
       // ---------------------------------------------------------------
       case State::kWaitingForSync:
         if (raw == kSyncByte) {
-          reset_parser();
+          ResetParser();
           if (timestamp_) {
             frame_start_ts_ = timestamp_();
           }
           state_ = State::kReadingHeader;
-          debug_verbose("SYNC detected");
+          DebugVerbose("SYNC detected");
         }
         // Discard everything else while searching for sync.
         break;
@@ -139,20 +139,20 @@ void Protocol::run() {
       // ---------------------------------------------------------------
       case State::kReadingHeader: {
         uint8_t byte;
-        consume_byte(raw, byte);
+        ConsumeByte(raw, byte);
 
         rx_buffer_[rx_index_] = byte;
         ++rx_index_;
 
         if (rx_index_ >= kHeaderSize) {
-          FrameHeader hdr = Frame::parse_header(rx_buffer_);
+          FrameHeader hdr = Frame::ParseHeader(rx_buffer_);
           if (hdr.length > kMaxFrameDataLength) {
-            debug_log("Bad frame length: %u (max %u)", hdr.length,
-                      kMaxFrameDataLength);
-            reset_parser();
+            DebugLog("Bad frame length: %u (max %u)", hdr.length,
+                     kMaxFrameDataLength);
+            ResetParser();
             break;
           }
-          debug_verbose("Header: tag=0x%04X len=%u", hdr.tag, hdr.length);
+          DebugVerbose("Header: tag=0x%04X len=%u", hdr.tag, hdr.length);
           rx_tag_ = hdr.tag;
           rx_data_length_ = hdr.length;
           rx_index_ = 0;
@@ -169,13 +169,13 @@ void Protocol::run() {
       // ---------------------------------------------------------------
       case State::kReadingData: {
         uint8_t byte;
-        consume_byte(raw, byte);
+        ConsumeByte(raw, byte);
 
         rx_buffer_[kHeaderSize + rx_index_] = byte;
         ++rx_index_;
 
         if (rx_index_ >= rx_data_length_) {
-          debug_verbose("Data complete: %u bytes", rx_data_length_);
+          DebugVerbose("Data complete: %u bytes", rx_data_length_);
           state_ = State::kReadingChecksum;
         }
         break;
@@ -184,19 +184,19 @@ void Protocol::run() {
       // ---------------------------------------------------------------
       case State::kReadingChecksum: {
         uint8_t received_checksum;
-        consume_byte(raw, received_checksum);
+        ConsumeByte(raw, received_checksum);
 
-        uint8_t expected = compute_checksum(
-          rx_buffer_, rx_buffer_ + kHeaderSize, rx_data_length_);
+        uint8_t expected = ComputeChecksum(rx_buffer_, rx_buffer_ + kHeaderSize,
+                                           rx_data_length_);
 
         if (received_checksum == expected) {
-          debug_verbose("CRC OK");
-          dispatch_frame();
-          reset_parser();
+          DebugVerbose("CRC OK");
+          DispatchFrame();
+          ResetParser();
         } else {
-          debug_log("CRC mismatch: got 0x%02X expected 0x%02X",
-                    received_checksum, expected);
-          reset_parser();
+          DebugLog("CRC mismatch: got 0x%02X expected 0x%02X",
+                   received_checksum, expected);
+          ResetParser();
         }
         break;
       }
@@ -204,14 +204,14 @@ void Protocol::run() {
   }
 
   // Transmit any frame that was queued by a handler during dispatch.
-  tx_phase();
+  TxPhase();
 }
 
 // ============================================================================
 // Protocol — internal helpers
 // ============================================================================
 
-bool Protocol::read_raw_byte(uint8_t& out) {
+bool Protocol::ReadRawByte(uint8_t& out) {
   // Serve from the read-ahead cache when possible.
   if (readahead_idx_ < readahead_cnt_) {
     out = readahead_[readahead_idx_];
@@ -224,7 +224,7 @@ bool Protocol::read_raw_byte(uint8_t& out) {
     readahead_cnt_ =
       (n > sizeof(readahead_)) ? sizeof(readahead_) : static_cast<uint8_t>(n);
     if (readahead_cnt_ > 0) {
-      debug_verbose(readahead_, readahead_cnt_, "Rx %u bytes:", readahead_cnt_);
+      DebugVerbose(readahead_, readahead_cnt_, "Rx %u bytes:", readahead_cnt_);
       readahead_idx_ = 1;
       out = readahead_[0];
       return true;
@@ -233,8 +233,8 @@ bool Protocol::read_raw_byte(uint8_t& out) {
   return false;
 }
 
-bool Protocol::write_frame_wire(const uint8_t* header, const uint8_t* data,
-                                uint16_t data_length) {
+bool Protocol::WriteFrameWire(const uint8_t* header, const uint8_t* data,
+                              uint16_t data_length) {
   if (!write_) {
     return false;
   }
@@ -278,14 +278,14 @@ bool Protocol::write_frame_wire(const uint8_t* header, const uint8_t* data,
   }
 
   // 4. Checksum: XOR of header + data.
-  uint8_t checksum = compute_checksum(header, data, data_length);
+  uint8_t checksum = ComputeChecksum(header, data, data_length);
   if (!emit(checksum)) return false;
 
   return flush();
 }
 
-uint8_t Protocol::compute_checksum(const uint8_t* header, const uint8_t* data,
-                                   uint16_t data_length) {
+uint8_t Protocol::ComputeChecksum(const uint8_t* header, const uint8_t* data,
+                                  uint16_t data_length) {
   uint8_t cs = 0;
   for (size_t i = 0; i < kHeaderSize; ++i) {
     cs ^= header[i];
@@ -298,7 +298,7 @@ uint8_t Protocol::compute_checksum(const uint8_t* header, const uint8_t* data,
   return cs;
 }
 
-void Protocol::reset_parser() {
+void Protocol::ResetParser() {
   state_ = State::kWaitingForSync;
   rx_index_ = 0;
   rx_data_length_ = 0;
@@ -306,11 +306,11 @@ void Protocol::reset_parser() {
   frame_start_ts_ = 0;
 }
 
-void Protocol::dispatch_frame() {
+void Protocol::DispatchFrame() {
   // Search the handler table for a matching tag.
   for (uint8_t i = 0; i < handler_count_; ++i) {
     if (static_cast<uint16_t>(handlers_[i].tag) == rx_tag_) {
-      debug_verbose("Dispatch: tag=0x%04X", rx_tag_);
+      DebugVerbose("Dispatch: tag=0x%04X", rx_tag_);
       handlers_[i].handler(handlers_[i].context, rx_buffer_ + kHeaderSize,
                            rx_data_length_);
       return;
@@ -320,9 +320,9 @@ void Protocol::dispatch_frame() {
   // No handler registered for this tag — frame is silently dropped.
 }
 
-void Protocol::consume_byte(uint8_t raw, uint8_t& out) { out = raw; }
+void Protocol::ConsumeByte(uint8_t raw, uint8_t& out) { out = raw; }
 
-void Protocol::tx_phase() {
+void Protocol::TxPhase() {
   if (tx_data_) {
     uint8_t header[4];
     header[0] = static_cast<uint8_t>(tx_tag_ & 0xFF);
@@ -330,15 +330,15 @@ void Protocol::tx_phase() {
     header[2] = static_cast<uint8_t>(tx_length_ & 0xFF);
     header[3] = static_cast<uint8_t>((tx_length_ >> 8) & 0xFF);
 
-    if (write_frame_wire(header, tx_data_, tx_length_)) {
+    if (WriteFrameWire(header, tx_data_, tx_length_)) {
       tx_data_ = nullptr;
     }
     // If write fails, retry on the next call.
   }
 }
 
-void Protocol::loopback_impl_(void* context, const uint8_t* data,
-                              uint16_t length) {
+void Protocol::LoopbackImpl(void* context, const uint8_t* data,
+                            uint16_t length) {
   auto* self = static_cast<Protocol*>(context);
   if (self->tx_data_) {
     return;  // TX busy, drop this loopback frame.
@@ -361,28 +361,28 @@ void Protocol::loopback_impl_(void* context, const uint8_t* data,
   do {                                             \
     std::va_list args;                             \
     va_start(args, fmt);                           \
-    debug_log_impl(data, length, fmt, args);       \
+    DebugLogImpl(data, length, fmt, args);         \
     va_end(args);                                  \
   } while (0)
 
-void Protocol::debug_log(const char* fmt, ...) const {
+void Protocol::DebugLog(const char* fmt, ...) const {
   PROTOCOL_DEBUG_LOG_IMPL(nullptr, 0, fmt);
 }
 
-void Protocol::debug_log(const uint8_t* data, uint32_t length, const char* fmt,
-                         ...) const {
+void Protocol::DebugLog(const uint8_t* data, uint32_t length, const char* fmt,
+                        ...) const {
   PROTOCOL_DEBUG_LOG_IMPL(data, length, fmt);
 }
 
-void Protocol::debug_verbose(const char* fmt, ...) const {
+void Protocol::DebugVerbose(const char* fmt, ...) const {
   if (!verbose_) {
     return;
   }
   PROTOCOL_DEBUG_LOG_IMPL(nullptr, 0, fmt);
 }
 
-void Protocol::debug_verbose(const uint8_t* data, uint32_t length,
-                             const char* fmt, ...) const {
+void Protocol::DebugVerbose(const uint8_t* data, uint32_t length,
+                            const char* fmt, ...) const {
   if (!verbose_) {
     return;
   }
@@ -391,8 +391,8 @@ void Protocol::debug_verbose(const uint8_t* data, uint32_t length,
 
 #undef PROTOCOL_DEBUG_LOG_IMPL
 
-void Protocol::debug_log_impl(const uint8_t* data, uint32_t length,
-                              const char* fmt, std::va_list args) const {
+void Protocol::DebugLogImpl(const uint8_t* data, uint32_t length,
+                            const char* fmt, std::va_list args) const {
   if (!debug_) {
     return;
   }

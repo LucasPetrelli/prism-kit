@@ -48,7 +48,7 @@ class HwTask {
 
   /// @brief Access the event-flag group the task loop blocks on.
   /// @return Reference to the wake event group.
-  oshal::EventFlagGroup& event_group() { return event_group_; }
+  oshal::EventFlagGroup& EventGroup() { return event_group_; }
 
  private:
   oshal::EventFlagGroup& event_group_;

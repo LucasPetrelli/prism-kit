@@ -30,6 +30,6 @@ void prism::Controller::Run() const {
     instructions_[i].execute();
   }
   if (strip_ != nullptr) {
-    strip_->show();
+    strip_->Show();
   }
 }

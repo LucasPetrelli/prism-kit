@@ -14,4 +14,16 @@ fi
 repo_root=$(git rev-parse --show-toplevel)
 cd "$repo_root"
 
+# ── Stage 1: format staged sources ──────────────────────────────────
 "$PYTHON" scripts/format.py --staged --git-add
+
+# ── Stage 2: lint staged sources (non-blocking) ─────────────────────
+# clang-tidy runs on staged .cpp/.hpp files.  Violations are warnings
+# only — they do not block the commit.  Run `uv run lint` before
+# committing to see the full picture.
+if [ -f "build/compile_commands.json" ]; then
+  "$PYTHON" scripts/lint.py --staged 2>&1 | tail -5 || true
+  echo "[pre-commit] lint complete (non-blocking)."
+else
+  echo "[pre-commit] build/compile_commands.json not found — skipping lint."
+fi

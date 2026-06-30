@@ -12,7 +12,7 @@ prism::InstructionMemorySlot::~InstructionMemorySlot() { destroy(); }
 
 void prism::InstructionMemorySlot::set(const ControllerInstruction* instr) {
   destroy();
-  switch (instr->tag()) {
+  switch (instr->Tag()) {
     case InstructionTag::kSetMultipleColor:
       ::new (&setMultipleColor)
         SetMultipleColor(*static_cast<const SetMultipleColor*>(instr));
@@ -22,7 +22,7 @@ void prism::InstructionMemorySlot::set(const ControllerInstruction* instr) {
         SetSingleColor(*static_cast<const SetSingleColor*>(instr));
       break;
   }
-  tag_ = instr->tag();
+  tag_ = instr->Tag();
 }
 
 prism::ControllerInstruction* prism::InstructionMemorySlot::active() {
@@ -64,9 +64,9 @@ void prism::SetMultipleColor::Execute() const {
     return;
   }
   for (std::uint32_t i = range.start; i < range.end; ++i) {
-    StripLed* led = strip->led(i);
+    StripLed* led = strip->Led(i);
     if (led != nullptr) {
-      led->set_color(color);
+      led->SetColor(color);
     }
   }
 }
@@ -79,8 +79,8 @@ void prism::SetSingleColor::Execute() const {
   if (strip == nullptr) {
     return;
   }
-  StripLed* led = strip->led(index);
+  StripLed* led = strip->Led(index);
   if (led != nullptr) {
-    led->set_color(color);
+    led->SetColor(color);
   }
 }

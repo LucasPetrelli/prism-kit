@@ -7,7 +7,7 @@ namespace prism {
 
 /// @brief Sleep for the requested number of milliseconds.
 /// @param duration_ms Duration to sleep, in milliseconds.
-void sleep_ms(std::uint32_t duration_ms);
+void SleepMs(std::uint32_t duration_ms);
 
 }  // namespace prism
 

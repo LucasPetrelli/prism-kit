@@ -49,28 +49,28 @@ class Frame {
   /// @param data  Pointer to payload data. May be nullptr if length is 0.
   /// @param length Payload length in bytes. Must be <= kMaxFrameDataLength.
   /// @return A valid Frame, or an invalid frame (is_valid() == false) on error.
-  static Frame create(Tag tag, const uint8_t* data, uint16_t length);
+  static Frame Create(Tag tag, const uint8_t* data, uint16_t length);
 
   /// @brief Parse a received frame header from wire bytes.
   /// @param wire_data Pointer to 4-byte header (tag LE, length LE).
   /// @return Parsed FrameHeader.
-  static FrameHeader parse_header(const uint8_t* wire_data);
+  static FrameHeader ParseHeader(const uint8_t* wire_data);
 
   /// @brief Default-construct an empty, invalid frame.
   Frame() = default;
 
   /// @return The frame's tag.
-  Tag tag() const { return tag_; }
+  Tag GetTag() const { return tag_; }
 
   /// @return Pointer to payload data. nullptr if empty or invalid.
-  const uint8_t* data() const { return data_; }
+  const uint8_t* Data() const { return data_; }
 
   /// @return Payload length in bytes.
-  uint16_t length() const { return length_; }
+  uint16_t Length() const { return length_; }
 
   /// @return True if the frame contains valid data.
   /// A zero-length frame is valid even with a null data pointer.
-  bool is_valid() const { return length_ == 0 || data_ != nullptr; }
+  bool IsValid() const { return length_ == 0 || data_ != nullptr; }
 
  private:
   Frame(Tag tag, const uint8_t* data, uint16_t length);

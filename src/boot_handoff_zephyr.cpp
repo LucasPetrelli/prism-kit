@@ -2,5 +2,5 @@
 #include "bal/bootstrap.hpp"
 
 extern "C" int oshal_main_handoff(void) {
-  return bal::run_bootstrap(app::setup, app::loop);
+  return bal::RunBootstrap(app::setup, app::loop);
 }

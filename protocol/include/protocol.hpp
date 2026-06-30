@@ -104,29 +104,29 @@ class Protocol {
   ///                Protocol instance is passed as the handler's context.
   /// @return true on success, false if the table is full, the tag is
   ///         already registered, or handler is null.
-  bool add_handler(Tag tag, FrameHandler handler);
+  bool AddHandler(Tag tag, FrameHandler handler);
 
   /// @brief Queue a frame for transmission.
-  /// @param frame The frame to send. Must be valid (is_valid() == true).
+  /// @param frame The frame to send. Must be valid (IsValid() == true).
   /// @return true if the frame was queued, false if a frame is already
   ///         pending transmission.
   /// @note Only one frame can be queued at a time. The frame's data
   ///       is copied into an internal buffer, so the caller may free or
   ///       reuse the original data immediately after this call returns.
-  bool send(const Frame& frame);
+  bool Send(const Frame& frame);
 
   /// @brief Process one iteration of the protocol state machine.
   ///
   /// Reads available bytes from the stream, parses complete frames,
   /// dispatches them to registered handlers, and transmits any queued
   /// outgoing frame. Call this periodically from the main task loop.
-  void run();
+  void Run();
 
   /// @brief Print a diagnostic message through the debug callback.
   /// @param fmt  Printf-style format string.
   /// @param ...  Format arguments.
   /// @note Prepends "[PROTO] " to every message.
-  void debug_log(const char* fmt, ...) const;
+  void DebugLog(const char* fmt, ...) const;
 
   /// @brief Print a diagnostic message with an optional hexdump.
   /// @param data    Data to hexdump (nullptr to skip).
@@ -134,8 +134,8 @@ class Protocol {
   /// @param fmt     Printf-style format string.
   /// @param ...     Format arguments.
   /// @note Prepends "[PROTO] " to every message.
-  void debug_log(const uint8_t* data, uint32_t length, const char* fmt,
-                 ...) const;
+  void DebugLog(const uint8_t* data, uint32_t length, const char* fmt,
+                ...) const;
 
  private:
   enum class State : uint8_t {
@@ -152,58 +152,57 @@ class Protocol {
   };
 
   /// @brief Built-in loopback handler (registered for kLoopback by default).
-  static void loopback_impl_(void* context, const uint8_t* data,
-                             uint16_t length);
+  static void LoopbackImpl(void* context, const uint8_t* data, uint16_t length);
 
   /// @brief Read a single raw byte from the stream or fed buffer.
   /// @param out Set to the byte read on success.
   /// @return true if a byte was available, false if no data.
-  bool read_raw_byte(uint8_t& out);
+  bool ReadRawByte(uint8_t& out);
 
   /// @brief Write a frame to the stream with sync and checksum.
   /// @param header      Pointer to 4-byte header (tag LE, length LE).
   /// @param data        Pointer to payload data.
   /// @param data_length Payload length in bytes.
   /// @return true if all bytes were written successfully.
-  bool write_frame_wire(const uint8_t* header, const uint8_t* data,
-                        uint16_t data_length);
+  bool WriteFrameWire(const uint8_t* header, const uint8_t* data,
+                      uint16_t data_length);
 
   /// @brief Compute XOR checksum over header bytes + data bytes.
   /// @param header     Pointer to 4-byte header (tag LE, length LE).
   /// @param data       Pointer to payload data.
   /// @param data_length Payload length in bytes.
   /// @return XOR checksum byte.
-  static uint8_t compute_checksum(const uint8_t* header, const uint8_t* data,
-                                  uint16_t data_length);
+  static uint8_t ComputeChecksum(const uint8_t* header, const uint8_t* data,
+                                 uint16_t data_length);
 
   /// @brief Reset the parser to the waiting-for-sync state.
-  void reset_parser();
+  void ResetParser();
 
   /// @brief Dispatch a fully received frame to the matching handler.
-  void dispatch_frame();
+  void DispatchFrame();
 
   /// @brief Store one raw byte into the output reference.
   /// @param raw  The raw byte from the stream.
   /// @param out  Set to raw.
-  static void consume_byte(uint8_t raw, uint8_t& out);
+  static void ConsumeByte(uint8_t raw, uint8_t& out);
 
   /// @brief Attempt to transmit the pending outgoing frame.
   /// If successful, clears the TX-pending flag so a new frame can be
   /// queued.  If the transport write fails, the frame remains pending
   /// and will be retried on the next call.
-  void tx_phase();
+  void TxPhase();
 
-  /// @brief Shared implementation for debug_log() overloads.
-  void debug_log_impl(const uint8_t* data, uint32_t length, const char* fmt,
-                      std::va_list args) const;
+  /// @brief Shared implementation for DebugLog() overloads.
+  void DebugLogImpl(const uint8_t* data, uint32_t length, const char* fmt,
+                    std::va_list args) const;
 
-  /// @brief Like debug_log() but only emits when verbose_ is true.
-  void debug_verbose(const char* fmt, ...) const;
+  /// @brief Like DebugLog() but only emits when verbose_ is true.
+  void DebugVerbose(const char* fmt, ...) const;
 
-  /// @brief Like debug_log(data, len, ...) but only emits when verbose_
+  /// @brief Like DebugLog(data, len, ...) but only emits when verbose_
   ///        is true.
-  void debug_verbose(const uint8_t* data, uint32_t length, const char* fmt,
-                     ...) const;
+  void DebugVerbose(const uint8_t* data, uint32_t length, const char* fmt,
+                    ...) const;
 
   // --- Configuration ---
   StreamReader read_{nullptr};

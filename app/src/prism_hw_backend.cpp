@@ -19,7 +19,7 @@
 
 namespace prism {
 
-int initialize() {
+int Initialize() {
   static bool initialized = false;
   if (initialized) {
     return STATUS_OK;
@@ -29,38 +29,38 @@ int initialize() {
     return STATUS_ERR_NOT_READY;
   }
 
-  bal::Ws2812Strip& backend_strip = bal::ws2812_strip();
-  if (!backend_strip.is_ready()) {
+  bal::Ws2812Strip& backend_strip = bal::GetWs2812Strip();
+  if (!backend_strip.IsReady()) {
     return STATUS_ERR_DEVICE_UNAVAILABLE;
   }
 
-  bal::Led& status_led = bal::status_led();
-  if (!status_led.is_ready()) {
+  bal::Led& status_led = bal::StatusLed();
+  if (!status_led.IsReady()) {
     return STATUS_ERR_DEVICE_UNAVAILABLE;
   }
 
-  if (!oshal::debug_port.is_ready()) {
+  if (!oshal::debug_port.IsReady()) {
     return STATUS_ERR_DEVICE_UNAVAILABLE;
   }
 
-  if ((oshal::command_port != nullptr) && !oshal::command_port->is_ready()) {
+  if ((oshal::command_port != nullptr) && !oshal::command_port->IsReady()) {
     return STATUS_ERR_DEVICE_UNAVAILABLE;
   }
 
-  const std::size_t led_count = backend_strip.led_count();
+  const std::size_t led_count = backend_strip.LedCount();
   if (led_count > app::hw::kSharedFrameCapacity) {
     return STATUS_ERR_DEVICE_UNAVAILABLE;
   }
 
   /* Configure the HW managers before starting the executor task.
-   * StripManager implements prism::Strip — APP code calls fill()/show()
-   * on it directly, and show() posts the committed frame to the internal
+   * StripManager implements prism::Strip — APP code calls Fill()/Show()
+   * on it directly, and Show() posts the committed frame to the internal
    * mailbox for the app_hw task to drain. */
   app::hw::StripManager::Instance().Configure(&backend_strip, led_count,
-                                              backend_strip.name());
+                                              backend_strip.Name());
   app::hw::CommandManager::Instance().Configure(
     oshal::command_port, &oshal::debug_port,
-    &app::hw::StripManager::Instance().event_group());
+    &app::hw::StripManager::Instance().EventGroup());
   app::hw::StatusLed::Instance().Configure(&status_led,
                                            app::hw::kTaskIdleSleepMs);
 
@@ -74,8 +74,8 @@ int initialize() {
   return STATUS_OK;
 }
 
-Strip& strip() { return app::hw::StripManager::Instance(); }
+Strip& GetStrip() { return app::hw::StripManager::Instance(); }
 
-void sleep_ms(std::uint32_t duration_ms) { oshal::sleep_ms(duration_ms); }
+void SleepMs(std::uint32_t duration_ms) { oshal::SleepMs(duration_ms); }
 
 }  // namespace prism

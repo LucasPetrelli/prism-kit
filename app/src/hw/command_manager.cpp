@@ -20,19 +20,19 @@ void CommandManager::Configure(oshal::SerialPort* command_port,
   debug_port_ = debug_port;
 
   if (command_port_ != nullptr) {
-    command_port_->set_rx_event(event_group, kCommandRxEventMask);
+    command_port_->SetRxEvent(event_group, kCommandRxEventMask);
   }
 }
 
-void CommandManager::Run() { protocol_.run(); }
+void CommandManager::Run() { protocol_.Run(); }
 
 bool CommandManager::PrintBanner(const char* strip_name) {
   if (debug_port_ == nullptr) {
     return false;
   }
 
-  return debug_port_->printf("DebugPort online on %s, strip on %s\n",
-                             debug_port_->name(), strip_name) >= 0;
+  return debug_port_->Printf("DebugPort online on %s, strip on %s\n",
+                             debug_port_->Name(), strip_name) >= 0;
 }
 
 std::uint32_t CommandManager::ReadAdapter(std::uint8_t* buffer,
@@ -43,7 +43,7 @@ std::uint32_t CommandManager::ReadAdapter(std::uint8_t* buffer,
     return 0U;
   }
 
-  const int ret = port->read(buffer, static_cast<std::size_t>(length));
+  const int ret = port->Read(buffer, static_cast<std::size_t>(length));
   return ret < 0 ? 0U : static_cast<std::uint32_t>(ret);
 }
 
@@ -55,7 +55,7 @@ bool CommandManager::WriteAdapter(const std::uint8_t* data,
     return false;
   }
 
-  return port->write(data, static_cast<std::size_t>(length)) >= 0;
+  return port->Write(data, static_cast<std::size_t>(length)) >= 0;
 }
 
 int CommandManager::DebugPrintfAdapter(const char* fmt, ...) {
@@ -67,7 +67,7 @@ int CommandManager::DebugPrintfAdapter(const char* fmt, ...) {
 
   std::va_list args;
   va_start(args, fmt);
-  const int ret = dbg->vprintf(fmt, args);
+  const int ret = dbg->Vprintf(fmt, args);
   va_end(args);
   return ret;
 }

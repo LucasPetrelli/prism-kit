@@ -27,6 +27,7 @@ dependencies = [
 build = "scripts.build:main"
 flash = "scripts.flash:main"
 format = "scripts.format:main"
+lint = "scripts.lint:main"
 smoke-test = "scripts.smoke_test:main"
 unit-tests = "scripts.unit_tests:main"
 

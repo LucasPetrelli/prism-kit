@@ -33,10 +33,10 @@ class ControllerTest : public ::testing::Test {
 TEST_F(ControllerTest, SetSingleColorDispatchesToCorrectLed) {
   constexpr std::uint8_t kTargetIndex = 3U;
   constexpr prism::Color kColor = prism::Color::kPureGreen;
-  const prism::RgbColor kExpectedRgb = prism::to_rgb(kColor);
+  const prism::RgbColor kExpectedRgb = prism::ToRgb(kColor);
 
   prism::SetSingleColor instr;
-  instr.color = prism::to_rgb(kColor);
+  instr.color = prism::ToRgb(kColor);
   instr.strip = &mock_strip_;
   instr.index = kTargetIndex;
 
@@ -45,7 +45,7 @@ TEST_F(ControllerTest, SetSingleColorDispatchesToCorrectLed) {
   slot.set(&instr);
 
   EXPECT_CALL(*mock_strip_.mutable_led(static_cast<std::size_t>(kTargetIndex)),
-              set_color(kExpectedRgb))
+              SetColor(kExpectedRgb))
     .WillOnce(testing::Return(0));
   EXPECT_CALL(mock_strip_, show()).Times(0);
 
@@ -57,7 +57,7 @@ TEST_F(ControllerTest, SetSingleColorWithNullStripIsNoop) {
   constexpr prism::Color kColor = prism::Color::kPureRed;
 
   prism::SetSingleColor instr;
-  instr.color = prism::to_rgb(kColor);
+  instr.color = prism::ToRgb(kColor);
   instr.strip = nullptr;
   instr.index = 0U;
 
@@ -76,10 +76,10 @@ TEST_F(ControllerTest, SetSingleColorWithNullStripIsNoop) {
 ///     every pixel in [start, end) and commits the frame.
 TEST_F(ControllerTest, SetMultipleColorFillsRange) {
   constexpr prism::Color kColor = prism::Color::kIceBlue;
-  const prism::RgbColor kExpectedRgb = prism::to_rgb(kColor);
+  const prism::RgbColor kExpectedRgb = prism::ToRgb(kColor);
 
   prism::SetMultipleColor instr;
-  instr.color = prism::to_rgb(kColor);
+  instr.color = prism::ToRgb(kColor);
   instr.strip = &mock_strip_;
   instr.range.start = 1U;
   instr.range.end = 3U;
@@ -88,9 +88,9 @@ TEST_F(ControllerTest, SetMultipleColorFillsRange) {
   slot.set(&instr);
 
   // Pixels 1 and 2 get set_color; pixel 0 does not.
-  EXPECT_CALL(*mock_strip_.mutable_led(1U), set_color(kExpectedRgb))
+  EXPECT_CALL(*mock_strip_.mutable_led(1U), SetColor(kExpectedRgb))
     .WillOnce(testing::Return(0));
-  EXPECT_CALL(*mock_strip_.mutable_led(2U), set_color(kExpectedRgb))
+  EXPECT_CALL(*mock_strip_.mutable_led(2U), SetColor(kExpectedRgb))
     .WillOnce(testing::Return(0));
   EXPECT_CALL(mock_strip_, show()).Times(0);
 
@@ -104,45 +104,45 @@ TEST_F(ControllerTest, SetMultipleColorFillsRange) {
 /// @brief Run() iterates through all populated instruction slots.
 TEST_F(ControllerTest, RunIteratesAllSlots) {
   prism::SetSingleColor r;
-  r.color = prism::to_rgb(prism::Color::kPureRed);
+  r.color = prism::ToRgb(prism::Color::kPureRed);
   r.strip = &mock_strip_;
   r.index = 0U;
   controller_.AddInstruction(&r);
 
   prism::SetSingleColor g;
-  g.color = prism::to_rgb(prism::Color::kPureGreen);
+  g.color = prism::ToRgb(prism::Color::kPureGreen);
   g.strip = &mock_strip_;
   g.index = 1U;
   controller_.AddInstruction(&g);
 
   prism::SetSingleColor b;
-  b.color = prism::to_rgb(prism::Color::kPureBlue);
+  b.color = prism::ToRgb(prism::Color::kPureBlue);
   b.strip = &mock_strip_;
   b.index = 2U;
   controller_.AddInstruction(&b);
 
   // Controller calls show() once after all instructions.
-  EXPECT_CALL(mock_strip_, show()).Times(1);
+  EXPECT_CALL(mock_strip_, Show()).Times(1);
 
   controller_.Run();
 }
 
 /// @brief Run() with zero instructions is a no-op.
 TEST_F(ControllerTest, RunOnEmptyControllerIsNoop) {
-  EXPECT_CALL(mock_strip_, show()).Times(0);
+  EXPECT_CALL(mock_strip_, Show()).Times(0);
   controller_.Run();
 }
 
 /// @brief ResetInstructions() clears the queue so Run() does nothing.
 TEST_F(ControllerTest, ResetInstructionsClearsState) {
   prism::SetSingleColor gold;
-  gold.color = prism::to_rgb(prism::Color::kChristmasGold);
+  gold.color = prism::ToRgb(prism::Color::kChristmasGold);
   gold.strip = &mock_strip_;
   gold.index = 4U;
   controller_.AddInstruction(&gold);
 
   prism::SetSingleColor pink;
-  pink.color = prism::to_rgb(prism::Color::kCyberpunkPink);
+  pink.color = prism::ToRgb(prism::Color::kCyberpunkPink);
   pink.strip = &mock_strip_;
   pink.index = 5U;
   controller_.AddInstruction(&pink);
@@ -164,16 +164,16 @@ TEST_F(ControllerTest, SlotExecuteDispatchesCorrectly) {
 
   // Set up a SetSingleColor instruction.
   prism::SetSingleColor single;
-  single.color = prism::to_rgb(kColor);
+  single.color = prism::ToRgb(kColor);
   single.strip = &mock_strip_;
   single.index = 5U;
 
   prism::InstructionMemorySlot slot;
   slot.set(&single);
 
-  EXPECT_CALL(*mock_strip_.mutable_led(5U), set_color(testing::_))
+  EXPECT_CALL(*mock_strip_.mutable_led(5U), SetColor(testing::_))
     .WillOnce(testing::Return(0));
-  EXPECT_CALL(mock_strip_, show()).Times(0);
+  EXPECT_CALL(mock_strip_, Show()).Times(0);
 
   slot.execute();
 }
@@ -184,16 +184,16 @@ TEST_F(ControllerTest, SlotCanBeReused) {
 
   // First: SetSingleColor.
   prism::SetSingleColor single;
-  single.color = prism::to_rgb(kColor);
+  single.color = prism::ToRgb(kColor);
   single.strip = &mock_strip_;
   single.index = 2U;
 
   prism::InstructionMemorySlot slot;
   slot.set(&single);
 
-  EXPECT_CALL(*mock_strip_.mutable_led(2U), set_color(testing::_))
+  EXPECT_CALL(*mock_strip_.mutable_led(2U), SetColor(testing::_))
     .WillOnce(testing::Return(0));
-  EXPECT_CALL(mock_strip_, show()).Times(0);
+  EXPECT_CALL(mock_strip_, Show()).Times(0);
   slot.execute();
 
   // Reset the mock expectations for the second execution.
@@ -201,17 +201,17 @@ TEST_F(ControllerTest, SlotCanBeReused) {
 
   // Reuse the slot as SetMultipleColor.
   prism::SetMultipleColor multi;
-  multi.color = prism::to_rgb(prism::Color::kPureBlue);
+  multi.color = prism::ToRgb(prism::Color::kPureBlue);
   multi.strip = &mock_strip_;
   multi.range.start = 0U;
   multi.range.end = 2U;
 
   slot.set(&multi);
 
-  EXPECT_CALL(*mock_strip_.mutable_led(0U), set_color(testing::_))
+  EXPECT_CALL(*mock_strip_.mutable_led(0U), SetColor(testing::_))
     .WillOnce(testing::Return(0));
-  EXPECT_CALL(*mock_strip_.mutable_led(1U), set_color(testing::_))
+  EXPECT_CALL(*mock_strip_.mutable_led(1U), SetColor(testing::_))
     .WillOnce(testing::Return(0));
-  EXPECT_CALL(mock_strip_, show()).Times(0);
+  EXPECT_CALL(mock_strip_, Show()).Times(0);
   slot.execute();
 }

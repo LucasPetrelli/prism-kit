@@ -59,7 +59,7 @@ enum class Color : std::uint32_t {
 /// @param color Named preset color.
 /// @return Equivalent RgbColor extracted from the packed 0xRRGGBB
 ///     representation.
-constexpr RgbColor to_rgb(Color color) noexcept {
+constexpr RgbColor ToRgb(Color color) noexcept {
   const auto raw = static_cast<std::uint32_t>(color);
   return RgbColor{
     static_cast<std::uint8_t>((raw >> 16) & 0xFF),

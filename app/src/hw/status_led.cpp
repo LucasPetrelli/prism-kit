@@ -27,7 +27,7 @@ bool StatusLed::Blink() {
   }
 
   blink_tick_ = 0U;
-  return led_->toggle() >= 0;
+  return led_->Toggle() >= 0;
 }
 
 }  // namespace app::hw
