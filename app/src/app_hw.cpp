@@ -1,4 +1,3 @@
-#include <cstddef>
 #include <cstdint>
 
 #include "bal/ws2812_strip.hpp"
@@ -10,7 +9,6 @@
 #include "hw/strip_manager.hpp"
 #include "oshal/event.hpp"
 #include "oshal/status.h"
-#include "oshal/task.hpp"
 
 namespace {
 

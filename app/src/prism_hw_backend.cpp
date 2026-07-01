@@ -13,7 +13,6 @@
 #include "oshal/status.h"
 #include "oshal/task.hpp"
 #include "oshal/time.hpp"
-#include "prism/color.hpp"
 #include "prism/strip.hpp"
 #include "prism/time.hpp"
 

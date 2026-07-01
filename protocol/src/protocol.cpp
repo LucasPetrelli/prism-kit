@@ -1,5 +1,6 @@
 #include "protocol.hpp"
 
+#include <algorithm>
 #include <cstdarg>
 #include <cstdio>
 #include <cstring>
@@ -439,9 +440,7 @@ void Protocol::DebugLogImpl(const uint8_t* data, uint32_t length,
       const int wrote = std::snprintf(&line[pos], k_line_capacity - pos + 1U,
                                       "%02X", data[offset + i]);
       pos += static_cast<uint32_t>(wrote > 0 ? wrote : 0);
-      if (pos > k_line_capacity) {
-        pos = k_line_capacity;
-      }
+      pos = std::min(pos, k_line_capacity);
     }
     line[pos] = '\0';
     debug_("%s", line);
