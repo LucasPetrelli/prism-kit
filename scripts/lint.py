@@ -27,6 +27,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -149,6 +150,50 @@ def _staged_files(repo_root: Path) -> list[Path]:
     return staged
 
 
+_SOURCE_DIRS = ("app", "bal", "oshal", "protocol", "src")
+
+
+def _find_includers(header: Path, repo_root: Path) -> list[Path]:
+    """Return .cpp files under project source dirs that #include *header*.
+
+    Resolves ``#include "..."`` and ``#include <...>`` directives against
+    the project root and ``include/`` directory to find translation units
+    that pull in *header*.
+    """
+    includers: list[Path] = []
+    include_roots = [
+        repo_root,
+        repo_root / "include",
+    ]
+
+    for dir_name in _SOURCE_DIRS:
+        src_dir = repo_root / dir_name
+        if not src_dir.is_dir():
+            continue
+        for cpp in src_dir.rglob("*.cpp"):
+            try:
+                content = cpp.read_text(encoding="utf-8")
+            except (OSError, UnicodeDecodeError):
+                continue
+            for line in content.splitlines():
+                stripped = line.strip()
+                if not stripped.startswith("#include"):
+                    continue
+                m = re.search(r'#include\s*[<"]([^>"]+)[>"]', stripped)
+                if not m:
+                    continue
+                include_path = m.group(1)
+                for root in include_roots:
+                    candidate = (root / include_path).resolve()
+                    if candidate == header:
+                        includers.append(cpp.resolve())
+                        break
+                else:
+                    continue
+                break  # matched in this file, move to next .cpp
+    return includers
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Run clang-tidy on prism-kit")
     parser.add_argument(
@@ -227,6 +272,28 @@ def main() -> None:
         fp = Path(entry["file"]).resolve()
         original_index[fp] = entry
 
+    # ── Resolve header-only staged targets ───────────────────────────
+    if args.staged:
+        resolved: list[Path] = []
+        for t in targets:
+            if t in original_index:
+                resolved.append(t)
+            elif t.suffix in (".hpp", ".h"):
+                includers = _find_includers(t, repo_root)
+                if includers:
+                    resolved.extend(includers)
+                else:
+                    rel = t.relative_to(repo_root)
+                    print(f"Skipping header not directly compiled: {rel}")
+            # else: .cpp not in DB — silently dropped
+        # Deduplicate while preserving order.
+        seen: set[Path] = set()
+        targets = []
+        for t in resolved:
+            if t not in seen:
+                seen.add(t)
+                targets.append(t)
+
     filtered_db: list[dict[str, Any]] = []
     for t in targets:
         if t not in original_index:
@@ -236,8 +303,8 @@ def main() -> None:
         filtered_db.append(entry)
 
     if not filtered_db:
-        print("No compilation entries found for the requested files.")
-        sys.exit(1)
+        print("No compilation entries found for the requested files — nothing to lint.")
+        sys.exit(0)
 
     # Write the filtered database as compile_commands.json in a temp dir.
     tmp_dir = tempfile.mkdtemp(prefix="clang-tidy-", dir=str(build_dir))
