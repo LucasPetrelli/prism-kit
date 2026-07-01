@@ -3,5 +3,6 @@
 
 // NOLINTNEXTLINE(readability-identifier-naming)
 extern "C" int oshal_main_handoff(void) {
-  return bal::RunBootstrap(app::Setup, app::Loop);
+  return bal::RunBootstrap(app::AppTask::SetupTrampoline,
+                           app::AppTask::LoopTrampoline);
 }

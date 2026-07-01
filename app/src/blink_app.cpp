@@ -15,27 +15,34 @@ constexpr std::array<prism::RgbColor, 3U> kStripColors = {
   prism::RgbColor{0U, 255U, 0U},
 };
 
-struct BlinkAppState {
-  std::uint32_t color_step_count = 0U;
-};
-
-BlinkAppState g_blink_app_state = {};
-
 }  // namespace
 
-bool app::Setup(void* context) {
-  static_cast<void>(context);
+namespace app {
 
-  g_blink_app_state.color_step_count = 0U;
+AppTask& AppTask::Instance() {
+  static AppTask instance;
+  return instance;
+}
+
+bool AppTask::SetupTrampoline(void* context) {
+  static_cast<void>(context);
+  return Instance().Setup();
+}
+
+bool AppTask::LoopTrampoline(void* context) {
+  static_cast<void>(context);
+  return Instance().Loop();
+}
+
+bool AppTask::Setup() {
+  color_step_count_ = 0U;
   return prism::Initialize() >= 0;
 }
 
-bool app::Loop(void* context) {
-  static_cast<void>(context);
-
+bool AppTask::Loop() {
   prism::Strip& demo_strip = prism::GetStrip();
   const prism::RgbColor& next_color =
-    kStripColors[g_blink_app_state.color_step_count % kStripColors.size()];
+    kStripColors[color_step_count_ % kStripColors.size()];
 
   if (demo_strip.Fill(next_color) < 0) {
     return false;
@@ -45,7 +52,9 @@ bool app::Loop(void* context) {
     return false;
   }
 
-  ++g_blink_app_state.color_step_count;
+  ++color_step_count_;
   prism::SleepMs(kColorStepPeriodMs);
   return true;
 }
+
+}  // namespace app
