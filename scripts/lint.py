@@ -171,6 +171,11 @@ def main() -> None:
         default=[],
         help="Extra arguments to pass to clang-tidy (can be repeated)",
     )
+    parser.add_argument(
+        "--verbose",
+        action="store_true",
+        help="Show per-file processing messages and all clang-tidy output",
+    )
     args = parser.parse_args()
 
     repo_root = Path(__file__).resolve().parent.parent
@@ -274,6 +279,10 @@ def main() -> None:
                     break
         # Set the target triple to match the ARM cross-compiler.
         cmd.insert(1, "--extra-arg-before=--target=arm-none-eabi")
+        # Narrow target to the specific MCU so CMSIS and Zephyr arch headers
+        # resolve correctly (avoids "#error Unknown Arm architecture profile"
+        # and undeclared __get_PRIMASK).
+        cmd.insert(1, "--extra-arg-before=-mcpu=cortex-m0plus")
 
     # Suppress diagnostics about cross-compiler flags that clang does not
     # recognise (we already strip the worst offenders from the compilation
@@ -283,7 +292,14 @@ def main() -> None:
     cmd.insert(1, "--extra-arg-before=-Qunused-arguments")
 
     try:
-        subprocess.run(cmd, check=True)
+        if args.verbose:
+            subprocess.run(cmd, check=True)
+        else:
+            result = subprocess.run(cmd, capture_output=True, text=True)
+            if result.returncode != 0:
+                print(result.stdout, end="", file=sys.stderr)
+                print(result.stderr, end="", file=sys.stderr)
+                sys.exit(result.returncode)
     except subprocess.CalledProcessError:
         sys.exit(1)
     finally:

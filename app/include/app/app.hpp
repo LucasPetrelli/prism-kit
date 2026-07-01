@@ -9,13 +9,13 @@ namespace app {
 ///     false.
 /// @pre BAL completed board bring-up for every board-owned resource required by
 ///     the application.
-bool setup(void* context = nullptr);
+bool Setup(void* context = nullptr);
 
 /// @brief Run one iteration of the steady-state application loop.
 /// @param context Optional task context supplied by the launcher.
 /// @return True to keep the APP task running, otherwise false.
-/// @pre APP setup() completed successfully for the current task instance.
-bool loop(void* context = nullptr);
+/// @pre APP Setup() completed successfully for the current task instance.
+bool Loop(void* context = nullptr);
 
 }  // namespace app
 

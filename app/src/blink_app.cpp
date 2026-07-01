@@ -23,14 +23,14 @@ BlinkAppState g_blink_app_state = {};
 
 }  // namespace
 
-bool app::setup(void* context) {
+bool app::Setup(void* context) {
   static_cast<void>(context);
 
   g_blink_app_state.color_step_count = 0U;
   return prism::Initialize() >= 0;
 }
 
-bool app::loop(void* context) {
+bool app::Loop(void* context) {
   static_cast<void>(context);
 
   prism::Strip& demo_strip = prism::GetStrip();

@@ -241,13 +241,15 @@ bool Protocol::WriteFrameWire(const uint8_t* header, const uint8_t* data,
 
   // Assemble the escaped frame in chunks so the transport receives at most
   // a handful of write_() calls instead of one per byte.
-  constexpr size_t kChunkSize = 64;
-  uint8_t chunk[kChunkSize];
+  constexpr size_t k_chunk_size = 64;
+  uint8_t chunk[k_chunk_size];
   size_t fill = 0;
 
   // Flush the current chunk to the transport.  Returns true on success.
   auto flush = [&]() -> bool {
-    if (fill == 0) return true;
+    if (fill == 0) {
+      return true;
+    }
     bool ok = write_(chunk, static_cast<uint32_t>(fill));
     fill = 0;
     return ok;
@@ -255,31 +257,41 @@ bool Protocol::WriteFrameWire(const uint8_t* header, const uint8_t* data,
 
   // Emit one raw byte into the chunk.
   auto emit = [&](uint8_t b) -> bool {
-    if (fill + 1 > kChunkSize) {
-      if (!flush()) return false;
+    if (fill + 1 > k_chunk_size) {
+      if (!flush()) {
+        return false;
+      }
     }
     chunk[fill++] = b;
     return true;
   };
 
   // 1. Sync byte.
-  if (!emit(kSyncByte)) return false;
+  if (!emit(kSyncByte)) {
+    return false;
+  }
 
   // 2. Header: 4 bytes (tag LE, length LE).
   for (size_t i = 0; i < kHeaderSize; ++i) {
-    if (!emit(header[i])) return false;
+    if (!emit(header[i])) {
+      return false;
+    }
   }
 
   // 3. Data: data_length bytes.
   if (data && data_length > 0) {
     for (uint16_t i = 0; i < data_length; ++i) {
-      if (!emit(data[i])) return false;
+      if (!emit(data[i])) {
+        return false;
+      }
     }
   }
 
   // 4. Checksum: XOR of header + data.
-  uint8_t checksum = ComputeChecksum(header, data, data_length);
-  if (!emit(checksum)) return false;
+  const uint8_t checksum = ComputeChecksum(header, data, data_length);
+  if (!emit(checksum)) {
+    return false;
+  }
 
   return flush();
 }
@@ -412,23 +424,23 @@ void Protocol::DebugLogImpl(const uint8_t* data, uint32_t length,
 
   // Hexdump: up to 16 bytes per line.
   char line[64];
-  constexpr uint32_t kLineCapacity = sizeof(line) - 1U;
+  constexpr uint32_t k_line_capacity = sizeof(line) - 1U;
   for (uint32_t offset = 0U; offset < length; offset += 16U) {
     uint32_t pos = 0U;
     const uint32_t remain = length - offset;
     const uint32_t chunk = remain < 16U ? remain : 16U;
     for (uint32_t i = 0U; i < chunk; ++i) {
-      if (i > 0U && pos < kLineCapacity) {
+      if (i > 0U && pos < k_line_capacity) {
         line[pos++] = ' ';
       }
-      if (pos >= kLineCapacity) {
+      if (pos >= k_line_capacity) {
         break;  // Line full — truncate this row.
       }
-      const int wrote = std::snprintf(&line[pos], kLineCapacity - pos + 1U,
+      const int wrote = std::snprintf(&line[pos], k_line_capacity - pos + 1U,
                                       "%02X", data[offset + i]);
       pos += static_cast<uint32_t>(wrote > 0 ? wrote : 0);
-      if (pos > kLineCapacity) {
-        pos = kLineCapacity;
+      if (pos > k_line_capacity) {
+        pos = k_line_capacity;
       }
     }
     line[pos] = '\0';

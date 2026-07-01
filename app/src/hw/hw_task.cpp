@@ -10,7 +10,7 @@ HwTask::HwTask(oshal::EventFlagGroup& event_group)
 int HwTask::Start(const char* name, oshal::TaskSetup setup,
                   oshal::TaskLoop loop, void* context,
                   std::size_t stack_size_bytes, int priority) {
-  if (task_.is_valid()) {
+  if (task_.IsValid()) {
     return STATUS_OK;
   }
 
@@ -21,13 +21,13 @@ int HwTask::Start(const char* name, oshal::TaskSetup setup,
   config.context = context;
   config.stack_size_bytes = stack_size_bytes;
   config.priority = priority;
-  return oshal::TaskHandle::create(task_, config);
+  return oshal::TaskHandle::Create(task_, config);
 }
 
-bool HwTask::IsRunning() const { return task_.is_valid(); }
+bool HwTask::IsRunning() const { return task_.IsValid(); }
 
-bool HwTask::HasExited() const { return task_.has_exited(); }
+bool HwTask::HasExited() const { return task_.HasExited(); }
 
-int HwTask::ExitCode(int* out_code) const { return task_.exit_code(out_code); }
+int HwTask::ExitCode(int* out_code) const { return task_.ExitCode(out_code); }
 
 }  // namespace app::hw

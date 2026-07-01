@@ -25,7 +25,7 @@ int Initialize() {
     return STATUS_OK;
   }
 
-  if (!oshal::TaskHandle::current().is_valid()) {
+  if (!oshal::TaskHandle::Current().IsValid()) {
     return STATUS_ERR_NOT_READY;
   }
 

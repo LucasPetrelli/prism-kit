@@ -27,6 +27,9 @@ Checks: >
   -bugprone-narrowing-conversions,
   -bugprone-reserved-identifier,
   -misc-include-cleaner,
+  -misc-const-correctness,
+  -misc-header-include-cycle,
+  -misc-misplaced-const,
   -misc-no-recursion,
   -misc-non-private-member-variables-in-classes,
   -readability-convert-member-functions-to-static,
@@ -35,6 +38,7 @@ Checks: >
   -readability-implicit-bool-conversion,
   -readability-magic-numbers,
   -readability-named-parameter,
+  -readability-non-const-parameter,
   -readability-redundant-access-specifiers,
   -readability-uppercase-literal-suffix,
   -readability-use-anyofallof,
@@ -47,7 +51,7 @@ Checks: >
 # Only naming/readability violations are errors; clang-diagnostic and similar
 # cross-compiler issues are suppressed since clang-tidy runs on the host while
 # the project targets ARM GCC.
-WarningsAsErrors: 'readability-*'
+WarningsAsErrors: 'readability-*,misc-*'
 
 # Only lint project-owned headers — skip Zephyr, ARM GCC, and other
 # third-party includes.
@@ -78,6 +82,12 @@ CheckOptions:
     value: CamelCase
   - key: readability-identifier-naming.TypeTemplateParameterCase
     value: CamelCase
+
+  # Value (non-type) template parameters: kPascalCase (like constants)
+  - key: readability-identifier-naming.ValueTemplateParameterCase
+    value: CamelCase
+  - key: readability-identifier-naming.ValueTemplateParameterPrefix
+    value: k
 
   # Enumerators: kPascalCase
   - key: readability-identifier-naming.EnumConstantCase
