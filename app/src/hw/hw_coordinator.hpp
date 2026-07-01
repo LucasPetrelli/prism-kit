@@ -5,17 +5,18 @@ namespace app::hw {
 
 /// @brief Create and start the app_hw task.
 ///
-/// Must be called after StripManager, CommandManager, and StatusLed have
-/// been configured.  The task runs the hardware executor loop: draining
-/// strip frames, servicing the command-port protocol, and blinking the
-/// status LED.
+/// Must be called after HwTask::Instance()'s Strip() and StatusLed() have
+/// been configured via prism::Initialize().  The task runs the hardware
+/// executor loop: draining strip frames, servicing the command-port
+/// protocol, and blinking the status LED.
 ///
 /// Idempotent — returns STATUS_OK immediately if the task is already
 /// running, making repeated calls safe from multiple initialisation paths.
 ///
 /// @return STATUS_OK on success, or a negative project-defined status code.
-/// @pre StripManager::Instance(), CommandManager::Instance(), and
-///     StatusLed::Instance() have been configured with valid pointers.
+/// @pre HwTask::Instance().GetStrip().Configure() and
+///     HwTask::Instance().GetStatusLed().Configure() have been called with
+///     valid pointers.
 int StartHwExecutor();
 
 }  // namespace app::hw

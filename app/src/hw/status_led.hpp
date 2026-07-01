@@ -20,13 +20,6 @@ class StatusLed {
   ///     (one complete on/off cycle every 2 s).
   static constexpr std::uint32_t kBlinkHalfPeriodMs = 1000U;
 
-  /// @brief Access the process-wide singleton.
-  /// @return Reference to the StatusLed singleton.
-  static StatusLed& Instance();
-
-  StatusLed(const StatusLed&) = delete;
-  StatusLed& operator=(const StatusLed&) = delete;
-
   /// @brief Wire the status LED and set the idle-sleep granularity.
   /// @param led             Board-owned status LED (must be ready).
   /// @param idle_sleep_ms   Task-loop idle sleep interval, in milliseconds.

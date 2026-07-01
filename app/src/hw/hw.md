@@ -214,19 +214,22 @@ end note
 
 ## Construction Order
 
-All instances live as file-scope statics in `app_hw.cpp`:
+`HwTask` is a process-wide singleton (`HwTask::Instance()`, defined in
+`hw_task.cpp`).  It owns `EventFlagGroup`, `StripManager`, and `StatusLed`
+by value.  Construction order is implicit in the member declaration order:
 
-1. **`g_event_group`** — `oshal::EventFlagGroup` (constructed first)
-2. **`g_hw_task`** — `HwTask{g_event_group}`
-3. **`g_strip_manager`** — `StripManager{g_event_group}`
+1. `EventFlagGroup event_group_` — constructed first
+2. `StatusLed status_led_` — plain default construction
+3. `StripManager strip_manager_{event_group_}` — mailbox posts to `event_group_`
 
 ## Ownership & Lifecycle
 
 | Instance | Scope | Pattern |
 |---|---|---|
-| `g_hw_task` | `app_hw.cpp` anonymous ns | Plain object |
-| `g_strip_manager` | `app_hw.cpp` anonymous ns | `StripManager::Instance()` |
-| `g_status_led` | `status_led.cpp` anonymous ns | `StatusLed::Instance()` |
+| `HwTask` | `hw_task.cpp` anonymous ns | `HwTask::Instance()` |
+| `event_group_` | Member of `HwTask` | Owned by value |
+| `strip_manager_` | Member of `HwTask` | Owned by value, accessed via `HwTask::GetStrip()` |
+| `status_led_` | Member of `HwTask` | Owned by value, accessed via `HwTask::GetStatusLed()` |
 | `g_command_manager` | `command_manager.cpp` anonymous ns | `CommandManager::Instance()` |
 
 ## Event Flow

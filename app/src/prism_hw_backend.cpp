@@ -5,9 +5,8 @@
 #include "hw/command_manager.hpp"
 #include "hw/hw_constants.hpp"
 #include "hw/hw_coordinator.hpp"
+#include "hw/hw_task.hpp"
 #include "hw/shared_frame.hpp"
-#include "hw/status_led.hpp"
-#include "hw/strip_manager.hpp"
 #include "oshal/debug_port.hpp"
 #include "oshal/serial_port.hpp"
 #include "oshal/status.h"
@@ -55,13 +54,11 @@ int Initialize() {
    * StripManager implements prism::Strip — APP code calls Fill()/Show()
    * on it directly, and Show() posts the committed frame to the internal
    * mailbox for the app_hw task to drain. */
-  app::hw::StripManager::Instance().Configure(&backend_strip, led_count,
-                                              backend_strip.Name());
+  auto& hw = app::hw::HwTask::Instance();
+  hw.GetStrip().Configure(&backend_strip, led_count, backend_strip.Name());
   app::hw::CommandManager::Instance().Configure(
-    oshal::command_port, &oshal::debug_port,
-    &app::hw::StripManager::Instance().EventGroup());
-  app::hw::StatusLed::Instance().Configure(&status_led,
-                                           app::hw::kTaskIdleSleepMs);
+    oshal::command_port, &oshal::debug_port, &hw.EventGroup());
+  hw.GetStatusLed().Configure(&status_led, app::hw::kTaskIdleSleepMs);
 
   /* Start the HW executor before publishing any committed strip frame. */
   const int start_ret = app::hw::StartHwExecutor();
@@ -73,7 +70,7 @@ int Initialize() {
   return STATUS_OK;
 }
 
-Strip& GetStrip() { return app::hw::StripManager::Instance(); }
+Strip& GetStrip() { return app::hw::HwTask::Instance().GetStrip(); }
 
 void SleepMs(std::uint32_t duration_ms) { oshal::SleepMs(duration_ms); }
 

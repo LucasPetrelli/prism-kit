@@ -19,8 +19,9 @@ class StripManager;
 
 /// @brief Concrete prism::StripLed view that delegates to StripManager.
 ///
-/// Each view stores only its own zero-based index.  All colour staging
-/// and readiness queries are forwarded to the StripManager singleton.
+/// Each view stores its own zero-based index and a pointer to the
+/// owning StripManager.  All colour staging and readiness queries are
+/// forwarded through that back-pointer.
 class StripLedView : public prism::StripLed {
  public:
   StripLedView() = default;
@@ -29,12 +30,17 @@ class StripLedView : public prism::StripLed {
   /// @param index Zero-based strip index.
   void SetIndex(std::size_t index) { index_ = index; }
 
+  /// @brief Wire the owning StripManager back-pointer.
+  /// @param manager Owning StripManager (must outlive this view).
+  void SetManager(StripManager* manager) { manager_ = manager; }
+
   bool IsReady() const override;
   int SetColor(const prism::RgbColor& color) override;
   prism::RgbColor Color() const override;
   std::size_t Index() const override { return index_; }
 
  private:
+  StripManager* manager_ = nullptr;
   std::size_t index_ = 0U;
 };
 
@@ -49,10 +55,6 @@ class StripManager : public prism::Strip {
  public:
   /// @brief Event bitmask posted when a frame enters the mailbox.
   static constexpr std::uint32_t kFrameEventMask = oshal::UserEvent(0);
-
-  /// @brief Access the process-wide singleton.
-  /// @return Reference to the StripManager singleton.
-  static StripManager& Instance();
 
   StripManager(const StripManager&) = delete;
   StripManager& operator=(const StripManager&) = delete;

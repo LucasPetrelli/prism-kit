@@ -10,15 +10,16 @@ namespace app::hw {
  * ======================================================================== */
 
 bool StripLedView::IsReady() const {
-  return StripManager::Instance().IsReady();
+  return (manager_ != nullptr) ? manager_->IsReady() : false;
 }
 
 int StripLedView::SetColor(const prism::RgbColor& color) {
-  return StripManager::Instance().SetLedColor(index_, color);
+  return (manager_ != nullptr) ? manager_->SetLedColor(index_, color)
+                               : STATUS_ERR_NOT_READY;
 }
 
 prism::RgbColor StripLedView::Color() const {
-  return StripManager::Instance().LedColor(index_);
+  return (manager_ != nullptr) ? manager_->LedColor(index_) : prism::RgbColor{};
 }
 
 /* ========================================================================
@@ -29,6 +30,7 @@ StripManager::StripManager(oshal::EventFlagGroup& event_group)
     : event_group_(event_group) {
   for (std::size_t i = 0; i < led_views_.size(); ++i) {
     led_views_[i].SetIndex(i);
+    led_views_[i].SetManager(this);
   }
 }
 

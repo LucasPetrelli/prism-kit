@@ -1,14 +1,6 @@
 #include "status_led.hpp"
 
-namespace {
-
-app::hw::StatusLed g_status_led;
-
-}  // namespace
-
 namespace app::hw {
-
-StatusLed& StatusLed::Instance() { return g_status_led; }
 
 void StatusLed::Configure(bal::Led* led, std::uint32_t idle_sleep_ms) {
   led_ = led;
