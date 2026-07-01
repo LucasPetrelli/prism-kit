@@ -47,7 +47,7 @@ TEST_F(ControllerTest, SetSingleColorDispatchesToCorrectLed) {
   EXPECT_CALL(*mock_strip_.mutable_led(static_cast<std::size_t>(kTargetIndex)),
               SetColor(kExpectedRgb))
     .WillOnce(testing::Return(0));
-  EXPECT_CALL(mock_strip_, show()).Times(0);
+  EXPECT_CALL(mock_strip_, Show()).Times(0);
 
   slot.execute();
 }
@@ -92,7 +92,7 @@ TEST_F(ControllerTest, SetMultipleColorFillsRange) {
     .WillOnce(testing::Return(0));
   EXPECT_CALL(*mock_strip_.mutable_led(2U), SetColor(kExpectedRgb))
     .WillOnce(testing::Return(0));
-  EXPECT_CALL(mock_strip_, show()).Times(0);
+  EXPECT_CALL(mock_strip_, Show()).Times(0);
 
   slot.execute();
 }
@@ -149,7 +149,7 @@ TEST_F(ControllerTest, ResetInstructionsClearsState) {
 
   controller_.ResetInstructions();
 
-  EXPECT_CALL(mock_strip_, show()).Times(0);
+  EXPECT_CALL(mock_strip_, Show()).Times(0);
   controller_.Run();
 }
 
