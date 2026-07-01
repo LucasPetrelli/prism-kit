@@ -2,7 +2,6 @@
 #define PRISM_STRIP_HPP_
 
 #include <cstddef>
-#include <cstdint>
 
 #include "prism/color.hpp"
 
