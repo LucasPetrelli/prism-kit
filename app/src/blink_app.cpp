@@ -71,32 +71,14 @@ bool AppTask::Setup() {
   return true;
 }
 
+prism::Controller& AppTask::GetController() { return controller_; }
+
 bool AppTask::Loop() {
   /* Block until a controller command arrives. */
   command_event_group_.WaitAny(kCommandEventMask, oshal::kEventWaitForever);
 
-  /* Drain all pending commands. */
-  app::hw::ControllerCommandMessage msg;
-  while (command_mailbox_.Receive(&msg)) {
-    switch (msg.cmd) {
-      case app::hw::ControllerCommand::kSetMultipleColor: {
-        const prism::SetMultipleColor instr{msg.set_multiple};
-        controller_.AddInstruction(&instr);
-        break;
-      }
-      case app::hw::ControllerCommand::kSetSingleColor: {
-        const prism::SetSingleColor instr{msg.set_single};
-        controller_.AddInstruction(&instr);
-        break;
-      }
-      case app::hw::ControllerCommand::kResetInstructions:
-        controller_.ResetInstructions();
-        break;
-      case app::hw::ControllerCommand::kRun:
-        controller_.Run();
-        break;
-    }
-  }
+  /* Drain all pending commands through the controller command sink. */
+  app::hw::ControllerCommandSink::Instance().DrainCommands(controller_);
   return true;
 }
 

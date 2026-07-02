@@ -44,6 +44,11 @@ class ControllerCommandSink {
   void SetMailbox(
     oshal::EventMailbox<sizeof(ControllerCommandMessage), 4U>* mailbox);
 
+  /// @brief Drain all pending commands from the mailbox and dispatch them
+  ///     to the given animation controller.
+  /// @param controller Controller to enqueue / reset / run instructions on.
+  void DrainCommands(prism::Controller& controller);
+
  private:
   ControllerCommandSink() = default;
 

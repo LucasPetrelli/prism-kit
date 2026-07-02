@@ -26,6 +26,34 @@ void ControllerCommandSink::SetMailbox(
   mailbox_ = mailbox;
 }
 
+void ControllerCommandSink::DrainCommands(prism::Controller& controller) {
+  if (mailbox_ == nullptr) {
+    return;
+  }
+
+  ControllerCommandMessage msg;
+  while (mailbox_->Receive(&msg)) {
+    switch (msg.cmd) {
+      case ControllerCommand::kSetMultipleColor: {
+        const prism::SetMultipleColor instr{msg.set_multiple};
+        controller.AddInstruction(&instr);
+        break;
+      }
+      case ControllerCommand::kSetSingleColor: {
+        const prism::SetSingleColor instr{msg.set_single};
+        controller.AddInstruction(&instr);
+        break;
+      }
+      case ControllerCommand::kResetInstructions:
+        controller.ResetInstructions();
+        break;
+      case ControllerCommand::kRun:
+        controller.Run();
+        break;
+    }
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Static handler implementations
 // ---------------------------------------------------------------------------

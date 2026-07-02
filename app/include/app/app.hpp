@@ -28,6 +28,10 @@ class AppTask {
   AppTask(const AppTask&) = delete;
   AppTask& operator=(const AppTask&) = delete;
 
+  /// @brief Access the animation controller owned by this task.
+  /// @return Reference to the prism::Controller instance.
+  prism::Controller& GetController();
+
   /// @brief C-callable setup trampoline for bal::RunBootstrap.
   /// @param context Unused — all state is accessed via Instance().
   /// @return True when the steady-state loop may begin.
