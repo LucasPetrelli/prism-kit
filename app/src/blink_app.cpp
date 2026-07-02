@@ -2,7 +2,6 @@
 #include <cstdint>
 
 #include "app/app.hpp"
-#include "hw/controller_command.hpp"
 #include "hw/controller_command_sink.hpp"
 #include "oshal/event.hpp"
 #include "prism/color.hpp"
@@ -73,12 +72,36 @@ bool AppTask::Setup() {
 
 prism::Controller& AppTask::GetController() { return controller_; }
 
+void AppTask::UpdateInstructions() {
+  app::hw::ControllerCommandMessage msg;
+  while (command_mailbox_.Receive(&msg)) {
+    switch (msg.cmd) {
+      case app::hw::ControllerCommand::kSetMultipleColor: {
+        const prism::SetMultipleColor instr{msg.set_multiple};
+        controller_.AddInstruction(&instr);
+        break;
+      }
+      case app::hw::ControllerCommand::kSetSingleColor: {
+        const prism::SetSingleColor instr{msg.set_single};
+        controller_.AddInstruction(&instr);
+        break;
+      }
+      case app::hw::ControllerCommand::kResetInstructions:
+        controller_.ResetInstructions();
+        break;
+      case app::hw::ControllerCommand::kRun:
+        controller_.Run();
+        break;
+    }
+  }
+}
+
 bool AppTask::Loop() {
   /* Block until a controller command arrives. */
   command_event_group_.WaitAny(kCommandEventMask, oshal::kEventWaitForever);
 
-  /* Drain all pending commands through the controller command sink. */
-  app::hw::ControllerCommandSink::Instance().DrainCommands(controller_);
+  /* Drain and dispatch all pending commands. */
+  UpdateInstructions();
   return true;
 }
 

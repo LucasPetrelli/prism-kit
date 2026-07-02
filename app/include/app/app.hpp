@@ -54,6 +54,10 @@ class AppTask {
   /// @return True to keep running.
   bool Loop();
 
+  /// @brief Drain all pending commands from the mailbox and dispatch them
+  ///     to the controller.
+  void UpdateInstructions();
+
   /// @brief High-level animation controller.
   prism::Controller controller_;
   /// @brief Cached LED count for range construction.
