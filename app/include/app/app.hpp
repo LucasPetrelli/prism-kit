@@ -1,7 +1,10 @@
 #ifndef APP_APP_HPP_
 #define APP_APP_HPP_
 
+#include <array>
 #include <cstdint>
+
+#include "prism/controller.hpp"
 
 namespace app {
 
@@ -32,7 +35,7 @@ class AppTask {
  private:
   AppTask() = default;
 
-  /// @brief One-time application setup after BAL prepared board resources.
+  /// @brief Bind the controller to the strip and pre-build color instructions.
   /// @return True when the steady-state loop may begin.
   bool Setup();
 
@@ -40,6 +43,13 @@ class AppTask {
   /// @return True to keep running.
   bool Loop();
 
+  /// @brief High-level animation controller.
+  prism::Controller controller_;
+  /// @brief Pre-built color-fill instructions, one per cycle color.
+  std::array<prism::SetMultipleColor, 3U> instructions_;
+  /// @brief Cached LED count for range construction.
+  std::uint8_t led_count_;
+  /// @brief Monotonically-increasing color-step index.
   std::uint32_t color_step_count_ = 0U;
 };
 
