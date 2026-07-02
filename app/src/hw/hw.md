@@ -105,44 +105,59 @@ struct app::hw::SharedFrame {
 package "app::hw" {
 
   class HwTask {
-    - event_group_ : EventFlagGroup&
+    - event_group_ : EventFlagGroup
+    - status_led_ : StatusLed
+    - strip_manager_ : StripManager
     - task_ : TaskHandle
     ..
-    + HwTask(EventFlagGroup&)
-    + Start(name, setup, loop, ctx, stack, prio) : int
+    + {static} Instance() : HwTask&
+    + Start(name, stack_size_bytes, priority) : int
     + IsRunning() : bool
     + HasExited() : bool
     + ExitCode(out) : int
-    + {property} EventGroup()
+    + EventGroup() : EventFlagGroup&
+    + GetStatusLed() : StatusLed&
+    + GetStrip() : StripManager&
+    - Setup() : bool
+    - Loop() : bool
+    - {static} SetupTrampoline(ctx) : bool
+    - {static} LoopTrampoline(ctx) : bool
   }
 
   class StripManager {
     - event_group_ : EventFlagGroup&
-    - mailbox_ : EventMailbox<SharedFrame, 1>
+    - mailbox_ : EventMailbox<sizeof(SharedFrame), 1U>
     - backend_strip_ : Ws2812Strip*
-    - staged_frame_ : SharedFrame
-    - led_views_ : array<StripLedView, 16>
     - ready_ : bool
     - led_count_ : size_t
     - name_ : const char*
+    - staged_frame_ : SharedFrame
+    - led_views_ : array<StripLedView, kSharedFrameCapacity>
     ..
-    + {static} Instance() : StripManager&
+    + {static} kFrameEventMask : uint32
+    + StripManager(event_group : EventFlagGroup&)
     + Configure(strip, count, name)
-    + Name(), IsReady(), LedCount()
+    + Name() : const char*
+    + IsReady() : bool
+    + LedCount() : size_t
     + Led(index) : StripLed*
-    + Fill(color), Show() : int
+    + Led(index) : const StripLed* {const}
+    + Fill(color) : int
+    + Show() : int
     + TryApplyLatest() : bool
-    + {property} EventGroup()
-    + {property} FrameEventMask()
-    # SetLedColor(index, color) : int
-    # LedColor(index) : RgbColor
+    + EventGroup() : EventFlagGroup&
+    + FrameEventMask() : uint32
+    + SetLedColor(index, color) : int
+    + LedColor(index) : RgbColor
     - ApplyFrame(frame) : int
   }
 
   class StripLedView {
+    - manager_ : StripManager*
     - index_ : size_t
     ..
     + SetIndex(index)
+    + SetManager(manager)
     + IsReady() : bool
     + SetColor(color) : int
     + Color() : RgbColor
@@ -154,10 +169,9 @@ package "app::hw" {
     - blink_half_period_ticks_ : uint32
     - blink_tick_ : uint32
     ..
-    + {static} Instance() : StatusLed&
+    + {static} kBlinkHalfPeriodMs : uint32 = 1000
     + Configure(led, idle_sleep_ms)
     + Blink() : bool
-    - {static} kBlinkHalfPeriodMs = 1000
   }
 
   class CommandManager {
@@ -165,15 +179,16 @@ package "app::hw" {
     - debug_port_ : DebugPort*
     - protocol_ : Protocol
     ..
+    + {static} kCommandRxEventMask : uint32
     + {static} Instance() : CommandManager&
     + Configure(port, debug, event_group)
     + Run()
     + PrintBanner(strip_name) : bool
-    + {property} CommandPort()
-    + {property} RxEventMask()
-    - {static} ReadAdapter(...) : uint32
-    - {static} WriteAdapter(...) : bool
-    - {static} DebugPrintfAdapter(...) : int
+    + CommandPort() : SerialPort*
+    + RxEventMask() : uint32
+    - {static} ReadAdapter(buf, len) : uint32
+    - {static} WriteAdapter(data, len) : bool
+    - {static} DebugPrintfAdapter(fmt, ...) : int
   }
 }
 
@@ -181,16 +196,18 @@ package "app::hw" {
 ' Relationships
 ' ============================================================
 
-HwTask         *---> oshal::EventFlagGroup : "ref"
+HwTask         *---> oshal::EventFlagGroup : "owns"
 HwTask         *---> oshal::TaskHandle
+HwTask         *---> StatusLed : "owns"
+HwTask         *---> StripManager : "owns"
 
 StripManager    ---|> prism::Strip
 StripManager    *---> oshal::EventFlagGroup : "ref"
-StripManager    *---> oshal::EventMailbox<SharedFrame,1>
+StripManager    *---> oshal::EventMailbox<sizeof(SharedFrame),1U>
 StripManager    *---> bal::Ws2812Strip : "ref"
-StripManager    *---* StripLedView : "array<16>"
+StripManager    *---* StripLedView : "array<kSharedFrameCapacity>"
 StripLedView     ---|> prism::StripLed
-StripLedView     ..> StripManager : "delegates via Instance()"
+StripLedView     ..> StripManager : "delegates via manager_ pointer"
 
 StatusLed       *---> bal::Led : "ref"
 
@@ -198,15 +215,17 @@ CommandManager  *---> oshal::SerialPort : "ref"
 CommandManager  *---> oshal::DebugPort : "ref"
 CommandManager  *---> protocol::Protocol
 
-SharedFrame       ..> prism::RgbColor : "contains array<16>"
+SharedFrame       ..> prism::RgbColor : "contains array<kSharedFrameCapacity>"
 StripManager      ..> SharedFrame : "mailbox IPC"
 
 ' Coordinator
 note top of HwTask
-  All three singletons (StripManager,
-  CommandManager, StatusLed) plus HwTask
-  are instantiated in app_hw.cpp with
-  controlled construction order.
+  HwTask and CommandManager are
+  process-wide singletons. StatusLed
+  and StripManager are owned by value
+  inside HwTask. StartHwExecutor()
+  in app_hw.cpp wires them together
+  and launches the task loop.
 end note
 
 @enduml
@@ -215,12 +234,20 @@ end note
 ## Construction Order
 
 `HwTask` is a process-wide singleton (`HwTask::Instance()`, defined in
-`hw_task.cpp`).  It owns `EventFlagGroup`, `StripManager`, and `StatusLed`
+`hw_task.cpp`).  It owns `EventFlagGroup`, `StatusLed`, and `StripManager`
 by value.  Construction order is implicit in the member declaration order:
 
 1. `EventFlagGroup event_group_` — constructed first
-2. `StatusLed status_led_` — plain default construction
-3. `StripManager strip_manager_{event_group_}` — mailbox posts to `event_group_`
+2. `StatusLed status_led_` — default construction
+3. `StripManager strip_manager_{event_group_}` — receives ref to `event_group_`
+
+`CommandManager` is a separate process-wide singleton (`CommandManager::Instance()`,
+defined in `command_manager.cpp`).  Its `protocol_` member stores static
+adapter function pointers, so no direct reference to the HwTask event group is
+needed at construction time.
+
+`StartHwExecutor()` (declared in `hw_coordinator.hpp`, defined in `app_hw.cpp`)
+wires everything together and launches the task loop.
 
 ## Ownership & Lifecycle
 
@@ -239,13 +266,26 @@ APP task                              app_hw task
 ─────────                             ──────────
 StripManager::Fill()  ──┐
                         │
-StripManager::Show()  ──┤──mailbox_.Send()──▶ mailbox_.Receive()
+StripManager::Show()  ──┤── mailbox_.Send() ──▶ mailbox (posts kFrameEventMask
+                        │                       to event_group_ internally)
                         │                       │
-                   event_group_.Post()           ├── ApplyFrame()
+                        │              event_group_.WaitAny( frame_mask
+                        │                       │          | rx_mask,
+                        │                       │          kTaskIdleSleepMs)
                         │                       │
-                        └──▶ event_group_.WaitAny()◀── command_port::SetRxEvent()
-                                                     │
-                                                     cmd_mgr.Run()
-                                                     │
-                                                     led.Blink()
+                        │                       ├── TryApplyLatest()
+                        │                       │     └── ApplyFrame()
+                        │                       │
+                        │                       ├── cmd_mgr.Run()
+                        │                       │     (only if rx events)
+                        │                       │
+                        │                       └── status_led_.Blink()
 ```
+
+## Supporting Files
+
+| File | Purpose |
+|------|---------|
+| `hw_constants.hpp` | `kTaskIdleSleepMs`, `kTaskStackSizeBytes`, `kTaskPriority` |
+| `hw_coordinator.hpp` | Declares `StartHwExecutor()` (defined in `app_hw.cpp`) |
+| `shared_frame.hpp` | `kSharedFrameCapacity`, `SharedFrame` struct |
