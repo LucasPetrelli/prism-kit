@@ -24,6 +24,12 @@ void prism::InstructionMemorySlot::Set(const ControllerInstruction* instr) {
   tag = instr->Tag();
 }
 
+void prism::InstructionMemorySlot::SetStrip(Strip* s) {
+  if (ControllerInstruction* instr = Active(); instr != nullptr) {
+    instr->strip = s;
+  }
+}
+
 prism::ControllerInstruction* prism::InstructionMemorySlot::Active() {
   switch (tag) {
     case InstructionTag::kSetMultipleColor:

@@ -62,6 +62,10 @@ class ControllerInstruction {
  protected:
   ControllerInstruction() = default;
   InstructionTag tag_{};
+
+ public:
+  /// @brief Non-owning pointer to the target strip, or nullptr.
+  Strip* strip{nullptr};
 };
 
 /// @brief Instruction that sets a range of pixels to a single preset color.
@@ -72,9 +76,7 @@ class SetMultipleColor : public ControllerInstruction {
   /// @brief Construct from a serialized wire-format payload.
   /// @param payload Source payload to unpack.
   explicit SetMultipleColor(const SetMultipleColorPayload& payload)
-      : color{payload.r, payload.g, payload.b},
-        strip(nullptr),
-        range(payload.range) {
+      : color{payload.r, payload.g, payload.b}, range(payload.range) {
     tag_ = InstructionTag::kSetMultipleColor;
   }
 
@@ -83,8 +85,6 @@ class SetMultipleColor : public ControllerInstruction {
 
   /// @brief RGB color to apply.
   RgbColor color{};
-  /// @brief Non-owning pointer to the target strip.
-  Strip* strip{nullptr};
   /// @brief Zero-based [start, end) pixel range.
   Range range{0U, 0U};
 };
@@ -97,9 +97,7 @@ class SetSingleColor : public ControllerInstruction {
   /// @brief Construct from a serialized wire-format payload.
   /// @param payload Source payload to unpack.
   explicit SetSingleColor(const SetSingleColorPayload& payload)
-      : color{payload.r, payload.g, payload.b},
-        strip(nullptr),
-        index(payload.index) {
+      : color{payload.r, payload.g, payload.b}, index(payload.index) {
     tag_ = InstructionTag::kSetSingleColor;
   }
 
@@ -108,8 +106,6 @@ class SetSingleColor : public ControllerInstruction {
 
   /// @brief RGB color to apply.
   RgbColor color{};
-  /// @brief Non-owning pointer to the target strip.
-  Strip* strip{nullptr};
   /// @brief Zero-based pixel index within the strip.
   std::uint8_t index{0U};
 };
@@ -142,6 +138,10 @@ struct InstructionMemorySlot {
   ///     instruction.  The previously-active member is destroyed first.
   /// @param instr Pointer to the source instruction.  Must not be null.
   void Set(const ControllerInstruction* instr);
+
+  /// @brief Set the strip pointer on the active instruction.
+  /// @param s Non-owning pointer to the strip to bind.
+  void SetStrip(Strip* s);
 
   /// @brief Execute the active instruction.
   void Execute() const;

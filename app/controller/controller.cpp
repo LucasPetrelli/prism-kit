@@ -17,7 +17,10 @@ void prism::Controller::AddInstruction(const ControllerInstruction* instr) {
   if (instruction_count_ >= kMaxInstruction) {
     return;
   }
-  instructions_[instruction_count_++].Set(instr);
+  auto& slot = instructions_[instruction_count_];
+  slot.Set(instr);
+  slot.SetStrip(strip_);
+  ++instruction_count_;
 }
 
 void prism::Controller::ResetInstructions() { instruction_count_ = 0U; }
