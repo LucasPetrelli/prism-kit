@@ -59,6 +59,10 @@ class CommandManager {
   /// @return kCommandRxEventMask.
   std::uint32_t RxEventMask() const { return kCommandRxEventMask; }
 
+  /// @brief Access the underlying protocol engine for handler registration.
+  /// @return Reference to the owned Protocol instance.
+  protocol::Protocol& Protocol() { return protocol_; }
+
   CommandManager() = default;
 
  private:

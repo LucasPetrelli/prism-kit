@@ -1,9 +1,11 @@
 #ifndef APP_APP_HPP_
 #define APP_APP_HPP_
 
-#include <array>
 #include <cstdint>
 
+#include "hw/controller_command.hpp"
+#include "oshal/event.hpp"
+#include "oshal/event_mailbox.hpp"
 #include "prism/controller.hpp"
 
 namespace app {
@@ -15,6 +17,10 @@ namespace app {
 /// methods which hold the real logic and state.
 class AppTask {
  public:
+  /// @brief Event bitmask posted when a controller command arrives from the
+  ///     protocol layer (HW thread).
+  static constexpr std::uint32_t kCommandEventMask = oshal::UserEvent(2);
+
   /// @brief Access the process-wide singleton.
   /// @return Reference to the AppTask singleton.
   static AppTask& Instance();
@@ -35,22 +41,24 @@ class AppTask {
  private:
   AppTask() = default;
 
-  /// @brief Bind the controller to the strip and pre-build color instructions.
+  /// @brief Bind the controller to the strip, apply the rainbow default,
+  ///     and wire the command mailbox to the protocol layer.
   /// @return True when the steady-state loop may begin.
   bool Setup();
 
-  /// @brief Run one iteration of the steady-state application loop.
+  /// @brief Wait for controller commands and dispatch them.
   /// @return True to keep running.
   bool Loop();
 
   /// @brief High-level animation controller.
   prism::Controller controller_;
-  /// @brief Pre-built color-fill instructions, one per cycle color.
-  std::array<prism::SetMultipleColor, 3U> instructions_;
   /// @brief Cached LED count for range construction.
   std::uint8_t led_count_;
-  /// @brief Monotonically-increasing color-step index.
-  std::uint32_t color_step_count_ = 0U;
+  /// @brief Event group that the protocol post to when a command arrives.
+  oshal::EventFlagGroup command_event_group_;
+  /// @brief Mailbox carrying ControllerCommandMessage from HW→APP thread.
+  oshal::EventMailbox<sizeof(app::hw::ControllerCommandMessage), 4U>
+    command_mailbox_{command_event_group_, kCommandEventMask};
 };
 
 }  // namespace app

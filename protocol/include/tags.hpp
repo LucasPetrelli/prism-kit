@@ -21,6 +21,22 @@ enum class Tag : uint16_t {
 
   /// @brief First tag available for application-defined commands.
   kUserMin = 0x0100,
+
+  /// @brief Set a range of pixels to a single color.
+  /// Payload: r, g, b, start, end (5 bytes).
+  kSetMultipleColor = 0x0100,
+
+  /// @brief Set a single pixel to a color.
+  /// Payload: r, g, b, index (4 bytes).
+  kSetSingleColor = 0x0101,
+
+  /// @brief Clear all queued controller instructions.
+  /// Payload: none (0 bytes).
+  kResetInstructions = 0x0102,
+
+  /// @brief Execute all queued controller instructions.
+  /// Payload: none (0 bytes).
+  kRun = 0x0103,
 };
 
 }  // namespace protocol

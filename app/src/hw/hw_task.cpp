@@ -2,6 +2,7 @@
 
 #include "bal/ws2812_strip.hpp"
 #include "hw/command_manager.hpp"
+#include "hw/controller_command_sink.hpp"
 #include "hw/hw_constants.hpp"
 #include "oshal/status.h"
 
@@ -49,6 +50,12 @@ bool HwTask::LoopTrampoline(void* context) {
 
 bool HwTask::Setup() {
   auto& cmd_mgr = CommandManager::Instance();
+
+  /* Register controller-command protocol handlers before the loop begins
+   * dispatching frames.  The sink's mailbox pointer may still be null
+   * (AppTask sets it later) — handlers check and silently drop frames. */
+  ControllerCommandSink::Instance().Register(cmd_mgr.Protocol());
+
   return cmd_mgr.PrintBanner(bal::GetWs2812Strip().Name());
 }
 

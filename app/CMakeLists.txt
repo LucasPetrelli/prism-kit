@@ -12,6 +12,7 @@ target_sources(app PRIVATE src/blink_app.cpp
                          src/hw/status_led.cpp
                          src/hw/strip_manager.cpp
                          src/hw/command_manager.cpp
+                         src/hw/controller_command_sink.cpp
                          controller/controller.cpp
                          controller/instructions.cpp)
 

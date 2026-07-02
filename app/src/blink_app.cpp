@@ -2,19 +2,26 @@
 #include <cstdint>
 
 #include "app/app.hpp"
+#include "hw/controller_command.hpp"
+#include "hw/controller_command_sink.hpp"
+#include "oshal/event.hpp"
 #include "prism/color.hpp"
 #include "prism/controller.hpp"
 #include "prism/strip.hpp"
-#include "prism/time.hpp"
 
 namespace {
 
-constexpr std::uint32_t kColorStepPeriodMs = 1000U;
-constexpr std::array<prism::RgbColor, 3U> kStripColors = {
-  prism::RgbColor{255U, 0U, 0U},
-  prism::RgbColor{0U, 0U, 255U},
-  prism::RgbColor{0U, 255U, 0U},
-};
+/// @brief Rainbow colours for the 7 WS2812 LEDs at startup, with green
+///     components attenuated for perceptual balance.
+constexpr std::array<prism::RgbColor, 7U> kRainbowColors = {{
+  {255U, 0U, 0U},    // Red
+  {255U, 40U, 0U},   // Orange
+  {180U, 60U, 0U},   // Yellow
+  {0U, 80U, 0U},     // Green
+  {0U, 0U, 255U},    // Blue
+  {40U, 0U, 160U},   // Indigo
+  {140U, 0U, 255U},  // Violet
+}};
 
 }  // namespace
 
@@ -36,7 +43,6 @@ bool AppTask::LoopTrampoline(void* context) {
 }
 
 bool AppTask::Setup() {
-  color_step_count_ = 0U;
   if (prism::Initialize() < 0) {
     return false;
   }
@@ -45,22 +51,52 @@ bool AppTask::Setup() {
   led_count_ = static_cast<std::uint8_t>(strip.LedCount());
   controller_.SetStrip(&strip);
 
-  for (std::size_t i = 0U; i < instructions_.size(); ++i) {
-    instructions_[i].color = kStripColors[i];
-    instructions_[i].range.start = 0U;
-    instructions_[i].range.end = led_count_;
+  /* Wire the command mailbox so protocol handlers can deliver commands. */
+  app::hw::ControllerCommandSink::Instance().SetMailbox(&command_mailbox_);
+
+  /* Rainbow default — one SetSingleColor instruction per LED.
+   * Clamp to the actual LED count so boards with fewer pixels still work. */
+  const std::uint8_t count =
+    (led_count_ < kRainbowColors.size())
+      ? led_count_
+      : static_cast<std::uint8_t>(kRainbowColors.size());
+  for (std::uint8_t i = 0U; i < count; ++i) {
+    const prism::SetSingleColorPayload payload{kRainbowColors[i].red,
+                                               kRainbowColors[i].green,
+                                               kRainbowColors[i].blue, i};
+    prism::SetSingleColor instr{payload};
+    controller_.AddInstruction(&instr);
   }
+  controller_.Run();
   return true;
 }
 
 bool AppTask::Loop() {
-  controller_.ResetInstructions();
-  controller_.AddInstruction(
-    &instructions_[color_step_count_ % instructions_.size()]);
-  controller_.Run();
+  /* Block until a controller command arrives. */
+  command_event_group_.WaitAny(kCommandEventMask, oshal::kEventWaitForever);
 
-  ++color_step_count_;
-  prism::SleepMs(kColorStepPeriodMs);
+  /* Drain all pending commands. */
+  app::hw::ControllerCommandMessage msg;
+  while (command_mailbox_.Receive(&msg)) {
+    switch (msg.cmd) {
+      case app::hw::ControllerCommand::kSetMultipleColor: {
+        const prism::SetMultipleColor instr{msg.set_multiple};
+        controller_.AddInstruction(&instr);
+        break;
+      }
+      case app::hw::ControllerCommand::kSetSingleColor: {
+        const prism::SetSingleColor instr{msg.set_single};
+        controller_.AddInstruction(&instr);
+        break;
+      }
+      case app::hw::ControllerCommand::kResetInstructions:
+        controller_.ResetInstructions();
+        break;
+      case app::hw::ControllerCommand::kRun:
+        controller_.Run();
+        break;
+    }
+  }
   return true;
 }
 
