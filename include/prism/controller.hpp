@@ -121,16 +121,16 @@ class SetSingleColor : public ControllerInstruction {
 struct InstructionMemorySlot {
   union {
     /// @brief Active member: range-fill instruction.
-    SetMultipleColor setMultipleColor;
+    SetMultipleColor set_multiple_color;
     /// @brief Active member: single-pixel instruction.
-    SetSingleColor setSingleColor;
+    SetSingleColor set_single_color;
   };
 
   /// @brief Tag identifying the currently-active member.
-  InstructionTag tag_{};
+  InstructionTag tag{};
 
   /// @brief Default constructor — leaves storage uninitialised, tag is empty.
-  InstructionMemorySlot() : tag_{} {}
+  InstructionMemorySlot() : tag{} {}
 
   /// @brief Destroy the active member before the slot goes out of scope.
   ~InstructionMemorySlot();
@@ -141,20 +141,20 @@ struct InstructionMemorySlot {
   /// @brief Activate this slot with a copy of an already-constructed
   ///     instruction.  The previously-active member is destroyed first.
   /// @param instr Pointer to the source instruction.  Must not be null.
-  void set(const ControllerInstruction* instr);
+  void Set(const ControllerInstruction* instr);
 
   /// @brief Execute the active instruction.
-  void execute() const;
+  void Execute() const;
 
  private:
   /// @brief Return a base-class pointer to the active instruction.
-  ControllerInstruction* active();
+  ControllerInstruction* Active();
 
   /// @brief Return a const base-class pointer to the active instruction.
-  const ControllerInstruction* active() const;
+  const ControllerInstruction* Active() const;
 
   /// @brief Destroy the active member and reset the tag.
-  void destroy();
+  void Destroy();
 };
 
 /// @brief High-level animation controller for a Prism Kit strip.

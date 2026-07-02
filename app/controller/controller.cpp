@@ -17,7 +17,7 @@ void prism::Controller::AddInstruction(const ControllerInstruction* instr) {
   if (instruction_count_ >= kMaxInstruction) {
     return;
   }
-  instructions_[instruction_count_++].set(instr);
+  instructions_[instruction_count_++].Set(instr);
 }
 
 void prism::Controller::ResetInstructions() { instruction_count_ = 0U; }
@@ -27,7 +27,7 @@ void prism::Controller::Run() const {
     return;
   }
   for (std::uint32_t i = 0U; i < instruction_count_; ++i) {
-    instructions_[i].execute();
+    instructions_[i].Execute();
   }
   if (strip_ != nullptr) {
     strip_->Show();

@@ -13,6 +13,7 @@
 // Test fixture
 // ====================================================================
 
+namespace {
 class ControllerTest : public ::testing::Test {
  protected:
   void SetUp() override {
@@ -23,6 +24,7 @@ class ControllerTest : public ::testing::Test {
   prism::test::MockStrip mock_strip_;
   prism::Controller controller_;
 };
+}  // namespace
 
 // ====================================================================
 // SetSingleColor tests
@@ -31,41 +33,41 @@ class ControllerTest : public ::testing::Test {
 /// @brief A SetSingleColor instruction writes the unpacked RgbColor to the
 ///     correct pixel and commits the frame.
 TEST_F(ControllerTest, SetSingleColorDispatchesToCorrectLed) {
-  constexpr std::uint8_t kTargetIndex = 3U;
-  constexpr prism::Color kColor = prism::Color::kPureGreen;
-  const prism::RgbColor kExpectedRgb = prism::ToRgb(kColor);
+  constexpr std::uint8_t target_index = 3U;
+  constexpr prism::Color color = prism::Color::kPureGreen;
+  const prism::RgbColor expected_rgb = prism::ToRgb(color);
 
   prism::SetSingleColor instr;
-  instr.color = prism::ToRgb(kColor);
+  instr.color = prism::ToRgb(color);
   instr.strip = &mock_strip_;
-  instr.index = kTargetIndex;
+  instr.index = target_index;
 
   // Activate a slot and execute.
   prism::InstructionMemorySlot slot;
-  slot.set(&instr);
+  slot.Set(&instr);
 
-  EXPECT_CALL(*mock_strip_.mutable_led(static_cast<std::size_t>(kTargetIndex)),
-              SetColor(kExpectedRgb))
+  EXPECT_CALL(*mock_strip_.mutable_led(static_cast<std::size_t>(target_index)),
+              SetColor(expected_rgb))
     .WillOnce(testing::Return(0));
   EXPECT_CALL(mock_strip_, Show()).Times(0);
 
-  slot.execute();
+  slot.Execute();
 }
 
 /// @brief SetSingleColor does nothing when strip is null.
 TEST_F(ControllerTest, SetSingleColorWithNullStripIsNoop) {
-  constexpr prism::Color kColor = prism::Color::kPureRed;
+  constexpr prism::Color color = prism::Color::kPureRed;
 
   prism::SetSingleColor instr;
-  instr.color = prism::ToRgb(kColor);
+  instr.color = prism::ToRgb(color);
   instr.strip = nullptr;
   instr.index = 0U;
 
   prism::InstructionMemorySlot slot;
-  slot.set(&instr);
+  slot.Set(&instr);
 
   // No interaction with any mock — strip is null.
-  slot.execute();
+  slot.Execute();
 }
 
 // ====================================================================
@@ -75,26 +77,26 @@ TEST_F(ControllerTest, SetSingleColorWithNullStripIsNoop) {
 /// @brief A SetMultipleColor instruction writes the unpacked RgbColor to
 ///     every pixel in [start, end) and commits the frame.
 TEST_F(ControllerTest, SetMultipleColorFillsRange) {
-  constexpr prism::Color kColor = prism::Color::kIceBlue;
-  const prism::RgbColor kExpectedRgb = prism::ToRgb(kColor);
+  constexpr prism::Color color = prism::Color::kIceBlue;
+  const prism::RgbColor expected_rgb = prism::ToRgb(color);
 
   prism::SetMultipleColor instr;
-  instr.color = prism::ToRgb(kColor);
+  instr.color = prism::ToRgb(color);
   instr.strip = &mock_strip_;
   instr.range.start = 1U;
   instr.range.end = 3U;
 
   prism::InstructionMemorySlot slot;
-  slot.set(&instr);
+  slot.Set(&instr);
 
   // Pixels 1 and 2 get set_color; pixel 0 does not.
-  EXPECT_CALL(*mock_strip_.mutable_led(1U), SetColor(kExpectedRgb))
+  EXPECT_CALL(*mock_strip_.mutable_led(1U), SetColor(expected_rgb))
     .WillOnce(testing::Return(0));
-  EXPECT_CALL(*mock_strip_.mutable_led(2U), SetColor(kExpectedRgb))
+  EXPECT_CALL(*mock_strip_.mutable_led(2U), SetColor(expected_rgb))
     .WillOnce(testing::Return(0));
   EXPECT_CALL(mock_strip_, Show()).Times(0);
 
-  slot.execute();
+  slot.Execute();
 }
 
 // ====================================================================
@@ -160,41 +162,41 @@ TEST_F(ControllerTest, ResetInstructionsClearsState) {
 /// @brief execute() dispatches through the correct vtable regardless of
 ///     which member was constructed.
 TEST_F(ControllerTest, SlotExecuteDispatchesCorrectly) {
-  constexpr prism::Color kColor = prism::Color::kPureWhite;
+  constexpr prism::Color color = prism::Color::kPureWhite;
 
   // Set up a SetSingleColor instruction.
   prism::SetSingleColor single;
-  single.color = prism::ToRgb(kColor);
+  single.color = prism::ToRgb(color);
   single.strip = &mock_strip_;
   single.index = 5U;
 
   prism::InstructionMemorySlot slot;
-  slot.set(&single);
+  slot.Set(&single);
 
   EXPECT_CALL(*mock_strip_.mutable_led(5U), SetColor(testing::_))
     .WillOnce(testing::Return(0));
   EXPECT_CALL(mock_strip_, Show()).Times(0);
 
-  slot.execute();
+  slot.Execute();
 }
 
 /// @brief A slot can be reused by calling set() again with a different type.
 TEST_F(ControllerTest, SlotCanBeReused) {
-  constexpr prism::Color kColor = prism::Color::kPureRed;
+  constexpr prism::Color color = prism::Color::kPureRed;
 
   // First: SetSingleColor.
   prism::SetSingleColor single;
-  single.color = prism::ToRgb(kColor);
+  single.color = prism::ToRgb(color);
   single.strip = &mock_strip_;
   single.index = 2U;
 
   prism::InstructionMemorySlot slot;
-  slot.set(&single);
+  slot.Set(&single);
 
   EXPECT_CALL(*mock_strip_.mutable_led(2U), SetColor(testing::_))
     .WillOnce(testing::Return(0));
   EXPECT_CALL(mock_strip_, Show()).Times(0);
-  slot.execute();
+  slot.Execute();
 
   // Reset the mock expectations for the second execution.
   testing::Mock::VerifyAndClearExpectations(&mock_strip_);
@@ -206,12 +208,12 @@ TEST_F(ControllerTest, SlotCanBeReused) {
   multi.range.start = 0U;
   multi.range.end = 2U;
 
-  slot.set(&multi);
+  slot.Set(&multi);
 
   EXPECT_CALL(*mock_strip_.mutable_led(0U), SetColor(testing::_))
     .WillOnce(testing::Return(0));
   EXPECT_CALL(*mock_strip_.mutable_led(1U), SetColor(testing::_))
     .WillOnce(testing::Return(0));
   EXPECT_CALL(mock_strip_, Show()).Times(0);
-  slot.execute();
+  slot.Execute();
 }

@@ -1,6 +1,5 @@
 #include <new>
 
-#include "prism/color.hpp"
 #include "prism/controller.hpp"
 #include "prism/strip.hpp"
 
@@ -8,50 +7,50 @@
 // InstructionMemorySlot
 // ====================================================================
 
-prism::InstructionMemorySlot::~InstructionMemorySlot() { destroy(); }
+prism::InstructionMemorySlot::~InstructionMemorySlot() { Destroy(); }
 
-void prism::InstructionMemorySlot::set(const ControllerInstruction* instr) {
-  destroy();
+void prism::InstructionMemorySlot::Set(const ControllerInstruction* instr) {
+  Destroy();
   switch (instr->Tag()) {
     case InstructionTag::kSetMultipleColor:
-      ::new (&setMultipleColor)
+      ::new (&set_multiple_color)
         SetMultipleColor(*static_cast<const SetMultipleColor*>(instr));
       break;
     case InstructionTag::kSetSingleColor:
-      ::new (&setSingleColor)
+      ::new (&set_single_color)
         SetSingleColor(*static_cast<const SetSingleColor*>(instr));
       break;
   }
-  tag_ = instr->Tag();
+  tag = instr->Tag();
 }
 
-prism::ControllerInstruction* prism::InstructionMemorySlot::active() {
-  switch (tag_) {
+prism::ControllerInstruction* prism::InstructionMemorySlot::Active() {
+  switch (tag) {
     case InstructionTag::kSetMultipleColor:
-      return &setMultipleColor;
+      return &set_multiple_color;
     case InstructionTag::kSetSingleColor:
-      return &setSingleColor;
+      return &set_single_color;
   }
   return nullptr;
 }
 
-const prism::ControllerInstruction* prism::InstructionMemorySlot::active()
+const prism::ControllerInstruction* prism::InstructionMemorySlot::Active()
   const {
-  switch (tag_) {
+  switch (tag) {
     case InstructionTag::kSetMultipleColor:
-      return &setMultipleColor;
+      return &set_multiple_color;
     case InstructionTag::kSetSingleColor:
-      return &setSingleColor;
+      return &set_single_color;
   }
   return nullptr;
 }
 
-void prism::InstructionMemorySlot::execute() const { active()->Execute(); }
+void prism::InstructionMemorySlot::Execute() const { Active()->Execute(); }
 
-void prism::InstructionMemorySlot::destroy() {
-  if (tag_ != InstructionTag{}) {
-    active()->~ControllerInstruction();
-    tag_ = {};
+void prism::InstructionMemorySlot::Destroy() {
+  if (tag != InstructionTag{}) {
+    Active()->~ControllerInstruction();
+    tag = {};
   }
 }
 
