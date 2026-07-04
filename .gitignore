@@ -1,9 +1,3 @@
-# West workspace metadata and fetched dependencies live beside the app when the
-# repository is used as a manifest root.
-.west/
-zephyr/
-modules/
-
 # Standard build outputs.
 build/
 compile_commands.json
