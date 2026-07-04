@@ -18,6 +18,8 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 import sys
+import threading
+import time
 
 # Ensure the repo root is on sys.path so package imports resolve correctly
 # both when running directly (uv run scripts/smoke_test.py) and via entry
@@ -36,6 +38,7 @@ from scripts.modules.serial_utils import (
     format_missing_markers,
     print_captured_lines,
 )
+from scripts import rainbow
 
 DEFAULT_BAUDRATE = 115200
 DEFAULT_WAIT_FOR_PORT_SECONDS = 10.0
@@ -121,6 +124,19 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Do not stream console lines while capturing.",
     )
+    parser.add_argument(
+        "--skip-rainbow",
+        action="store_true",
+        help="Skip the visual LED rainbow sequence test.",
+    )
+    parser.add_argument(
+        "--rainbow-step-delay",
+        type=int,
+        default=100,
+        help=(
+            "Milliseconds between rainbow sequence steps. " "Default: %(default)s ms."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -180,11 +196,16 @@ class SmokeTest:
 
         loopback_ok = self._run_loopback()
 
+        rainbow_ok = True
+        if not self.args.skip_rainbow:
+            rainbow_ok = self._run_rainbow_sequence()
+
         # Always dump the debug console content at the end — it may
-        # contain clues about why the loopback test succeeded or failed.
+        # contain clues about why the loopback test or rainbow sequence
+        # succeeded or failed.
         self._dump_debug_console()
 
-        if not loopback_ok:
+        if not loopback_ok or not rainbow_ok:
             return 1
 
         return 0
@@ -381,6 +402,94 @@ class SmokeTest:
                 file=sys.stderr,
             )
             return False
+
+        return True
+
+    # ── Phase: run rainbow sequence ────────────────────────────────
+
+    def _run_rainbow_sequence(self) -> bool:
+        """Run the visual rainbow LED chase while capturing debug output.
+
+        Delegates the command-port frame sequence to
+        :func:`rainbow.run_rainbow_sequence` while a background thread
+        drains the debug port so firmware log output is captured.
+        """
+        command_device = self._resolve_command_device()
+        if not command_device:
+            print(
+                "Smoke test — no command port identified for rainbow sequence.",
+                file=sys.stderr,
+            )
+            if self.args.no_default_requirements:
+                print(
+                    "Note: use --command-port to specify the command port explicitly.",
+                    file=sys.stderr,
+                )
+            return False
+
+        debug_device = self.role_ports.get("debug")
+        captured: list[str] = []
+        reader_error: Exception | None = None
+        stop_reader = threading.Event()
+
+        def _read_debug() -> None:
+            """Background thread: drain the debug port until signalled."""
+            nonlocal reader_error
+            if not debug_device:
+                return
+            try:
+                with self.serial.Serial(
+                    debug_device,
+                    baudrate=self.args.baudrate,
+                    timeout=0.05,
+                ) as port:
+                    port.reset_input_buffer()
+                    buf = b""
+                    while not stop_reader.is_set():
+                        chunk = port.read(64)
+                        if chunk:
+                            buf += chunk
+                            while b"\n" in buf:
+                                raw_line, buf = buf.split(b"\n", 1)
+                                line = raw_line.decode(
+                                    "utf-8", errors="replace"
+                                ).rstrip("\r")
+                                if line:
+                                    captured.append(line)
+            except self.serial.SerialException as exc:
+                reader_error = exc
+
+        reader = threading.Thread(target=_read_debug, daemon=True)
+        reader.start()
+
+        try:
+            if not rainbow.run_rainbow_sequence(
+                self.serial,
+                command_device,
+                self.args.baudrate,
+                step_delay_ms=self.args.rainbow_step_delay,
+            ):
+                print(
+                    "Smoke test failed — rainbow sequence did not succeed.",
+                    file=sys.stderr,
+                )
+                return False
+        finally:
+            stop_reader.set()
+            reader.join(timeout=1.0)
+
+        if reader_error is not None:
+            print(
+                f"Rainbow sequence — debug reader error: {reader_error}.",
+                file=sys.stderr,
+            )
+
+        if captured:
+            print("Debug output during rainbow sequence:")
+            for line in captured:
+                print(f"  {line}")
+            if debug_device:
+                self.captured_lines.setdefault(debug_device, []).extend(captured)
 
         return True
 
