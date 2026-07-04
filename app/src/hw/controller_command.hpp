@@ -3,6 +3,7 @@
 
 #include <cstdint>
 
+#include "oshal/event_mailbox.hpp"
 #include "prism/controller.hpp"
 
 namespace app::hw {
@@ -40,6 +41,13 @@ struct ControllerCommandMessage {
     prism::SetSingleColorPayload set_single;
   };
 };
+
+/// @brief Mailbox type for delivering ControllerCommandMessage from the HW
+///     thread to the APP thread.
+/// @note Change the capacity here (second template argument) — it is the
+///     single source of truth for all consumers.
+using ControllerCommandMailbox =
+  oshal::EventMailbox<sizeof(ControllerCommandMessage), 16U>;
 
 }  // namespace app::hw
 

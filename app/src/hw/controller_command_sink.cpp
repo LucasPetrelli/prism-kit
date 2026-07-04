@@ -21,8 +21,7 @@ void ControllerCommandSink::Register(protocol::Protocol& protocol) {
   protocol.AddHandler(protocol::Tag::kRun, &HandleRun);
 }
 
-void ControllerCommandSink::SetMailbox(
-  oshal::EventMailbox<sizeof(ControllerCommandMessage), 4U>* mailbox) {
+void ControllerCommandSink::SetMailbox(ControllerCommandMailbox* mailbox) {
   mailbox_ = mailbox;
 }
 

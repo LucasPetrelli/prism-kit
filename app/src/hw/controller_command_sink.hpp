@@ -41,8 +41,7 @@ class ControllerCommandSink {
   /// @brief Set the mailbox that parsed commands are forwarded into.
   /// @param mailbox Non-owning pointer to an EventMailbox owned by AppTask.
   ///     May be null to disable forwarding (handlers silently drop frames).
-  void SetMailbox(
-    oshal::EventMailbox<sizeof(ControllerCommandMessage), 4U>* mailbox);
+  void SetMailbox(ControllerCommandMailbox* mailbox);
 
  private:
   ControllerCommandSink() = default;
@@ -65,7 +64,7 @@ class ControllerCommandSink {
   /// @brief Non-owning pointer to the EventMailbox owned by AppTask.
   ///     Null until SetMailbox() is called; handlers silently drop frames
   ///     while null.
-  oshal::EventMailbox<sizeof(ControllerCommandMessage), 4U>* mailbox_ = nullptr;
+  ControllerCommandMailbox* mailbox_ = nullptr;
 };
 
 }  // namespace app::hw

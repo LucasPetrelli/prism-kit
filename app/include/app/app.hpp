@@ -65,8 +65,8 @@ class AppTask {
   /// @brief Event group that the protocol post to when a command arrives.
   oshal::EventFlagGroup command_event_group_;
   /// @brief Mailbox carrying ControllerCommandMessage from HW→APP thread.
-  oshal::EventMailbox<sizeof(app::hw::ControllerCommandMessage), 4U>
-    command_mailbox_{command_event_group_, kCommandEventMask};
+  app::hw::ControllerCommandMailbox command_mailbox_{command_event_group_,
+                                                     kCommandEventMask};
 };
 
 }  // namespace app
