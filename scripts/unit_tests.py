@@ -4,8 +4,7 @@
 # dependencies = []
 # ///
 
-"""
-Compile and run project unit-tests outside of the Zephyr build system.
+"""Compile and run project unit-tests outside of the Zephyr build system.
 
 Usage::
 
@@ -42,8 +41,7 @@ def resolve_project_root() -> Path:
 
 
 def find_build_tool() -> str:
-    """
-    Return the best available CMake build-tool flag for this platform.
+    """Return the best available CMake build-tool flag for this platform.
 
     On Windows, prefers MinGW Makefiles so the native g++ compiler is used
     instead of clang targeting MSVC.
@@ -237,7 +235,6 @@ def _suite_name(root: Path, tests_dir: Path) -> str:
       2. The ``project(NAME ...)`` from the suite's ``CMakeLists.txt``.
       3. The name of the directory that contains the ``tests/`` folder.
     """
-
     # 1. Explicit .suite-name file
     name_file = tests_dir / ".suite-name"
     if name_file.exists():
@@ -277,6 +274,11 @@ def _parse_project_name(cmake_path: Path) -> str:
 
 
 def main() -> int:
+    """Discover, build, and run all test suites.
+
+    Returns:
+        0 if all suites pass, non-zero otherwise.
+    """
     root = resolve_project_root()
 
     parser = argparse.ArgumentParser(

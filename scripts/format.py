@@ -34,6 +34,12 @@ SUBMODULE_SOURCE_DIRS = {"bal", "oshal"}
 
 
 def parse_args() -> argparse.Namespace:
+    """Parse command-line arguments for the format script.
+
+    Returns:
+        Parsed arguments with paths, ``--check``, ``--staged``,
+        ``--git-add``, and ``--clang-format`` flags.
+    """
     parser = argparse.ArgumentParser(
         description="Format repo C and C++ sources with the repo clang-format policy."
     )
@@ -66,10 +72,22 @@ def parse_args() -> argparse.Namespace:
 
 
 def repo_root() -> Path:
+    """Return the repository root directory.
+
+    Resolves relative to this script's location (``scripts/`` sibling).
+    """
     return Path(__file__).resolve().parent.parent
 
 
 def git_root(start_path: Path) -> Path:
+    """Resolve the top-level git directory for *start_path*.
+
+    Args:
+        start_path: A directory inside the git working tree.
+
+    Returns:
+        The absolute path to the git top-level directory.
+    """
     completed = subprocess.run(
         ["git", "rev-parse", "--show-toplevel"],
         cwd=start_path,
@@ -86,6 +104,15 @@ def git_root(start_path: Path) -> Path:
 
 
 def resolve_clang_format(explicit_path: str | None) -> Path:
+    """Resolve the clang-format executable path.
+
+    Args:
+        explicit_path: An explicit path to clang-format, or ``None``
+            to search ``PATH`` and common install locations.
+
+    Returns:
+        The resolved clang-format path.
+    """
     if explicit_path:
         candidate = Path(explicit_path)
         if candidate.is_file():
@@ -105,14 +132,42 @@ def resolve_clang_format(explicit_path: str | None) -> Path:
 
 
 def is_source_file(path: Path) -> bool:
+    """Return True if *path* is a C or C++ source file.
+
+    Args:
+        path: A filesystem path to check.
+
+    Returns:
+        True if the file has a recognised source extension.
+    """
     return path.is_file() and path.suffix.lower() in SOURCE_EXTENSIONS
 
 
 def is_ignored(path: Path) -> bool:
+    """Return True if *path* contains an ignored component.
+
+    Args:
+        path: A filesystem path to check.
+
+    Returns:
+        True if any part of the path is in the ignored set.
+    """
     return any(part in IGNORED_PARTS for part in path.parts)
 
 
 def missing_target_message(root: Path, target: Path) -> str:
+    """Build a user-friendly message when *target* does not exist.
+
+    If the missing target is a submodule source directory, the message
+    suggests running ``git submodule update``.
+
+    Args:
+        root: The repository root directory.
+        target: The path that was not found.
+
+    Returns:
+        A diagnostic message string.
+    """
     try:
         relative_target = target.relative_to(root)
     except ValueError:
@@ -133,6 +188,18 @@ def missing_target_message(root: Path, target: Path) -> str:
 
 
 def iter_source_files(root: Path, target: Path) -> list[Path]:
+    """Collect source files under *target*.
+
+    If *target* is a file, returns it in a list.  If it is a directory,
+    recursively discovers source files.  Ignored paths are skipped.
+
+    Args:
+        root: The repository root directory.
+        target: A file or directory to scan.
+
+    Returns:
+        A sorted list of absolute source-file paths.
+    """
     if not target.exists():
         raise SystemExit(missing_target_message(root, target))
 
@@ -154,6 +221,16 @@ def iter_source_files(root: Path, target: Path) -> list[Path]:
 
 
 def collect_targets(root: Path, requested_paths: list[str]) -> list[Path]:
+    """Resolve requested paths to a deduplicated, sorted list of source files.
+
+    Args:
+        root: The repository root directory.
+        requested_paths: User-supplied paths; defaults to standard source
+            directories when empty.
+
+    Returns:
+        A sorted list of absolute source-file paths.
+    """
     targets = (
         [root / path for path in requested_paths]
         if requested_paths
@@ -168,6 +245,14 @@ def collect_targets(root: Path, requested_paths: list[str]) -> list[Path]:
 
 
 def collect_staged_targets(root: Path) -> list[Path]:
+    """Return the list of staged C/C++ source files from the git index.
+
+    Args:
+        root: The repository root directory.
+
+    Returns:
+        A sorted list of absolute paths to staged source files.
+    """
     completed = subprocess.run(
         ["git", "diff", "--cached", "--name-only", "--diff-filter=ACMR", "-z"],
         cwd=root,
@@ -192,6 +277,16 @@ def collect_staged_targets(root: Path) -> list[Path]:
 
 
 def build_command(clang_format: Path, check: bool, file_path: Path) -> list[str]:
+    """Build the clang-format invocation for a single file.
+
+    Args:
+        clang_format: Path to the clang-format executable.
+        check: If True, use ``--dry-run --Werror``; otherwise ``-i``.
+        file_path: The source file to format.
+
+    Returns:
+        The command as a list of arguments.
+    """
     command = [str(clang_format), "-style=file"]
     if check:
         command.extend(["--dry-run", "--Werror"])
@@ -202,6 +297,17 @@ def build_command(clang_format: Path, check: bool, file_path: Path) -> list[str]
 
 
 def run_formatter(clang_format: Path, files: list[Path], check: bool) -> int:
+    """Run clang-format on *files*.
+
+    Args:
+        clang_format: Path to the clang-format executable.
+        files: Source files to format.
+        check: If True, fail on any formatting deviation; otherwise
+            rewrite files in-place.
+
+    Returns:
+        0 on success, 1 if any file fails formatting.
+    """
     if not files:
         print("No matching C or C++ source files found.")
         return 0
@@ -230,6 +336,15 @@ def run_formatter(clang_format: Path, files: list[Path], check: bool) -> int:
 
 
 def restage_files(root: Path, files: list[Path]) -> int:
+    """Re-add *files* to the git index after formatting.
+
+    Args:
+        root: The repository root directory.
+        files: Source files that were modified in-place.
+
+    Returns:
+        0 on success, 1 if ``git add`` fails.
+    """
     if not files:
         return 0
 
@@ -252,6 +367,11 @@ def restage_files(root: Path, files: list[Path]) -> int:
 
 
 def main() -> int:
+    """Run the format pipeline.
+
+    Returns:
+        0 on success, non-zero on failure.
+    """
     args = parse_args()
     if args.paths and args.staged:
         raise SystemExit("--staged cannot be combined with explicit paths.")

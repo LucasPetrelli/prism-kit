@@ -30,6 +30,12 @@ ARTIFACT_SUFFIXES = (".elf", ".hex", ".bin")
 
 
 def parse_args() -> argparse.Namespace:
+    """Parse command-line arguments for the flash script.
+
+    Returns:
+        Parsed arguments with artifact path, device, interface, speed,
+        and dry-run flags.
+    """
     parser = argparse.ArgumentParser(
         description="Flash the newest Zephyr artifact to the XIAO SAMD21 with SEGGER J-Link."
     )
@@ -52,6 +58,11 @@ def parse_args() -> argparse.Namespace:
 
 
 def candidate_jlink_paths() -> Iterable[Path]:
+    """Yield candidate paths to the J-Link Commander executable.
+
+    Checks, in order: the ``JLINK_EXE`` environment variable, ``PATH``,
+    and common SEGGER installation directories.
+    """
     env_override = os.environ.get("JLINK_EXE")
     if env_override:
         yield Path(env_override)
@@ -80,6 +91,14 @@ def candidate_jlink_paths() -> Iterable[Path]:
 
 
 def resolve_jlink_executable() -> Path:
+    """Resolve the J-Link Commander executable path.
+
+    Returns:
+        The first existing candidate from :func:`candidate_jlink_paths`.
+
+    Raises:
+        FileNotFoundError: If no J-Link executable can be found.
+    """
     for candidate in candidate_jlink_paths():
         if candidate.exists():
             return candidate.resolve()
@@ -91,6 +110,18 @@ def resolve_jlink_executable() -> Path:
 
 
 def resolve_artifact_path(user_supplied: str | None) -> Path:
+    """Resolve the firmware artifact to flash.
+
+    Args:
+        user_supplied: An explicit artifact path, or ``None`` to
+            auto-discover the newest artifact under ``build/zephyr/``.
+
+    Returns:
+        The resolved artifact path.
+
+    Raises:
+        FileNotFoundError: If the artifact cannot be found.
+    """
     if user_supplied:
         artifact = Path(user_supplied).expanduser().resolve()
         if not artifact.exists():
@@ -119,6 +150,18 @@ def resolve_artifact_path(user_supplied: str | None) -> Path:
 
 
 def read_kconfig_hex(symbol_name: str) -> int:
+    """Read a Kconfig hex value from the Zephyr ``.config`` file.
+
+    Args:
+        symbol_name: The Kconfig symbol to look up (e.g. ``CONFIG_FLASH_BASE_ADDRESS``).
+
+    Returns:
+        The integer value of the symbol.
+
+    Raises:
+        FileNotFoundError: If ``.config`` does not exist.
+        ValueError: If the symbol is not found in ``.config``.
+    """
     if not CONFIG_PATH.exists():
         raise FileNotFoundError(
             f"Zephyr config '{CONFIG_PATH}' was not found, so the .bin load address could not be determined."
@@ -133,18 +176,48 @@ def read_kconfig_hex(symbol_name: str) -> int:
 
 
 def resolve_bin_load_address() -> int:
+    """Compute the flash load address from Kconfig.
+
+    Adds ``CONFIG_FLASH_BASE_ADDRESS`` and ``CONFIG_FLASH_LOAD_OFFSET``.
+
+    Returns:
+        The combined flash load address.
+    """
     flash_base = read_kconfig_hex("CONFIG_FLASH_BASE_ADDRESS")
     flash_offset = read_kconfig_hex("CONFIG_FLASH_LOAD_OFFSET")
     return flash_base + flash_offset
 
 
 def build_load_command(artifact: Path) -> str:
+    """Build the J-Link Commander ``loadfile`` command for *artifact*.
+
+    For ``.bin`` artifacts, includes the computed flash load address.
+
+    Args:
+        artifact: Path to the firmware artifact (``.elf``, ``.hex``, or ``.bin``).
+
+    Returns:
+        The J-Link load command string.
+    """
     if artifact.suffix.lower() == ".bin":
         return f'loadfile "{artifact}" 0x{resolve_bin_load_address():X}'
     return f'loadfile "{artifact}"'
 
 
 def run_flash(jlink_exe: Path, artifact: Path, args: argparse.Namespace) -> int:
+    """Flash *artifact* to the target using J-Link Commander.
+
+    Builds a temporary J-Link commander script, invokes the tool, and
+    cleans up the script afterwards.
+
+    Args:
+        jlink_exe: Path to the J-Link Commander executable.
+        artifact: Path to the firmware artifact.
+        args: Parsed command-line arguments (device, interface, speed, dry_run).
+
+    Returns:
+        The J-Link process exit code.
+    """
     load_command = build_load_command(artifact)
     commander_lines = [
         "r",
@@ -195,6 +268,11 @@ def run_flash(jlink_exe: Path, artifact: Path, args: argparse.Namespace) -> int:
 
 
 def main() -> int:
+    """Run the flash pipeline.
+
+    Returns:
+        0 on success, 1 on failure.
+    """
     args = parse_args()
     try:
         jlink_exe = resolve_jlink_executable()

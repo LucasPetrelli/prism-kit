@@ -13,6 +13,13 @@ from typing import Any, Iterable, Sequence
 
 @dataclass(frozen=True)
 class PortInfo:
+    """Immutable snapshot of a serial port's metadata.
+
+    Captures all identifying fields returned by pyserial's
+    ``list_ports.comports()`` so port matching and grouping can be
+    performed without repeated enumeration.
+    """
+
     device: str
     description: str
     product: str | None
@@ -29,6 +36,14 @@ class PortInfo:
 
 
 def as_port_info(port: object) -> PortInfo:
+    """Convert a pyserial port object to a :class:`PortInfo`.
+
+    Args:
+        port: An object with pyserial ``ListPortInfo`` attributes.
+
+    Returns:
+        A frozen :class:`PortInfo` with all fields populated.
+    """
     return PortInfo(
         device=getattr(port, "device", ""),
         description=getattr(port, "description", "") or "",
@@ -44,6 +59,14 @@ def as_port_info(port: object) -> PortInfo:
 
 
 def port_fields(port: PortInfo) -> tuple[str, ...]:
+    """Return all searchable text fields of *port* as a tuple.
+
+    Args:
+        port: The port to extract fields from.
+
+    Returns:
+        A tuple of lowercased field strings for token matching.
+    """
     return (
         port.device,
         port.description,
@@ -79,6 +102,11 @@ def describe_port(port: PortInfo) -> str:
 
 
 def list_visible_ports(port_infos: Sequence[PortInfo]) -> None:
+    """Print a human-readable list of visible serial ports.
+
+    Args:
+        port_infos: The ports to display.
+    """
     if not port_infos:
         print("No serial ports detected.")
         return
@@ -127,6 +155,15 @@ def score_port(port: PortInfo, tokens: Sequence[str]) -> int:
 def resolve_explicit_port(
     port_infos: Sequence[PortInfo], explicit_port: str
 ) -> PortInfo | None:
+    """Find a port by exact device-name match (case-insensitive).
+
+    Args:
+        port_infos: The available ports.
+        explicit_port: A device name such as ``COM7`` or ``/dev/ttyACM0``.
+
+    Returns:
+        The matching :class:`PortInfo`, or ``None``.
+    """
     normalized = explicit_port.casefold()
     for port in port_infos:
         if port.device.casefold() == normalized:
@@ -137,6 +174,15 @@ def resolve_explicit_port(
 def resolve_auto_ports(
     port_infos: Sequence[PortInfo], tokens: Sequence[str]
 ) -> list[PortInfo]:
+    """Find ports matching *tokens*, falling back to USB serial ports.
+
+    Args:
+        port_infos: The available ports.
+        tokens: Case-insensitive match tokens.
+
+    Returns:
+        Matching ports sorted by relevance (highest score first).
+    """
     matches = [port for port in port_infos if port_matches_tokens(port, tokens)]
     if not matches:
         return [port for port in port_infos if looks_like_usb_serial_port(port)]
@@ -145,6 +191,14 @@ def resolve_auto_ports(
 
 
 def unique_ports(ports: Iterable[PortInfo]) -> list[PortInfo]:
+    """Deduplicate *ports* by device name, preserving first-seen order.
+
+    Args:
+        ports: An iterable of :class:`PortInfo` objects.
+
+    Returns:
+        A list with at most one entry per device.
+    """
     unique: list[PortInfo] = []
     seen_devices: set[str] = set()
     for port in ports:
@@ -307,12 +361,29 @@ def discover_ports(
 def update_marker_set(
     line: str, markers: Iterable[str], seen_markers: set[str]
 ) -> None:
+    """Record which *markers* appear in *line*.
+
+    Args:
+        line: A line of console output.
+        markers: Substrings to search for.
+        seen_markers: Set mutated in-place with any matches.
+    """
     for marker in markers:
         if marker in line:
             seen_markers.add(marker)
 
 
 def format_missing_markers(markers: Sequence[str], seen_markers: set[str]) -> str:
+    """Build a diagnostic listing markers that were not observed.
+
+    Args:
+        markers: The full set of expected markers.
+        seen_markers: The subset that were actually observed.
+
+    Returns:
+        A newline-separated bullet list of missing markers, or an
+        empty string if all were seen.
+    """
     missing = [marker for marker in markers if marker not in seen_markers]
     if not missing:
         return ""
@@ -320,6 +391,12 @@ def format_missing_markers(markers: Sequence[str], seen_markers: set[str]) -> st
 
 
 def print_captured_lines(captured_lines: dict[str, list[str]], stream: Any) -> None:
+    """Print captured console lines prefixed with their device name.
+
+    Args:
+        captured_lines: A dict mapping device names to line lists.
+        stream: A file-like object to write to (e.g. ``sys.stderr``).
+    """
     for device, lines in captured_lines.items():
         for line in lines:
             print(f"[{device}] {line}", file=stream)

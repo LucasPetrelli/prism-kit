@@ -195,6 +195,12 @@ def _find_includers(header: Path, repo_root: Path) -> list[Path]:
 
 
 def main() -> None:
+    """Run clang-tidy on prism-kit C++ sources.
+
+    Supports ``--staged``, ``--fix``, ``--list-checks``, and explicit
+    file paths.  Reads ``build/compile_commands.json``, filters cross-
+    compiler flags, and invokes clang-tidy.
+    """
     parser = argparse.ArgumentParser(description="Run clang-tidy on prism-kit")
     parser.add_argument(
         "files",

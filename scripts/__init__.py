@@ -1,1 +1,1 @@
-# Prism Kit CLI scripts package.
+"""Prism Kit CLI scripts package."""

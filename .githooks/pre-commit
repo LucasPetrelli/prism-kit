@@ -25,3 +25,12 @@ if [ -f "build/compile_commands.json" ]; then
 else
   echo "[pre-commit] build/compile_commands.json not found — skipping lint."
 fi
+
+# ── Stage 3: lint Python sources (blocking) ─────────────────────────
+# ruff runs on staged .py files.  Docstring and style violations block
+# the commit.
+if "$PYTHON" -c "import ruff" 2>/dev/null; then
+  "$PYTHON" scripts/lint_python.py --staged
+else
+  echo "[pre-commit] ruff not available — skipping Python lint."
+fi

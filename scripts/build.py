@@ -38,6 +38,11 @@ REQUIRED_SUBMODULES = ("bal", "oshal")
 
 
 def parse_args() -> argparse.Namespace:
+    """Parse command-line arguments for the build script.
+
+    Returns:
+        Parsed arguments with ``--no-opt`` and ``--debug-opt`` flags.
+    """
     parser = argparse.ArgumentParser(
         description="Build the firmware with the repo-local Zephyr toolchain setup."
     )
@@ -56,6 +61,10 @@ def parse_args() -> argparse.Namespace:
 
 
 def repo_root() -> Path:
+    """Return the repository root directory.
+
+    Resolves relative to this script's location (``scripts/`` sibling).
+    """
     return Path(__file__).resolve().parent.parent
 
 
@@ -114,6 +123,17 @@ def resolve_python_with_west(root: Path) -> Path:
 
 
 def get_short_path(path: Path) -> Path:
+    """Return the 8.3 short-path equivalent of *path* on Windows.
+
+    On non-Windows platforms the path is returned unchanged.  Short paths
+    avoid spaces that can confuse toolchains that do not quote arguments.
+
+    Args:
+        path: An absolute or relative filesystem path.
+
+    Returns:
+        The short-path form on Windows, or the original path otherwise.
+    """
     if os.name != "nt":
         return path
 
@@ -135,6 +155,17 @@ def get_short_path(path: Path) -> Path:
 
 
 def resolve_toolchain_root() -> Path:
+    """Resolve the GNU Arm Embedded toolchain installation root.
+
+    Checks the ``GNUARMEMB_TOOLCHAIN_PATH`` environment variable first,
+    then falls back to the default install path.
+
+    Returns:
+        The validated toolchain root directory.
+
+    Raises:
+        SystemExit: If the toolchain is not found at the expected location.
+    """
     configured_root = os.environ.get("GNUARMEMB_TOOLCHAIN_PATH")
     candidate = Path(configured_root) if configured_root else DEFAULT_TOOLCHAIN_ROOT
 
@@ -156,6 +187,14 @@ def resolve_toolchain_root() -> Path:
 
 
 def ensure_required_submodules(root: Path) -> None:
+    """Verify that required git submodules are initialized.
+
+    Args:
+        root: The repository root directory.
+
+    Raises:
+        SystemExit: If any required submodule is missing its CMakeLists.txt.
+    """
     missing_submodules = [
         name
         for name in REQUIRED_SUBMODULES
@@ -172,6 +211,11 @@ def ensure_required_submodules(root: Path) -> None:
 
 
 def remove_build_directory(root: Path) -> None:
+    """Remove the ``build/`` directory if it exists.
+
+    Args:
+        root: The repository root directory.
+    """
     shutil.rmtree(root / "build", ignore_errors=True)
 
 
@@ -181,6 +225,14 @@ def run_west_build(
     toolchain_root: Path,
     extra_conf_files: list[Path],
 ) -> None:
+    """Invoke ``west build`` with the project's standard configuration.
+
+    Args:
+        root: The repository root directory.
+        python_exe: Path to a Python interpreter that has ``west``.
+        toolchain_root: GNU Arm Embedded toolchain installation root.
+        extra_conf_files: Additional Kconfig fragment files to apply.
+    """
     env = os.environ.copy()
     env["ZEPHYR_TOOLCHAIN_VARIANT"] = "gnuarmemb"
     env["GNUARMEMB_TOOLCHAIN_PATH"] = str(toolchain_root)
@@ -210,6 +262,20 @@ def run_west_build(
 
 
 def append_cpp_include_flags(command: str, compiler: str) -> str:
+    """Inject ARM GCC C++ include paths into a compilation command.
+
+    Parses the toolchain root from *compiler* and appends
+    ``-isystem`` flags for the C++ standard library and GCC
+    internal headers so that host-side tools (clang-tidy, clangd)
+    can resolve C++ headers from the cross-compiler sysroot.
+
+    Args:
+        command: The original compilation command string.
+        compiler: Path to the cross-compiler (e.g. ``arm-none-eabi-g++``).
+
+    Returns:
+        The command string with C++ include flags appended.
+    """
     compiler_path = PureWindowsPath(compiler)
     toolchain_root = Path(compiler_path.parent.parent)
     cpp_include_root = toolchain_root / "arm-none-eabi" / "include" / "c++"
@@ -239,6 +305,15 @@ def append_cpp_include_flags(command: str, compiler: str) -> str:
 
 
 def sanitize_compile_database(root: Path) -> None:
+    """Rewrite ``build/compile_commands.json`` for host-side tooling.
+
+    Strips GCC-only flags that clang-based tools cannot parse, injects
+    ``--target=arm-none-eabi``, and appends C++ include paths.  The
+    sanitized database is written to the repo root.
+
+    Args:
+        root: The repository root directory.
+    """
     build_db = root / "build" / "compile_commands.json"
     root_db = root / "compile_commands.json"
     entries = json.loads(build_db.read_text(encoding="utf-8"))
@@ -274,6 +349,11 @@ def sanitize_compile_database(root: Path) -> None:
 
 
 def main() -> int:
+    """Run the full build pipeline.
+
+    Returns:
+        0 on success, non-zero on failure.
+    """
     args = parse_args()
     root = repo_root()
     python_exe = resolve_python_with_west(root)

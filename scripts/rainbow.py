@@ -95,6 +95,12 @@ def run_rainbow_sequence(
 
 
 def parse_args() -> argparse.Namespace:
+    """Parse command-line arguments for the rainbow script.
+
+    Returns:
+        Parsed arguments with ``--port``, ``--baudrate``, and
+        ``--step-delay`` flags.
+    """
     parser = argparse.ArgumentParser(
         description="Run rainbow LED chase on prism-kit command port."
     )
@@ -119,6 +125,11 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> int:
+    """Run the rainbow LED chase sequence.
+
+    Returns:
+        0 on success, 1 on failure.
+    """
     args = parse_args()
 
     import serial  # type: ignore[import-not-found]

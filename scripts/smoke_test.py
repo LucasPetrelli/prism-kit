@@ -56,6 +56,12 @@ DEFAULT_LOOPBACK_PAYLOAD = bytes.fromhex("01020304")
 
 
 def parse_args() -> argparse.Namespace:
+    """Parse command-line arguments for the smoke test script.
+
+    Returns:
+        Parsed arguments with port, baudrate, timeout, marker, and
+        loopback options.
+    """
     parser = argparse.ArgumentParser(
         description=(
             "Connect to the prism-kit USB CDC ports and verify that the debug "
@@ -143,10 +149,22 @@ def parse_args() -> argparse.Namespace:
 
 
 def repo_root() -> Path:
+    """Return the repository root directory.
+
+    Resolves relative to this script's location (``scripts/`` sibling).
+    """
     return Path(__file__).resolve().parent.parent
 
 
 def get_port_match_tokens(args: argparse.Namespace) -> list[str]:
+    """Build the list of port-matching tokens from defaults and CLI args.
+
+    Args:
+        args: Parsed command-line arguments.
+
+    Returns:
+        A list of case-insensitive tokens for port discovery.
+    """
     tokens = list(DEFAULT_PORT_MATCH_TOKENS)
     tokens.extend(args.match_port)
     return [token for token in tokens if token]
@@ -601,6 +619,11 @@ class SmokeTest:
 
 
 def main() -> int:
+    """Run the smoke test pipeline.
+
+    Returns:
+        0 on success, non-zero on failure.
+    """
     return SmokeTest(parse_args()).run()
 
 
