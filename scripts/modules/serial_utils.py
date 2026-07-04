@@ -19,6 +19,10 @@ class PortInfo:
     manufacturer: str | None
     serial_number: str | None
     hwid: str
+    vid: int | None = None
+    pid: int | None = None
+    location: str | None = None
+    interface: str | None = None
 
 
 # ── Port field helpers ──────────────────────────────────────────────────
@@ -32,6 +36,10 @@ def as_port_info(port: object) -> PortInfo:
         manufacturer=getattr(port, "manufacturer", None),
         serial_number=getattr(port, "serial_number", None),
         hwid=getattr(port, "hwid", "") or "",
+        vid=getattr(port, "vid", None),
+        pid=getattr(port, "pid", None),
+        location=getattr(port, "location", None),
+        interface=getattr(port, "interface", None),
     )
 
 
@@ -43,6 +51,8 @@ def port_fields(port: PortInfo) -> tuple[str, ...]:
         port.manufacturer or "",
         port.serial_number or "",
         port.hwid,
+        port.location or "",
+        port.interface or "",
     )
 
 
@@ -51,12 +61,20 @@ def describe_port(port: PortInfo) -> str:
     details = [port.device]
     if port.description:
         details.append(port.description)
+    if port.vid is not None and port.pid is not None:
+        details.append(f"VID:{port.vid:04X}:PID:{port.pid:04X}")
     if port.product and port.product != port.description:
         details.append(f"product={port.product}")
     if port.manufacturer:
         details.append(f"manufacturer={port.manufacturer}")
     if port.serial_number:
         details.append(f"serial={port.serial_number}")
+    if port.location:
+        details.append(f"location={port.location}")
+    if port.interface:
+        details.append(f"interface={port.interface}")
+    if port.hwid and port.hwid != "n/a":
+        details.append(f"hwid={port.hwid}")
     return " | ".join(details)
 
 
@@ -135,6 +153,88 @@ def unique_ports(ports: Iterable[PortInfo]) -> list[PortInfo]:
         seen_devices.add(port.device)
         unique.append(port)
     return unique
+
+
+# ── USB interface-number extraction ────────────────────────────────────
+
+
+def extract_interface_number(port: PortInfo) -> int | None:
+    """Extract the USB data-interface number from port metadata.
+
+    Returns ``None`` when the interface number cannot be determined
+    (e.g. non-USB ports or platforms that don't expose the value).
+
+    **Windows**: parses ``&MI_XX`` from ``hwid`` when it contains a raw
+    hardware-ID string, or the trailing ``:x.{N}`` segment from
+    ``location`` (or the ``LOCATION=...`` suffix in ``hwid``).
+
+    **Linux**: parses ``/dev/ttyACM{N}`` from the device path; the kernel
+    assigns indices in USB interface order for CDC ACM devices.
+
+    **Fallback**: parses the trailing ``:x.{N}`` segment from ``location``
+    if pyserial populated it.
+    """
+    import re
+
+    # Windows raw hardware ID: "USB\VID_...&MI_XX\..."
+    if port.hwid:
+        m = re.search(r"&MI_(\d{2})", port.hwid, re.IGNORECASE)
+        if m:
+            return int(m.group(1))
+
+    # Linux: /dev/ttyACM{N} — kernel assigns N in USB interface order
+    if port.device:
+        m = re.search(r"/dev/ttyACM(\d+)", port.device)
+        if m:
+            return int(m.group(1))
+
+    # Windows location field: "1-2:x.{N}" set by pyserial
+    if port.location:
+        m = re.search(r":x\.(\d+)$", port.location)
+        if m:
+            return int(m.group(1))
+
+    # Windows hwid from usb_info(): "USB VID:PID=... LOCATION=1-2:x.{N}"
+    if port.hwid:
+        m = re.search(r"LOCATION=[^:]*:x\.(\d+)", port.hwid, re.IGNORECASE)
+        if m:
+            return int(m.group(1))
+
+    return None
+
+
+def group_ports_by_device(
+    ports: Sequence[PortInfo],
+) -> dict[str, list[PortInfo]]:
+    """Group *ports* by their parent USB device identity.
+
+    Ports that share the same USB serial number (or the same VID/PID
+    pair plus location prefix) are considered siblings on the same
+    physical device.  Returns a dict mapping a device key to the list
+    of ports belonging to that device.
+
+    The key is the USB serial number when available, otherwise a
+    synthetic key derived from ``VID:PID`` and the location prefix.
+    """
+    import re
+
+    groups: dict[str, list[PortInfo]] = {}
+
+    for port in ports:
+        if port.serial_number:
+            key = f"sn:{port.serial_number}"
+        elif port.vid is not None and port.pid is not None and port.location:
+            # Strip the trailing :x.{N} to get the device-level location
+            prefix = re.sub(r":x\.\d+$", "", port.location)
+            key = f"vidpid:{port.vid:04X}:{port.pid:04X}:{prefix}"
+        elif port.vid is not None and port.pid is not None:
+            key = f"vidpid:{port.vid:04X}:{port.pid:04X}"
+        else:
+            key = f"dev:{port.device}"
+
+        groups.setdefault(key, []).append(port)
+
+    return groups
 
 
 # ── Port discovery ─────────────────────────────────────────────────────

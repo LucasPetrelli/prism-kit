@@ -35,7 +35,9 @@ from scripts.modules.serial_utils import (
     capture_console,
     describe_port,
     discover_ports,
+    extract_interface_number,
     format_missing_markers,
+    group_ports_by_device,
     print_captured_lines,
 )
 from scripts import rainbow
@@ -150,6 +152,59 @@ def get_port_match_tokens(args: argparse.Namespace) -> list[str]:
     return [token for token in tokens if token]
 
 
+# ── Port-role resolution by USB interface number ───────────────────────
+
+
+def resolve_roles_by_interface(
+    ports: Sequence[PortInfo],
+) -> dict[str, str | None]:
+    """Assign debug/command roles based on USB data-interface numbers.
+
+    Within each USB device (grouped by serial number or VID/PID), the
+    port with the lowest data-interface number is assigned the ``"debug"``
+    role and the next-lowest gets ``"command"``.  This mirrors the device
+    tree convention where ``cdc_acm_uart0`` (debug) registers before
+    ``cdc_acm_uart1`` (command).
+
+    When interface numbers cannot be extracted for every port in a device
+    group, the heuristic falls back to sorting by device name (e.g. COM
+    port number on Windows), which typically follows enumeration order.
+
+    Returns a dict with keys ``"debug"`` and ``"command"`` mapping to the
+    resolved device paths, or ``None`` when a role could not be resolved.
+    """
+    import re
+
+    roles: dict[str, str | None] = {"debug": None, "command": None}
+
+    for _device_key, device_ports in group_ports_by_device(ports).items():
+        iface_by_device = {p.device: extract_interface_number(p) for p in device_ports}
+
+        # Only trust interface-number ordering when ALL ports in the group
+        # have a known interface number.  Otherwise the asymmetry can
+        # produce incorrect assignments (a port with a known interface
+        # number sorts before one without, even when the latter should
+        # come first).
+        if all(v is not None for v in iface_by_device.values()) and iface_by_device:
+            sort_key = lambda p: iface_by_device.get(p.device, 9999)  # type: ignore[arg-type,return-value]
+        else:
+            # Fall back to device-name ordering (COM port number on
+            # Windows, /dev/ttyACM{N} on Linux).
+            def _device_sort_key(p: PortInfo) -> tuple[int, int]:
+                nums = re.findall(r"\d+", p.device)
+                return (0, int(nums[-1])) if nums else (1, 0)
+
+            sort_key = _device_sort_key
+
+        sorted_ports = sorted(device_ports, key=sort_key)
+        if len(sorted_ports) >= 1 and roles["debug"] is None:
+            roles["debug"] = sorted_ports[0].device
+        if len(sorted_ports) >= 2 and roles["command"] is None:
+            roles["command"] = sorted_ports[1].device
+
+    return roles
+
+
 # ── Smoke test orchestrator ────────────────────────────────────────────
 
 
@@ -182,6 +237,7 @@ class SmokeTest:
 
         try:
             self._discover_ports()
+            self._resolve_roles_by_interface()
             self._capture_console()
         except Exception as exc:
             print(exc, file=sys.stderr)
@@ -253,6 +309,47 @@ class SmokeTest:
         for port in self.ports:
             print(f"- {describe_port(port)}")
 
+    # ── Phase: resolve roles by interface number ───────────────────
+
+    def _resolve_roles_by_interface(self) -> None:
+        """Resolve debug/command roles from USB interface numbers.
+
+        This fast path avoids opening ports and listening for console
+        markers.  If either role cannot be resolved this way, the
+        subsequent :meth:`_capture_console` phase will fill in the
+        remaining roles from console output (the historical fallback).
+        """
+        if self.args.port and self.args.command_port:
+            # Both roles are already explicit — nothing to resolve.
+            self.role_ports["debug"] = self.args.port
+            self.role_ports["command"] = self.args.command_port
+            return
+
+        if self.args.port:
+            self.role_ports["debug"] = self.args.port
+
+        roles = resolve_roles_by_interface(self.ports)
+        if roles["debug"] is not None and "debug" not in self.role_ports:
+            self.role_ports["debug"] = roles["debug"]
+        if roles["command"] is not None and "command" not in self.role_ports:
+            self.role_ports["command"] = roles["command"]
+
+        # Report how each role was resolved
+        for role, device in (
+            ("debug", self.role_ports.get("debug")),
+            ("command", self.role_ports.get("command")),
+        ):
+            if device is None:
+                continue
+            port = next((p for p in self.ports if p.device == device), None)
+            if port is None:
+                continue
+            iface = extract_interface_number(port)
+            if iface is not None:
+                print(f"Resolved {role} port by USB interface #{iface}: {device}")
+            else:
+                print(f"Resolved {role} port by device order: {device}")
+
     # ── Phase: capture console ─────────────────────────────────────
 
     def _capture_console(self) -> None:
@@ -261,9 +358,9 @@ class SmokeTest:
             required_markers.extend(DEFAULT_REQUIRED_MARKERS)
         (
             self.captured_lines,
-            self.seen_required,
+            seen_required,
             self.seen_optional,
-            self.role_ports,
+            console_roles,
         ) = capture_console(
             self.serial,
             self.ports,
@@ -277,6 +374,12 @@ class SmokeTest:
             command_marker="",
             quiet=self.args.quiet,
         )
+        self.seen_required = seen_required
+        # Merge console-captured roles into any roles already resolved by
+        # interface number.  Interface-number resolution takes priority.
+        for role in ("debug", "command"):
+            if role not in self.role_ports and role in console_roles:
+                self.role_ports[role] = console_roles[role]
 
     # ── Phase: validate console markers ────────────────────────────
 
