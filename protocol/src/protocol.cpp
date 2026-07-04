@@ -417,7 +417,7 @@ void Protocol::DebugLogImpl(const uint8_t* data, uint32_t length,
     return;
   }
 
-  debug_("[PROTO] %s", buf);
+  debug_("[PROTO] %s\n", buf);
 
   if (!data || length == 0U) {
     return;
@@ -443,7 +443,7 @@ void Protocol::DebugLogImpl(const uint8_t* data, uint32_t length,
       pos = std::min(pos, k_line_capacity);
     }
     line[pos] = '\0';
-    debug_("%s", line);
+    debug_("%s\n", line);
   }
 }
 
