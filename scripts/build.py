@@ -6,11 +6,16 @@
 
 """Build the prism-kit firmware via ``west build``.
 
+Uses incremental builds by default (``--pristine auto``) for fast
+edit-compile cycles.  Pass ``--clean`` to force a full rebuild.
+
 Usage::
 
     uv run build
     uv run build --no-opt
     uv run build --debug-opt
+    uv run build --clean
+    uv run build --skip-lint
 """
 
 from __future__ import annotations
@@ -41,7 +46,8 @@ def parse_args() -> argparse.Namespace:
     """Parse command-line arguments for the build script.
 
     Returns:
-        Parsed arguments with ``--no-opt`` and ``--debug-opt`` flags.
+        Parsed arguments with ``--no-opt``, ``--debug-opt``, ``--clean``,
+        and ``--skip-lint`` flags.
     """
     parser = argparse.ArgumentParser(
         description="Build the firmware with the repo-local Zephyr toolchain setup."
@@ -56,6 +62,11 @@ def parse_args() -> argparse.Namespace:
         "--debug-opt",
         action="store_true",
         help="Build with CONFIG_DEBUG_OPTIMIZATIONS=y for a more debuggable -Og style build.",
+    )
+    parser.add_argument(
+        "--clean",
+        action="store_true",
+        help="Force a full clean rebuild (--pristine always).",
     )
     parser.add_argument(
         "--skip-lint",
@@ -229,6 +240,7 @@ def run_west_build(
     python_exe: Path,
     toolchain_root: Path,
     extra_conf_files: list[Path],
+    pristine: str = "auto",
 ) -> None:
     """Invoke ``west build`` with the project's standard configuration.
 
@@ -237,6 +249,8 @@ def run_west_build(
         python_exe: Path to a Python interpreter that has ``west``.
         toolchain_root: GNU Arm Embedded toolchain installation root.
         extra_conf_files: Additional Kconfig fragment files to apply.
+        pristine: West pristine level — ``"auto"`` (default) for incremental
+            builds or ``"always"`` for a full clean rebuild.
     """
     env = os.environ.copy()
     env["ZEPHYR_TOOLCHAIN_VARIANT"] = "gnuarmemb"
@@ -255,7 +269,7 @@ def run_west_build(
             "-b",
             "seeeduino_xiao",
             "--pristine",
-            "always",
+            pristine,
             ".",
             "--",
             *cmake_args,
@@ -404,8 +418,12 @@ def main() -> int:
         extra_conf_files.append(root / "prj.debug.conf")
 
     os.chdir(root)
-    remove_build_directory(root)
-    run_west_build(root, python_exe, toolchain_root, extra_conf_files)
+
+    pristine = "always" if args.clean else "auto"
+    if args.clean:
+        remove_build_directory(root)
+
+    run_west_build(root, python_exe, toolchain_root, extra_conf_files, pristine)
     sanitize_compile_database(root)
 
     if not args.skip_lint:
