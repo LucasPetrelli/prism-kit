@@ -22,38 +22,46 @@ through a staged handoff:
 Run commands from the repository root.
 
 ```bash
-# Clean an existing configured build directory.
-west build -t pristine
+# Build (incremental by default).
+uv run build
 
-# Default clean rebuild. The script deletes build/ and runs a pristine build.
-python scripts/build.py
+# Build with Zephyr debug-optimization overlays.
+uv run build --debug-opt
+uv run build --no-opt
 
-# Clean rebuild with Zephyr debug-optimization overlays.
-python scripts/build.py --debug-opt
-python scripts/build.py --no-opt
+# Force a full clean rebuild.
+uv run build --clean
 
 # Flash the newest build artifact over J-Link.
-python scripts/flash.py
+uv run flash
 
 # Flash a specific artifact.
-python scripts/flash.py build/zephyr/zephyr.elf
+uv run flash build/zephyr/zephyr.elf
 
 # Verify the USB CDC ACM debug and command ports and their expected markers.
-python scripts/smoke_test.py
+uv run smoke-test
 
 # Smoke-test helpers.
-python scripts/smoke_test.py --list-ports
-python scripts/smoke_test.py --port COM7
+uv run smoke-test --list-ports
+uv run smoke-test --port COM7
+
+# Lint project-owned source files with clang-tidy.
+uv run lint
+
+# Run host-compiled unit tests.
+uv run unit-tests
 ```
 
 Notes:
 
-- `scripts/build.py` is the default build entrypoint for this repo. It removes
-  `build/`, runs `west build -b seeeduino_xiao --pristine always .`, and
-  refreshes the root `compile_commands.json`.
-- `scripts/flash.py` uses SEGGER J-Link by default and resolves the newest
+- `uv run build` is the default build entrypoint for this repo. It uses
+  incremental builds (`--pristine auto`) for fast edit-compile cycles.
+  Pass `--clean` to force a full rebuild (deletes `build/` and runs
+  `--pristine always`). The script also refreshes the root
+  `compile_commands.json`.
+- `uv run flash` uses SEGGER J-Link by default and resolves the newest
   supported artifact under `build/zephyr`.
-- `scripts/smoke_test.py` discovers the Prism Kit CDC ACM ports and, by
+- `uv run smoke-test` discovers the Prism Kit CDC ACM ports and, by
   default, waits for `Task app_hw runtime:` and `Task app_main runtime:`
   markers on the debug channel before running a loopback test on the command
   channel. The command port is resolved as the other CDC ACM port.
@@ -75,15 +83,20 @@ The steady-state execution path is intentionally narrow:
 - `oshal/src/zephyr_system.c` validates board prerequisites and calls
   `oshal_main_handoff()` from `main()`.
 - `src/boot_handoff_zephyr.cpp` bridges that C-shaped handoff into
-  `bal::run_bootstrap(app::setup, app::loop)`.
+  `bal::RunBootstrap(app::AppTask::SetupTrampoline,
+  app::AppTask::LoopTrampoline)`.
 - `bal/src/bootstrap.cpp` confirms OSHAL startup succeeded, initializes BAL
   resources, and creates the `app_main` task.
-- `app/src/blink_app.cpp` initializes Prism during `app::setup()`, then
-  `app::loop()` fills the logical strip with the next color, calls `show()`,
+- `app/src/blink_app.cpp` owns the `AppTask` singleton. During `Setup()` it
+  initializes Prism (logical strip, status LED, command port, controller),
+  then `Loop()` fills the logical strip with the next color, calls `show()`,
   and sleeps.
-- `app/src/prism_hw_backend.cpp` stages frames in repo-owned Prism types.
-- `app/src/app_hw.cpp` consumes committed frames, writes them into the BAL
-  strip, flushes the physical LEDs, and toggles the board status LED.
+- `app/src/prism_hw_backend.cpp` implements `prism::Initialize()` — it wires
+  the BAL strip and status LED into the `app::hw` layer and starts the
+  `app_hw` executor.
+- `app/src/app_hw.cpp` starts the `app_hw` task that drains committed frames,
+  writes them into the BAL strip, flushes the physical LEDs, services the
+  command-port protocol, and toggles the board status LED.
 
 This keeps APP free of Zephyr headers and devicetree details while preserving a
 clear boot chain from Zephyr to OSHAL to BAL to APP.
@@ -91,36 +104,41 @@ clear boot chain from Zephyr to OSHAL to BAL to APP.
 ### HW Backend
 
 The HW backend (`app/src/`) owns the translation from logical Prism Kit
-strip operations to physical WS2812 mutations. It is split into two classes
-that share a lock-free SPSC mailbox:
+strip operations to physical WS2812 mutations. It is organised around five
+classes inside `app::hw` (`app/src/hw/`):
 
 ```
-┌──────────────────────────────┐     ┌──────────────────────────────┐
-│  prism_hw_backend.cpp        │     │  app_hw.cpp                  │
-│  (APP task — producer)       │     │  (app_hw task — consumer)    │
-│                              │     │                              │
-│  HardwareStrip::show()       │     │  PrismHwExecutor::Loop()     │
-│    → Executor().PublishFrame │     │    → TryApplyLatest()        │
-│         │                    │     │         │                    │
-│         ├── task guard       │     │         └→ Mailbox().Poll()  │
-│         └→ Mailbox().Publish │     │    → BlinkStatusLed()        │
-│                              │     │                              │
-│  prism::initialize()         │     │  PrismHwExecutor::Setup()    │
-│    → Executor().Configure()  │     │    → PrintStartupBanners()   │
-│    → Executor().Start()      │     │                              │
-└──────────────────────────────┘     └──────────────────────────────┘
-
-  Both access PrismHwMailbox() and PrismHwExecutor() via functions
+┌─────────────────────────────────┐    ┌─────────────────────────────────┐
+│  prism_hw_backend.cpp           │    │  HwTask (hw_task.cpp)           │
+│  (APP task — producer)          │    │  (app_hw task — consumer)       │
+│                                 │    │                                 │
+│  prism::Initialize()            │    │  HwTask::Loop()                 │
+│    → wires StripManager.Config  │    │    → event_group_.WaitAny()     │
+│    → wires StatusLed.Configure  │    │    → StripManager::Apply()      │
+│    → wires CommandManager       │    │    → CommandManager::Service()  │
+│    → app::hw::StartHwExecutor() │    │    → StatusLed::Blink()         │
+│                                 │    │                                 │
+│  prism::Strip::show()           │    │  StripLedView (via StripManager)│
+│    → StripLedView::SetColor()   │    │    → delegates to StripManager  │
+│    → commits via mailbox        │    │    → applies to bal::Ws2812Strip│
+└─────────────────────────────────┘    └─────────────────────────────────┘
 ```
 
-| Class | Responsibility | Replaces |
-|-------|---------------|----------|
-| `PrismHwMailbox` | Lock-free SPSC double-buffered frame delivery. `Publish()` (release semantics) and `Poll()` (acquire semantics). | `SharedMailbox`, `g_prism_hw_mailbox`, `publish_prism_hw_frame()` |
-| `PrismHwExecutor` | Owns the app_hw task lifecycle and runtime: frame application, status-LED blink, startup banners. `Configure()` receives the former `RuntimeServices` pointers; `Start()` creates the task; `PublishFrame()` guards + delegates to the mailbox. | `RuntimeServices`, `PrismHwTaskState`, `g_prism_hw_task`, `ensure_prism_hw_started()`, all task callbacks and anon-ns helpers |
+| Class | Header | Responsibility |
+|-------|--------|---------------|
+| `HwTask` | `hw_task.hpp` | Process-wide singleton owning the app_hw task, its wake event-flag group, the strip manager, the command manager, and the status LED. `Start()` creates the Zephyr task; `Loop()` waits on event bits and dispatches to sub-managers. |
+| `StripManager` | `strip_manager.hpp` | Owns the lock-free SPSC mailbox (`oshal::EventMailbox<SharedFrame>`) and the `StripLedView` array. `Configure()` wires the BAL strip and event group; `Apply()` polls the mailbox and writes committed frames to the physical strip. |
+| `StripLedView` | `strip_manager.hpp` | Concrete `prism::StripLed` implementation. Each view stores a zero-based pixel index and back-pointer to the owning `StripManager`; all `SetColor()` calls are forwarded to the manager's staging buffer. |
+| `CommandManager` | `command_manager.hpp` | Owns the command-port serial transport and the protocol adapter. Posts `kCommandRxEventMask` to the task event group on UART data arrival. |
+| `StatusLed` | `status_led.hpp` | Manages the board status LED blink pattern. `Blink()` counts idle ticks and toggles the hardware at a fixed 0.5 Hz rate. |
+| `HwCoordinator` | `hw_coordinator.hpp` | Free function `StartHwExecutor()` — idempotent entry point that starts the app_hw task. |
 
-`SharedFrame` remains a POD struct — it is the data payload, not behaviour.
-The internal header (`prism_hw_backend_internal.hpp`) declares both classes
-and their accessor functions; implementations live in `app_hw.cpp`.
+`SharedFrame` (in `shared_frame.hpp`) remains a POD struct — it is the data
+payload, not behaviour, with a `kSharedFrameCapacity` of 16 pixels.
+
+Controller commands arrive via `ControllerCommandSink` (in
+`controller_command_sink.hpp`), which posts command bytes into the same
+protocol pipeline that `CommandManager` owns.
 
 ## Setup/configuration Info
 
@@ -132,13 +150,12 @@ and their accessor functions; implementations live in `app_hw.cpp`.
 git submodule update --init --recursive
 ```
 
-- Create a virtual environment and install the Python packages used by the repo
-  scripts:
+- Set up the Python toolchain. The repo uses `uv` for script execution and
+  `pyproject.toml` for dependency management. Install the project and its
+  dependencies:
 
 ```bash
-python -m venv .venv
-source .venv/Scripts/activate
-pip install --upgrade pip west jsonschema pyelftools pyserial
+uv sync
 ```
 
 - Install the GNU Arm Embedded Toolchain. The build script expects version
@@ -191,26 +208,26 @@ the `readability-identifier-naming` check.  Configuration lives in
   distribution).
 - The ARM GCC toolchain on PATH (so the lint script can resolve the C++ standard
   library headers).
-- An existing build directory (run `scripts/build.py` first) — the lint script
+- An existing build directory (run `uv run build` first) — the lint script
   reads `build/compile_commands.json` for compilation flags.
 
 ### Usage
 
 ```bash
 # Lint all project-owned source files.
-python scripts/lint.py
+uv run lint
 
 # Lint a single file.
-python scripts/lint.py app/src/hw/strip_manager.cpp
+uv run lint app/src/hw/strip_manager.cpp
 
 # Apply auto-fixes (where supported).
-python scripts/lint.py --fix
+uv run lint --fix
 
 # List all enabled clang-tidy checks.
-python scripts/lint.py --list-checks
+uv run lint --list-checks
 
 # Pass extra flags to clang-tidy.
-python scripts/lint.py --clang-tidy-extra='--extra-arg=-DZEPHYR_LOG_MODULE_NAME=mymod'
+uv run lint --clang-tidy-extra='--extra-arg=-DZEPHYR_LOG_MODULE_NAME=mymod'
 ```
 
 The script filters out cross-compiler flags that host clang-tidy cannot
