@@ -1,6 +1,7 @@
 #include "strip_manager.hpp"
 
 #include "bal/rgb_led.hpp"
+#include "oshal/debug_port.hpp"
 #include "oshal/status.h"
 
 namespace app::hw {
@@ -40,6 +41,8 @@ void StripManager::Configure(bal::Ws2812Strip* backend_strip,
   led_count_ = led_count;
   name_ = strip_name;
   ready_ = true;
+  mailbox_.SetDebugPort(&oshal::debug_port);
+  mailbox_.SetDebugName("STRP");
 }
 
 // ---- prism::Strip interface --------------------------------------------

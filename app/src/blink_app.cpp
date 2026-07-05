@@ -3,6 +3,7 @@
 
 #include "app/app.hpp"
 #include "hw/controller_command_sink.hpp"
+#include "oshal/debug_port.hpp"
 #include "oshal/event.hpp"
 #include "prism/color.hpp"
 #include "prism/controller.hpp"
@@ -51,6 +52,8 @@ bool AppTask::Setup() {
   controller_.SetStrip(&strip);
 
   /* Wire the command mailbox so protocol handlers can deliver commands. */
+  command_mailbox_.SetDebugPort(&oshal::debug_port);
+  command_mailbox_.SetDebugName("CMDB");
   app::hw::ControllerCommandSink::Instance().SetMailbox(&command_mailbox_);
 
   /* Rainbow default — one SetSingleColor instruction per LED.
