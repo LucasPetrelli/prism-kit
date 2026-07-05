@@ -57,6 +57,11 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Build with CONFIG_DEBUG_OPTIMIZATIONS=y for a more debuggable -Og style build.",
     )
+    parser.add_argument(
+        "--skip-lint",
+        action="store_true",
+        help="Skip clang-tidy linting after a successful build.",
+    )
     return parser.parse_args()
 
 
@@ -348,6 +353,39 @@ def sanitize_compile_database(root: Path) -> None:
     root_db.write_text(json.dumps(sanitized_entries, indent=2) + "\n", encoding="utf-8")
 
 
+def run_lint(root: Path) -> int:
+    """Run clang-tidy lint across the project after a successful build.
+
+    Args:
+        root: The repository root directory.
+
+    Returns:
+        0 on success or if clang-tidy is not installed (non-fatal);
+        non-zero when violations are found.
+    """
+    if not shutil.which("clang-tidy"):
+        print(
+            "[lint] clang-tidy not installed — skipping lint.\n"
+            "  Install LLVM (https://llvm.org) to enable static analysis."
+        )
+        return 0
+
+    lint_script = root / "scripts" / "lint.py"
+    if not lint_script.is_file():
+        print("[lint] lint.py not found — skipping.")
+        return 0
+
+    print("[lint] Running clang-tidy …")
+    result = subprocess.run(
+        [str(Path(sys.executable)), str(lint_script)],
+        cwd=root,
+        check=False,
+    )
+    if result.returncode != 0:
+        print("[lint] clang-tidy violations found (see above).")
+    return result.returncode
+
+
 def main() -> int:
     """Run the full build pipeline.
 
@@ -369,6 +407,12 @@ def main() -> int:
     remove_build_directory(root)
     run_west_build(root, python_exe, toolchain_root, extra_conf_files)
     sanitize_compile_database(root)
+
+    if not args.skip_lint:
+        lint_rc = run_lint(root)
+        if lint_rc != 0:
+            return lint_rc
+
     return 0
 
 
