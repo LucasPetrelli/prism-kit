@@ -5,7 +5,6 @@
 
 #include "hw/controller_command.hpp"
 #include "oshal/event.hpp"
-#include "oshal/event_mailbox.hpp"
 #include "prism/controller.hpp"
 
 namespace app {
