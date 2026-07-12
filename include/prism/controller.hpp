@@ -13,12 +13,20 @@ namespace prism {
 /// @return Current timestamp value.
 using TimestampCallback = std::uint32_t (*)();
 
+/// @brief Callback invoked when a timed instruction yields a non-zero
+///     duration.  The owner should schedule a subsequent Run() call
+///     after the given delay.
+/// @param delay_ms Milliseconds until the next Run() should occur.
+using ScheduleCallback = void (*)(std::uint32_t delay_ms);
+
 /// @brief Tag identifying the concrete instruction type.
 enum class InstructionTag : std::uint8_t {
   /// @brief Range-fill instruction (SetMultipleColor).
   kSetMultipleColor,
   /// @brief Single-pixel instruction (SetSingleColor).
   kSetSingleColor,
+  /// @brief Time-delay instruction (Delay).
+  kDelay,
 };
 
 /// @brief Half-open [start, end) pixel index range.
@@ -45,6 +53,8 @@ struct SetSingleColorPayload {
   std::uint8_t index;
 };
 
+class Controller;
+
 /// @brief Polymorphic base for a single queued controller instruction.
 class ControllerInstruction {
  public:
@@ -53,7 +63,9 @@ class ControllerInstruction {
   virtual ~ControllerInstruction() = default;
 
   /// @brief Execute this instruction against its bound strip.
-  virtual void Execute() const = 0;
+  /// @return 0 if the instruction completed, or a positive duration in
+  ///     milliseconds after which Execute() should be called again.
+  virtual std::uint32_t Execute() = 0;
 
   /// @brief Return the tag identifying this instruction's concrete type.
   /// @return InstructionTag value set by the derived-class constructor.
@@ -66,6 +78,10 @@ class ControllerInstruction {
  public:
   /// @brief Non-owning pointer to the target strip, or nullptr.
   Strip* strip{nullptr};
+  /// @brief Non-owning pointer to the owning controller, or nullptr.
+  ///     Set by Controller::AddInstruction.  Timed instructions use this
+  ///     to call Block() / Unblock() on the controller.
+  Controller* controller{nullptr};
 };
 
 /// @brief Instruction that sets a range of pixels to a single preset color.
@@ -81,7 +97,8 @@ class SetMultipleColor : public ControllerInstruction {
   }
 
   /// @brief Execute the fill-and-show operation on the bound strip.
-  void Execute() const override;
+  /// @return 0 (instant instruction — always completes immediately).
+  std::uint32_t Execute() override;
 
   /// @brief RGB color to apply.
   RgbColor color{};
@@ -102,12 +119,43 @@ class SetSingleColor : public ControllerInstruction {
   }
 
   /// @brief Execute the set-and-show operation on the bound strip.
-  void Execute() const override;
+  /// @return 0 (instant instruction — always completes immediately).
+  std::uint32_t Execute() override;
 
   /// @brief RGB color to apply.
   RgbColor color{};
   /// @brief Zero-based pixel index within the strip.
   std::uint8_t index{0U};
+};
+
+/// @brief Delay that blocks instruction execution for a fixed duration.
+///
+/// The first call to Execute() marks the controller as blocked and returns
+/// the configured delay duration.  The controller re-arms via the schedule
+/// callback.  On the second call (after the timer fires), the Delay
+/// unblocks the controller and returns 0 (completed).
+class Delay : public ControllerInstruction {
+ public:
+  Delay() { tag_ = InstructionTag::kDelay; }
+
+  /// @brief Construct with a fixed delay duration.
+  /// @param delay_ms Delay duration in milliseconds.
+  explicit Delay(std::uint32_t delay_ms) : delay_ms_(delay_ms) {
+    tag_ = InstructionTag::kDelay;
+  }
+
+  /// @brief Execute one step of the delay.
+  /// @return delay_ms on first call, the remaining duration if the delay
+  ///     has not yet elapsed, or 0 on completion.
+  std::uint32_t Execute() override;
+
+ private:
+  /// @brief Configured delay duration in milliseconds.
+  std::uint32_t delay_ms_{0U};
+
+  /// @brief Timestamp captured at the first Execute() call.
+  /// @note 0 also serves as the first-call marker.
+  std::uint32_t start_time_ms_{0U};
 };
 
 /// @brief Variant storage for one instruction slot with active-member tracking.
@@ -120,6 +168,8 @@ struct InstructionMemorySlot {
     SetMultipleColor set_multiple_color;
     /// @brief Active member: single-pixel instruction.
     SetSingleColor set_single_color;
+    /// @brief Active member: time-delay instruction.
+    Delay delay;
   };
 
   /// @brief Tag identifying the currently-active member.
@@ -144,7 +194,12 @@ struct InstructionMemorySlot {
   void SetStrip(Strip* s);
 
   /// @brief Execute the active instruction.
-  void Execute() const;
+  /// @return 0 if completed, or a positive duration in ms until the next call.
+  std::uint32_t Execute();
+
+  /// @brief Set the controller pointer on the active instruction.
+  /// @param c Non-owning pointer to the owning controller.
+  void SetController(Controller* c);
 
  private:
   /// @brief Return a base-class pointer to the active instruction.
@@ -165,6 +220,8 @@ class Controller {
  public:
   /// @brief Maximum number of queued instructions.
   static constexpr std::uint32_t kMaxInstruction = 16U;
+  /// @brief Maximum number of concurrently-executing timed instructions.
+  static constexpr std::uint32_t kMaxExecuting = kMaxInstruction;
 
   Controller(const Controller&) = delete;
   Controller& operator=(const Controller&) = delete;
@@ -185,24 +242,77 @@ class Controller {
   /// @brief Clear all queued instructions.
   void ResetInstructions();
 
-  /// @brief Iterate through enqueued instructions and execute each one.
+  /// @brief Iterate through instructions: drain executing array first, then
+  ///     pick new instructions from the queue (if not blocked).
   ///
   /// @pre A valid timestamp callback must be registered before calling Run().
-  void Run() const;
+  void Run();
 
   /// @brief Register a timestamp callback for timing-aware execution.
   /// @param callback Function returning the current timestamp in milliseconds.
   void SetTimestampCallback(TimestampCallback callback);
 
+  /// @brief Query the current monotonically-increasing timestamp.
+  /// @return Current timestamp in milliseconds from the registered callback,
+  ///     or 0 if none is set.
+  std::uint32_t GetTimestamp() const;
+
+  /// @brief Register a schedule callback for timed-instruction re-arming.
+  /// @param callback Function called with the duration in ms after which
+  ///     Run() should be called again.  May be nullptr (no re-arm).
+  void SetScheduleCallback(ScheduleCallback callback);
+
+  /// @brief Increment the blocking counter.  While the counter is > 0,
+  ///     Run() will not pick up new instructions from the queue.
+  void Block();
+
+  /// @brief Decrement the blocking counter.  When the counter reaches 0,
+  ///     Run() may pick up new instructions again.
+  void Unblock();
+
+  /// @brief Check whether the controller is currently blocked.
+  /// @return True when Block() has been called more times than Unblock().
+  bool IsBlocked() const;
+
+  /// @brief Called by color-affecting instructions to request a Show()
+  ///     commit at the end of Run().  Idempotent within a single Run().
+  void RequestShow();
+
  private:
+  /// @brief Run timed instructions in the executing_ array, removing
+  ///     completed entries (swap-with-last).
+  void DrainExecuting();
+
+  /// @brief Consume new instructions from head_index_ while !IsBlocked().
+  void PickNewInstructions();
+
+  /// @brief Record a timeout for the end-of-run schedule callback.
+  /// @param ms Timeout in milliseconds.  Only the smallest value across all
+  ///     calls within a single Run() is retained.
+  void ScheduleTimeout(std::uint32_t ms);
+
   /// @brief Non-owning pointer to the bound strip, or nullptr.
   Strip* strip_;
   /// @brief Fixed-capacity instruction queue.
   InstructionMemorySlot instructions_[kMaxInstruction];
   /// @brief Number of active instructions in the queue.
   std::uint32_t instruction_count_;
+  /// @brief Index of the next instruction in instructions_[] to consume.
+  std::uint32_t head_index_{0U};
+  /// @brief Indices of instruction slots currently under execution (timed).
+  std::uint32_t executing_[kMaxExecuting]{};
+  /// @brief Number of entries in executing_.
+  std::uint32_t executing_count_{0U};
+  /// @brief Re-entrant blocking counter.
+  std::uint8_t block_count_{0U};
+  /// @brief Set by instructions via RequestShow(); cleared at each Run().
+  bool show_requested_{false};
   /// @brief Timestamp callback for timing-aware execution, or nullptr.
   TimestampCallback get_timestamp_;
+  /// @brief Schedule callback for timed-instruction re-arming, or nullptr.
+  ScheduleCallback schedule_next_run_;
+  /// @brief Cached minimum timeout across one Run(); 0 means no timeout.
+  std::uint32_t min_scheduled_timeout_{0U};
 };
 
 }  // namespace prism
