@@ -18,6 +18,8 @@ enum class ControllerCommand : std::uint8_t {
   kResetInstructions,
   /// @brief Execute all queued instructions (Run).
   kRun,
+  /// @brief Pause instruction execution for a fixed duration (Delay).
+  kDelay,
 };
 
 /// @brief IPC message sent from the HW thread (protocol handlers) to the APP
@@ -39,6 +41,8 @@ struct ControllerCommandMessage {
     prism::SetMultipleColorPayload set_multiple;
     /// @brief Payload for a SetSingleColor instruction.
     prism::SetSingleColorPayload set_single;
+    /// @brief Delay duration in milliseconds (for kDelay commands).
+    std::uint32_t delay_ms;
   };
 };
 

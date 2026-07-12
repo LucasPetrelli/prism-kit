@@ -37,6 +37,10 @@ enum class Tag : uint16_t {
   /// @brief Execute all queued controller instructions.
   /// Payload: none (0 bytes).
   kRun = 0x0103,
+
+  /// @brief Pause instruction execution for a fixed duration.
+  /// Payload: delay_ms (4 bytes, uint32_t little-endian).
+  kDelay = 0x0104,
 };
 
 }  // namespace protocol

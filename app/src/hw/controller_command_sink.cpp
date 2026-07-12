@@ -19,6 +19,7 @@ void ControllerCommandSink::Register(protocol::Protocol& protocol) {
   protocol.AddHandler(protocol::Tag::kResetInstructions,
                       &HandleResetInstructions);
   protocol.AddHandler(protocol::Tag::kRun, &HandleRun);
+  protocol.AddHandler(protocol::Tag::kDelay, &HandleDelay);
 }
 
 void ControllerCommandSink::SetMailbox(ControllerCommandMailbox* mailbox) {
@@ -106,6 +107,28 @@ void ControllerCommandSink::HandleRun(void* context, const uint8_t* data,
 
   ControllerCommandMessage msg;
   msg.cmd = ControllerCommand::kRun;
+  self.mailbox_->Send(&msg);
+}
+
+void ControllerCommandSink::HandleDelay(void* context, const uint8_t* data,
+                                        uint16_t length) {
+  static_cast<void>(context);
+  auto& self = Instance();
+  if (self.mailbox_ == nullptr) {
+    return;
+  }
+
+  // Wire format: delay_ms (4 bytes, uint32_t little-endian).
+  if (length < 4U) {
+    return;
+  }
+
+  ControllerCommandMessage msg;
+  msg.cmd = ControllerCommand::kDelay;
+  msg.delay_ms = static_cast<std::uint32_t>(data[0]) |
+                 (static_cast<std::uint32_t>(data[1]) << 8U) |
+                 (static_cast<std::uint32_t>(data[2]) << 16U) |
+                 (static_cast<std::uint32_t>(data[3]) << 24U);
   self.mailbox_->Send(&msg);
 }
 

@@ -61,6 +61,9 @@ class ControllerCommandSink {
   /// @brief Handler for the Run tag.
   static void HandleRun(void* context, const uint8_t* data, uint16_t length);
 
+  /// @brief Handler for the Delay tag.
+  static void HandleDelay(void* context, const uint8_t* data, uint16_t length);
+
   /// @brief Non-owning pointer to the EventMailbox owned by AppTask.
   ///     Null until SetMailbox() is called; handlers silently drop frames
   ///     while null.

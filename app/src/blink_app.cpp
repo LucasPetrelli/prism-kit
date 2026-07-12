@@ -98,6 +98,11 @@ void AppTask::UpdateInstructions() {
       case app::hw::ControllerCommand::kRun:
         controller_.Run();
         break;
+      case app::hw::ControllerCommand::kDelay: {
+        const prism::Delay instr{msg.delay_ms};
+        controller_.AddInstruction(&instr);
+        break;
+      }
     }
   }
 }
