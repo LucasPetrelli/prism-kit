@@ -52,6 +52,7 @@ bool AppTask::Setup() {
   led_count_ = static_cast<std::uint8_t>(strip.LedCount());
   controller_.SetStrip(&strip);
   controller_.SetTimestampCallback(prism::UptimeMs);
+  controller_.SetScheduleCallback(&AppTask::OnScheduleNextRun);
 
   /* Wire the command mailbox so protocol handlers can deliver commands. */
   command_mailbox_.SetDebugPort(&oshal::debug_port);
@@ -101,12 +102,27 @@ void AppTask::UpdateInstructions() {
   }
 }
 
-bool AppTask::Loop() {
-  /* Block until a controller command arrives. */
-  command_event_group_.WaitAny(kCommandEventMask, oshal::kEventWaitForever);
+void AppTask::OnScheduleNextRun(std::uint32_t delay_ms) {
+  Instance().run_timer_.Start(delay_ms, oshal::TimedEventMode::kOneShot);
+}
 
-  /* Drain and dispatch all pending commands. */
-  UpdateInstructions();
+bool AppTask::Loop() {
+  /* Block until a controller command or a run-schedule timeout arrives. */
+  const std::uint32_t events = app_event_group_.WaitAny(
+    kCommandEventMask | kTimeoutEventMask, oshal::kEventWaitForever);
+
+  /* Drain and dispatch pending commands, but only when signalled. */
+  if (events & kCommandEventMask) {
+    UpdateInstructions();
+  }
+
+  /* If the run-schedule timer fired, give the controller another pass.
+   * Note that UpdateInstructions() may have already called Run() via a
+   * kRun command; a second Run() is idempotent and harmless. */
+  if (events & kTimeoutEventMask) {
+    controller_.Run();
+  }
+
   return true;
 }
 

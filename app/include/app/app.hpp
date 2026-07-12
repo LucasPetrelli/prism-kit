@@ -5,6 +5,7 @@
 
 #include "hw/controller_command.hpp"
 #include "oshal/event.hpp"
+#include "oshal/timed_event.hpp"
 #include "prism/controller.hpp"
 
 namespace app {
@@ -19,6 +20,10 @@ class AppTask {
   /// @brief Event bitmask posted when a controller command arrives from the
   ///     protocol layer (HW thread).
   static constexpr std::uint32_t kCommandEventMask = oshal::UserEvent(2);
+
+  /// @brief Event bitmask posted by the run-schedule timer when a
+  ///     controller-instruction delay has elapsed.
+  static constexpr std::uint32_t kTimeoutEventMask = oshal::UserEvent(3);
 
   /// @brief Access the process-wide singleton.
   /// @return Reference to the AppTask singleton.
@@ -57,14 +62,24 @@ class AppTask {
   ///     to the controller.
   void UpdateInstructions();
 
+  /// @brief Static trampoline for ScheduleCallback — starts the run
+  ///     timer to wake Loop() after the given delay.
+  /// @param delay_ms Milliseconds until the next Run() should occur.
+  static void OnScheduleNextRun(std::uint32_t delay_ms);
+
   /// @brief High-level animation controller.
   prism::Controller controller_;
   /// @brief Cached LED count for range construction.
   std::uint8_t led_count_;
-  /// @brief Event group that the protocol post to when a command arrives.
-  oshal::EventFlagGroup command_event_group_;
+  /// @brief Event group for the APP-task loop — signalled by the protocol
+  ///     layer (kCommandEventMask) and the run-schedule timer
+  ///     (kTimeoutEventMask).
+  oshal::EventFlagGroup app_event_group_;
+  /// @brief One-shot timer that fires when a timed controller instruction
+  ///     needs re-arming.  Posts kTimeoutEventMask to app_event_group_.
+  oshal::TimedEvent run_timer_{app_event_group_, kTimeoutEventMask};
   /// @brief Mailbox carrying ControllerCommandMessage from HW→APP thread.
-  app::hw::ControllerCommandMailbox command_mailbox_{command_event_group_,
+  app::hw::ControllerCommandMailbox command_mailbox_{app_event_group_,
                                                      kCommandEventMask};
 };
 
