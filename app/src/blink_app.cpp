@@ -8,6 +8,7 @@
 #include "prism/color.hpp"
 #include "prism/controller.hpp"
 #include "prism/strip.hpp"
+#include "prism/time.hpp"
 
 namespace {
 
@@ -50,6 +51,7 @@ bool AppTask::Setup() {
   prism::Strip& strip = prism::GetStrip();
   led_count_ = static_cast<std::uint8_t>(strip.LedCount());
   controller_.SetStrip(&strip);
+  controller_.SetTimestampCallback(prism::UptimeMs);
 
   /* Wire the command mailbox so protocol handlers can deliver commands. */
   command_mailbox_.SetDebugPort(&oshal::debug_port);

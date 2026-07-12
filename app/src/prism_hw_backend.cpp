@@ -74,4 +74,6 @@ Strip& GetStrip() { return app::hw::HwTask::Instance().GetStrip(); }
 
 void SleepMs(std::uint32_t duration_ms) { oshal::SleepMs(duration_ms); }
 
+std::uint32_t UptimeMs() { return oshal::UptimeMs(); }
+
 }  // namespace prism
