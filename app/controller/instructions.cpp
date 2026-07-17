@@ -1,3 +1,4 @@
+#include <cstdio>
 #include <new>
 
 #include "prism/controller.hpp"
@@ -68,6 +69,10 @@ std::uint32_t prism::InstructionMemorySlot::Execute() {
   return Active()->Execute();
 }
 
+void prism::InstructionMemorySlot::ToString(char* buf, std::size_t size) const {
+  Active()->ToString(buf, size);
+}
+
 void prism::InstructionMemorySlot::Destroy() {
   if (tag != InstructionTag{}) {
     Active()->~ControllerInstruction();
@@ -134,4 +139,54 @@ std::uint32_t prism::Delay::Execute() {
   }
 
   return delay_ms_ - elapsed;
+}
+
+// ====================================================================
+// ToString
+// ====================================================================
+
+const char* prism::InstructionToString(InstructionTag tag) {
+  switch (tag) {
+    case InstructionTag::kSetMultipleColor:
+      return "SetMultipleColor";
+    case InstructionTag::kSetSingleColor:
+      return "SetSingleColor";
+    case InstructionTag::kDelay:
+      return "Delay";
+  }
+  return "Unknown";
+}
+
+// ====================================================================
+// ControllerInstruction::ToString  (default — tag name only)
+// ====================================================================
+
+void prism::ControllerInstruction::ToString(char* buf, std::size_t size) const {
+  std::snprintf(buf, size, "%s", prism::InstructionToString(tag_));
+}
+
+// ====================================================================
+// SetMultipleColor::ToString
+// ====================================================================
+
+void prism::SetMultipleColor::ToString(char* buf, std::size_t size) const {
+  std::snprintf(buf, size, "SetMultipleColor(r=%u g=%u b=%u [%u,%u))",
+                color.red, color.green, color.blue, range.start, range.end);
+}
+
+// ====================================================================
+// SetSingleColor::ToString
+// ====================================================================
+
+void prism::SetSingleColor::ToString(char* buf, std::size_t size) const {
+  std::snprintf(buf, size, "SetSingleColor(r=%u g=%u b=%u idx=%u)", color.red,
+                color.green, color.blue, index);
+}
+
+// ====================================================================
+// Delay::ToString
+// ====================================================================
+
+void prism::Delay::ToString(char* buf, std::size_t size) const {
+  std::snprintf(buf, size, "Delay(%u ms)", delay_ms_);
 }

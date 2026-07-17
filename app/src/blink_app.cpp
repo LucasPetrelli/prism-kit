@@ -7,6 +7,7 @@
 #include "oshal/event.hpp"
 #include "prism/color.hpp"
 #include "prism/controller.hpp"
+#include "prism/debug.hpp"
 #include "prism/strip.hpp"
 #include "prism/time.hpp"
 
@@ -23,6 +24,18 @@ constexpr std::array<prism::RgbColor, 7U> kRainbowColors = {{
   {40U, 0U, 160U},   // Indigo
   {140U, 0U, 255U},  // Violet
 }};
+
+/// @brief Adapter that bridges prism::Debug to an oshal::DebugPort.
+class PrismDebugPort final : public prism::Debug {
+ public:
+  explicit PrismDebugPort(oshal::DebugPort& port) : port_(port) {}
+  void Vprintf(const char* format, std::va_list args) override {
+    port_.Vprintf(format, args);
+  }
+
+ private:
+  oshal::DebugPort& port_;
+};
 
 }  // namespace
 
@@ -53,6 +66,12 @@ bool AppTask::Setup() {
   controller_.SetStrip(&strip);
   controller_.SetTimestampCallback(prism::UptimeMs);
   controller_.SetScheduleCallback(&AppTask::OnScheduleNextRun);
+
+  /* Wire the controller's debug output through the board's debug port. */
+  {
+    static PrismDebugPort s_debug{oshal::debug_port};
+    controller_.SetDebug(&s_debug);
+  }
 
   /* Wire the command mailbox so protocol handlers can deliver commands. */
   command_mailbox_.SetDebugPort(&oshal::debug_port);

@@ -4,7 +4,6 @@
 #include <cstdint>
 
 #include "hw/controller_command.hpp"
-#include "oshal/event_mailbox.hpp"
 #include "protocol.hpp"
 
 namespace app::hw {

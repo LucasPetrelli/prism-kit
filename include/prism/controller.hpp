@@ -1,9 +1,11 @@
 #ifndef PRISM_CONTROLLER_HPP_
 #define PRISM_CONTROLLER_HPP_
 
+#include <cstddef>
 #include <cstdint>
 
 #include "prism/color.hpp"
+#include "prism/debug.hpp"
 #include "prism/strip.hpp"
 
 namespace prism {
@@ -28,6 +30,11 @@ enum class InstructionTag : std::uint8_t {
   /// @brief Time-delay instruction (Delay).
   kDelay,
 };
+
+/// @brief Return a human-readable name for an instruction tag.
+/// @param tag Tag to stringify.
+/// @return Pointer to a static string describing the instruction type.
+const char* InstructionToString(InstructionTag tag);
 
 /// @brief Half-open [start, end) pixel index range.
 struct Range {
@@ -71,6 +78,12 @@ class ControllerInstruction {
   /// @return InstructionTag value set by the derived-class constructor.
   InstructionTag Tag() const { return tag_; }
 
+  /// @brief Write a human-readable description of this instruction into
+  ///     a caller-provided buffer.
+  /// @param buf  Destination buffer.
+  /// @param size Buffer capacity.
+  virtual void ToString(char* buf, std::size_t size) const;
+
  protected:
   ControllerInstruction() = default;
   InstructionTag tag_{};
@@ -100,6 +113,9 @@ class SetMultipleColor : public ControllerInstruction {
   /// @return 0 (instant instruction — always completes immediately).
   std::uint32_t Execute() override;
 
+  /// @brief Write a description including color and range into a buffer.
+  void ToString(char* buf, std::size_t size) const override;
+
   /// @brief RGB color to apply.
   RgbColor color{};
   /// @brief Zero-based [start, end) pixel range.
@@ -121,6 +137,9 @@ class SetSingleColor : public ControllerInstruction {
   /// @brief Execute the set-and-show operation on the bound strip.
   /// @return 0 (instant instruction — always completes immediately).
   std::uint32_t Execute() override;
+
+  /// @brief Write a description including color and index into a buffer.
+  void ToString(char* buf, std::size_t size) const override;
 
   /// @brief RGB color to apply.
   RgbColor color{};
@@ -148,6 +167,9 @@ class Delay : public ControllerInstruction {
   /// @return delay_ms on first call, the remaining duration if the delay
   ///     has not yet elapsed, or 0 on completion.
   std::uint32_t Execute() override;
+
+  /// @brief Write a description including the delay duration into a buffer.
+  void ToString(char* buf, std::size_t size) const override;
 
  private:
   /// @brief Configured delay duration in milliseconds.
@@ -197,6 +219,11 @@ struct InstructionMemorySlot {
   /// @return 0 if completed, or a positive duration in ms until the next call.
   std::uint32_t Execute();
 
+  /// @brief Write a description of the active instruction into a buffer.
+  /// @param buf  Destination buffer.
+  /// @param size Buffer capacity.
+  void ToString(char* buf, std::size_t size) const;
+
   /// @brief Set the controller pointer on the active instruction.
   /// @param c Non-owning pointer to the owning controller.
   void SetController(Controller* c);
@@ -222,6 +249,9 @@ class Controller {
   static constexpr std::uint32_t kMaxInstruction = 16U;
   /// @brief Maximum number of concurrently-executing timed instructions.
   static constexpr std::uint32_t kMaxExecuting = kMaxInstruction;
+  /// @brief Size of the stack buffer used by DebugLog to build the
+  ///     prefix-tagged format string.
+  static constexpr std::uint32_t kDebugLogBufferSize = 96U;
 
   Controller(const Controller&) = delete;
   Controller& operator=(const Controller&) = delete;
@@ -262,6 +292,11 @@ class Controller {
   ///     Run() should be called again.  May be nullptr (no re-arm).
   void SetScheduleCallback(ScheduleCallback callback);
 
+  /// @brief Register a debug output sink.
+  /// @param d Non-owning pointer to a Debug instance, or nullptr to
+  ///     disable debug output.
+  void SetDebug(Debug* d);
+
   /// @brief Increment the blocking counter.  While the counter is > 0,
   ///     Run() will not pick up new instructions from the queue.
   void Block();
@@ -291,6 +326,11 @@ class Controller {
   ///     calls within a single Run() is retained.
   void ScheduleTimeout(std::uint32_t ms);
 
+  /// @brief Write a formatted debug message through the registered debug sink.
+  /// @param format Printf-style format string.
+  /// @param ... Variadic arguments matching the format string.
+  void DebugLog(const char* format, ...) const;
+
   /// @brief Non-owning pointer to the bound strip, or nullptr.
   Strip* strip_;
   /// @brief Fixed-capacity instruction queue.
@@ -311,6 +351,8 @@ class Controller {
   TimestampCallback get_timestamp_;
   /// @brief Schedule callback for timed-instruction re-arming, or nullptr.
   ScheduleCallback schedule_next_run_;
+  /// @brief Non-owning pointer to the debug output sink, or nullptr.
+  Debug* debug_;
   /// @brief Cached minimum timeout across one Run(); 0 means no timeout.
   std::uint32_t min_scheduled_timeout_{0U};
 };

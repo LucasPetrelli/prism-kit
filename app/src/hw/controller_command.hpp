@@ -51,7 +51,7 @@ struct ControllerCommandMessage {
 /// @note Change the capacity here (second template argument) — it is the
 ///     single source of truth for all consumers.
 using ControllerCommandMailbox =
-  oshal::EventMailbox<sizeof(ControllerCommandMessage), 16U>;
+  oshal::EventMailbox<sizeof(ControllerCommandMessage), 20>;
 
 }  // namespace app::hw
 
