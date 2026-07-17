@@ -5,9 +5,11 @@ Wire format (matches ``protocol::Frame`` in ``protocol/include/frame.hpp``):
 
 - Sync byte: 0xAA (``protocol::kSyncByte``)
 - Loopback tag: 0x0000 (``protocol::Tag::kLoopback``)
+- SetMultipleColor tag: 0x0100 (``protocol::Tag::kSetMultipleColor``)
 - SetSingleColor tag: 0x0101 (``protocol::Tag::kSetSingleColor``)
 - ResetInstructions tag: 0x0102 (``protocol::Tag::kResetInstructions``)
 - Run tag: 0x0103 (``protocol::Tag::kRun``)
+- Delay tag: 0x0104 (``protocol::Tag::kDelay``)
 - Checksum: XOR of tag + length + data bytes.
 """
 
@@ -19,9 +21,11 @@ from typing import Any
 
 SYNC_BYTE = 0xAA
 TAG_LOOPBACK = 0x0000
+TAG_SET_MULTIPLE_COLOR = 0x0100
 TAG_SET_SINGLE_COLOR = 0x0101
 TAG_RESET_INSTRUCTIONS = 0x0102
 TAG_RUN = 0x0103
+TAG_DELAY = 0x0104
 
 
 def build_frame(tag: int, payload: bytes) -> bytes:
@@ -62,6 +66,20 @@ def build_set_single_color_frame(r: int, g: int, b: int, index: int) -> bytes:
     return build_frame(TAG_SET_SINGLE_COLOR, bytes([r, g, b, index]))
 
 
+def build_set_multiple_color_frame(
+    r: int, g: int, b: int, start: int, end: int
+) -> bytes:
+    """Build a ``kSetMultipleColor`` frame.
+
+    Payload: ``r(1) g(1) b(1) start(1) end(1)`` (5 bytes).
+
+    Sets a half-open range ``[start, end)`` of pixels to a single colour.
+    The instruction is queued in the controller but not executed until a
+    subsequent ``kRun`` frame is sent.
+    """
+    return build_frame(TAG_SET_MULTIPLE_COLOR, bytes([r, g, b, start, end]))
+
+
 def build_reset_instructions_frame() -> bytes:
     """Build a ``kResetInstructions`` frame (0-byte payload).
 
@@ -69,6 +87,18 @@ def build_reset_instructions_frame() -> bytes:
     the current pixel state on the strip.
     """
     return build_frame(TAG_RESET_INSTRUCTIONS, b"")
+
+
+def build_delay_frame(delay_ms: int) -> bytes:
+    """Build a ``kDelay`` frame.
+
+    Payload: ``delay_ms(4)`` (4 bytes, uint32 little-endian).
+
+    Pauses instruction execution on the device for the given duration.
+    The instruction is queued and applied when a subsequent ``kRun``
+    frame triggers execution.
+    """
+    return build_frame(TAG_DELAY, delay_ms.to_bytes(4, "little"))
 
 
 def build_run_frame() -> bytes:
