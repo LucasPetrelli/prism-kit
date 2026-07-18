@@ -21,11 +21,11 @@ class StripLed {
   /// @param color Requested logical RGB color.
   /// @return STATUS_OK on success, or a negative project-defined status code on
   ///     failure.
-  virtual int SetColor(const RgbColor& color) = 0;
+  virtual int SetColor(const color::RgbColor& color) = 0;
 
   /// @brief Return the currently staged logical RGB color for this pixel.
   /// @return Current staged logical RGB color.
-  virtual RgbColor Color() const = 0;
+  virtual color::RgbColor Color() const = 0;
 
   /// @brief Return the zero-based pixel index inside the owning strip.
   /// @return Zero-based strip index.
@@ -70,7 +70,7 @@ class Strip {
   /// @param color Requested logical RGB color.
   /// @return STATUS_OK on success, or a negative project-defined status code on
   ///     failure.
-  virtual int Fill(const RgbColor& color) = 0;
+  virtual int Fill(const color::RgbColor& color) = 0;
 
   /// @brief Commit the staged frame so the active backend can process it.
   /// @return STATUS_OK on success, or a negative project-defined status code on

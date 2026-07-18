@@ -40,6 +40,113 @@ class ControllerTest : public ::testing::Test {
   prism::test::MockStrip mock_strip_;
   prism::Controller controller_;
 };
+// ====================================================================
+// HSV instruction tests
+// ====================================================================
+
+/// @brief SetSingleColorHsv converts HSV to RGB and dispatches to the
+///     correct pixel.
+TEST_F(ControllerTest, SetSingleColorHsvConvertsAndDispatches) {
+  // Hue 170 ~ 240° (blue-cyan range), full saturation, full value.
+  constexpr prism::color::HsvColor hsv{170U, 255U, 255U};
+  constexpr prism::color::RgbColor expected_rgb = prism::color::HsvToRgb(hsv);
+
+  prism::SetSingleColorHsv instr;
+  instr.color = hsv;
+  instr.strip = &mock_strip_;
+  instr.controller = &controller_;
+  instr.index = 2U;
+
+  prism::InstructionMemorySlot slot;
+  slot.Set(&instr);
+
+  EXPECT_CALL(*mock_strip_.MutableLed(2U), SetColor(expected_rgb))
+    .WillOnce(testing::Return(0));
+  EXPECT_CALL(mock_strip_, Show()).Times(0);
+
+  slot.Execute();
+}
+
+/// @brief SetMultipleColorHsv converts HSV to RGB and fills the range.
+TEST_F(ControllerTest, SetMultipleColorHsvFillsRange) {
+  // Hue 85 ~ 120° (green), full saturation, full value.
+  constexpr prism::color::HsvColor hsv{85U, 255U, 255U};
+  constexpr prism::color::RgbColor expected_rgb = prism::color::HsvToRgb(hsv);
+
+  prism::SetMultipleColorHsv instr;
+  instr.color = hsv;
+  instr.strip = &mock_strip_;
+  instr.controller = &controller_;
+  instr.range.start = 0U;
+  instr.range.end = 3U;
+
+  prism::InstructionMemorySlot slot;
+  slot.Set(&instr);
+
+  EXPECT_CALL(*mock_strip_.MutableLed(0U), SetColor(expected_rgb))
+    .WillOnce(testing::Return(0));
+  EXPECT_CALL(*mock_strip_.MutableLed(1U), SetColor(expected_rgb))
+    .WillOnce(testing::Return(0));
+  EXPECT_CALL(*mock_strip_.MutableLed(2U), SetColor(expected_rgb))
+    .WillOnce(testing::Return(0));
+  EXPECT_CALL(mock_strip_, Show()).Times(0);
+
+  slot.Execute();
+}
+
+/// @brief SetSingleColorHsv is a no-op when strip is null.
+TEST_F(ControllerTest, SetSingleColorHsvWithNullStripIsNoop) {
+  constexpr prism::color::HsvColor hsv{0U, 255U, 255U};
+
+  prism::SetSingleColorHsv instr;
+  instr.color = hsv;
+  instr.strip = nullptr;
+  instr.index = 0U;
+
+  prism::InstructionMemorySlot slot;
+  slot.Set(&instr);
+
+  slot.Execute();
+}
+
+/// @brief Slot reused from SetSingleColor to SetSingleColorHsv.
+TEST_F(ControllerTest, SlotReusesRgbThenHsv) {
+  constexpr prism::color::Preset color = prism::color::Preset::kPureRed;
+
+  // First: RGB SetSingleColor.
+  prism::SetSingleColor single;
+  single.color = prism::color::ToRgb(color);
+  single.strip = &mock_strip_;
+  single.controller = &controller_;
+  single.index = 0U;
+
+  prism::InstructionMemorySlot slot;
+  slot.Set(&single);
+
+  EXPECT_CALL(*mock_strip_.MutableLed(0U), SetColor(testing::_))
+    .WillOnce(testing::Return(0));
+  EXPECT_CALL(mock_strip_, Show()).Times(0);
+  slot.Execute();
+
+  testing::Mock::VerifyAndClearExpectations(&mock_strip_);
+
+  // Reuse the slot as SetSingleColorHsv.
+  constexpr prism::color::HsvColor hsv{42U, 200U, 180U};
+  prism::SetSingleColorHsv hsv_instr;
+  hsv_instr.color = hsv;
+  hsv_instr.strip = &mock_strip_;
+  hsv_instr.controller = &controller_;
+  hsv_instr.index = 1U;
+
+  slot.Set(&hsv_instr);
+
+  const prism::color::RgbColor expected_rgb = prism::color::HsvToRgb(hsv);
+  EXPECT_CALL(*mock_strip_.MutableLed(1U), SetColor(expected_rgb))
+    .WillOnce(testing::Return(0));
+  EXPECT_CALL(mock_strip_, Show()).Times(0);
+  slot.Execute();
+}
+
 }  // namespace
 
 // ====================================================================
@@ -50,11 +157,11 @@ class ControllerTest : public ::testing::Test {
 ///     correct pixel and commits the frame.
 TEST_F(ControllerTest, SetSingleColorDispatchesToCorrectLed) {
   constexpr std::uint8_t target_index = 3U;
-  constexpr prism::Color color = prism::Color::kPureGreen;
-  const prism::RgbColor expected_rgb = prism::ToRgb(color);
+  constexpr prism::color::Preset color = prism::color::Preset::kPureGreen;
+  const prism::color::RgbColor expected_rgb = prism::color::ToRgb(color);
 
   prism::SetSingleColor instr;
-  instr.color = prism::ToRgb(color);
+  instr.color = prism::color::ToRgb(color);
   instr.strip = &mock_strip_;
   instr.index = target_index;
 
@@ -73,10 +180,10 @@ TEST_F(ControllerTest, SetSingleColorDispatchesToCorrectLed) {
 
 /// @brief SetSingleColor does nothing when strip is null.
 TEST_F(ControllerTest, SetSingleColorWithNullStripIsNoop) {
-  constexpr prism::Color color = prism::Color::kPureRed;
+  constexpr prism::color::Preset color = prism::color::Preset::kPureRed;
 
   prism::SetSingleColor instr;
-  instr.color = prism::ToRgb(color);
+  instr.color = prism::color::ToRgb(color);
   instr.strip = nullptr;
   instr.index = 0U;
 
@@ -94,11 +201,11 @@ TEST_F(ControllerTest, SetSingleColorWithNullStripIsNoop) {
 /// @brief A SetMultipleColor instruction writes the unpacked RgbColor to
 ///     every pixel in [start, end) and commits the frame.
 TEST_F(ControllerTest, SetMultipleColorFillsRange) {
-  constexpr prism::Color color = prism::Color::kIceBlue;
-  const prism::RgbColor expected_rgb = prism::ToRgb(color);
+  constexpr prism::color::Preset color = prism::color::Preset::kIceBlue;
+  const prism::color::RgbColor expected_rgb = prism::color::ToRgb(color);
 
   prism::SetMultipleColor instr;
-  instr.color = prism::ToRgb(color);
+  instr.color = prism::color::ToRgb(color);
   instr.strip = &mock_strip_;
   instr.controller = &controller_;
   instr.range.start = 1U;
@@ -124,19 +231,19 @@ TEST_F(ControllerTest, SetMultipleColorFillsRange) {
 /// @brief Run() iterates through all populated instruction slots.
 TEST_F(ControllerTest, RunIteratesAllSlots) {
   prism::SetSingleColor r;
-  r.color = prism::ToRgb(prism::Color::kPureRed);
+  r.color = prism::color::ToRgb(prism::color::Preset::kPureRed);
   r.strip = &mock_strip_;
   r.index = 0U;
   controller_.AddInstruction(&r);
 
   prism::SetSingleColor g;
-  g.color = prism::ToRgb(prism::Color::kPureGreen);
+  g.color = prism::color::ToRgb(prism::color::Preset::kPureGreen);
   g.strip = &mock_strip_;
   g.index = 1U;
   controller_.AddInstruction(&g);
 
   prism::SetSingleColor b;
-  b.color = prism::ToRgb(prism::Color::kPureBlue);
+  b.color = prism::color::ToRgb(prism::color::Preset::kPureBlue);
   b.strip = &mock_strip_;
   b.index = 2U;
   controller_.AddInstruction(&b);
@@ -156,13 +263,13 @@ TEST_F(ControllerTest, RunOnEmptyControllerIsNoop) {
 /// @brief ResetInstructions() clears the queue so Run() does nothing.
 TEST_F(ControllerTest, ResetInstructionsClearsState) {
   prism::SetSingleColor gold;
-  gold.color = prism::ToRgb(prism::Color::kChristmasGold);
+  gold.color = prism::color::ToRgb(prism::color::Preset::kChristmasGold);
   gold.strip = &mock_strip_;
   gold.index = 4U;
   controller_.AddInstruction(&gold);
 
   prism::SetSingleColor pink;
-  pink.color = prism::ToRgb(prism::Color::kCyberpunkPink);
+  pink.color = prism::color::ToRgb(prism::color::Preset::kCyberpunkPink);
   pink.strip = &mock_strip_;
   pink.index = 5U;
   controller_.AddInstruction(&pink);
@@ -180,11 +287,11 @@ TEST_F(ControllerTest, ResetInstructionsClearsState) {
 /// @brief execute() dispatches through the correct vtable regardless of
 ///     which member was constructed.
 TEST_F(ControllerTest, SlotExecuteDispatchesCorrectly) {
-  constexpr prism::Color color = prism::Color::kPureWhite;
+  constexpr prism::color::Preset color = prism::color::Preset::kPureWhite;
 
   // Set up a SetSingleColor instruction.
   prism::SetSingleColor single;
-  single.color = prism::ToRgb(color);
+  single.color = prism::color::ToRgb(color);
   single.strip = &mock_strip_;
   single.controller = &controller_;
   single.index = 5U;
@@ -201,11 +308,11 @@ TEST_F(ControllerTest, SlotExecuteDispatchesCorrectly) {
 
 /// @brief A slot can be reused by calling set() again with a different type.
 TEST_F(ControllerTest, SlotCanBeReused) {
-  constexpr prism::Color color = prism::Color::kPureRed;
+  constexpr prism::color::Preset color = prism::color::Preset::kPureRed;
 
   // First: SetSingleColor.
   prism::SetSingleColor single;
-  single.color = prism::ToRgb(color);
+  single.color = prism::color::ToRgb(color);
   single.strip = &mock_strip_;
   single.controller = &controller_;
   single.index = 2U;
@@ -223,7 +330,7 @@ TEST_F(ControllerTest, SlotCanBeReused) {
 
   // Reuse the slot as SetMultipleColor.
   prism::SetMultipleColor multi;
-  multi.color = prism::ToRgb(prism::Color::kPureBlue);
+  multi.color = prism::color::ToRgb(prism::color::Preset::kPureBlue);
   multi.strip = &mock_strip_;
   multi.controller = &controller_;
   multi.range.start = 0U;
@@ -272,8 +379,8 @@ TEST_F(ControllerTest, DelayBetweenTwoSets) {
   g_fake_time = 1U;
   controller_.SetTimestampCallback(FakeTimestamp);
 
-  constexpr prism::RgbColor red = {255U, 0U, 0U};
-  constexpr prism::RgbColor blue = {0U, 0U, 255U};
+  constexpr prism::color::RgbColor red = {255U, 0U, 0U};
+  constexpr prism::color::RgbColor blue = {0U, 0U, 255U};
 
   prism::SetSingleColor first;
   first.color = red;
@@ -313,9 +420,9 @@ TEST_F(ControllerTest, TwoDelaysBetweenSets) {
   g_fake_time = 1U;
   controller_.SetTimestampCallback(FakeTimestamp);
 
-  constexpr prism::RgbColor red = {255U, 0U, 0U};
-  constexpr prism::RgbColor green = {0U, 255U, 0U};
-  constexpr prism::RgbColor blue = {0U, 0U, 255U};
+  constexpr prism::color::RgbColor red = {255U, 0U, 0U};
+  constexpr prism::color::RgbColor green = {0U, 255U, 0U};
+  constexpr prism::color::RgbColor blue = {0U, 0U, 255U};
 
   prism::SetSingleColor a;
   a.color = red;

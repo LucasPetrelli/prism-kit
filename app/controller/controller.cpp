@@ -1,7 +1,11 @@
 #include "prism/controller.hpp"
 
 #include <cstdarg>
+#include <cstdint>
 #include <cstdio>
+
+#include "prism/debug.hpp"
+#include "prism/strip.hpp"
 
 // ====================================================================
 // Controller

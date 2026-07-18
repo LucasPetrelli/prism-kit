@@ -1,6 +1,7 @@
+#include <cstdint>
 #include <cstdio>
-#include <new>
 
+#include "prism/color.hpp"
 #include "prism/controller.hpp"
 #include "prism/strip.hpp"
 
@@ -20,6 +21,14 @@ void prism::InstructionMemorySlot::Set(const ControllerInstruction* instr) {
     case InstructionTag::kSetSingleColor:
       ::new (&set_single_color)
         SetSingleColor(*static_cast<const SetSingleColor*>(instr));
+      break;
+    case InstructionTag::kSetMultipleColorHsv:
+      ::new (&set_multiple_color_hsv)
+        SetMultipleColorHsv(*static_cast<const SetMultipleColorHsv*>(instr));
+      break;
+    case InstructionTag::kSetSingleColorHsv:
+      ::new (&set_single_color_hsv)
+        SetSingleColorHsv(*static_cast<const SetSingleColorHsv*>(instr));
       break;
     case InstructionTag::kDelay:
       ::new (&delay) Delay(*static_cast<const Delay*>(instr));
@@ -46,6 +55,10 @@ prism::ControllerInstruction* prism::InstructionMemorySlot::Active() {
       return &set_multiple_color;
     case InstructionTag::kSetSingleColor:
       return &set_single_color;
+    case InstructionTag::kSetMultipleColorHsv:
+      return &set_multiple_color_hsv;
+    case InstructionTag::kSetSingleColorHsv:
+      return &set_single_color_hsv;
     case InstructionTag::kDelay:
       return &delay;
   }
@@ -59,6 +72,10 @@ const prism::ControllerInstruction* prism::InstructionMemorySlot::Active()
       return &set_multiple_color;
     case InstructionTag::kSetSingleColor:
       return &set_single_color;
+    case InstructionTag::kSetMultipleColorHsv:
+      return &set_multiple_color_hsv;
+    case InstructionTag::kSetSingleColorHsv:
+      return &set_single_color_hsv;
     case InstructionTag::kDelay:
       return &delay;
   }
@@ -115,6 +132,42 @@ std::uint32_t prism::SetSingleColor::Execute() {
 }
 
 // ====================================================================
+// SetMultipleColorHsv::Execute
+// ====================================================================
+
+std::uint32_t prism::SetMultipleColorHsv::Execute() {
+  if (controller == nullptr || strip == nullptr) {
+    return 0U;
+  }
+  const color::RgbColor rgb = color::HsvToRgb(color);
+  for (std::uint32_t i = range.start; i < range.end; ++i) {
+    StripLed* led = strip->Led(i);
+    if (led != nullptr) {
+      led->SetColor(rgb);
+    }
+  }
+  controller->RequestShow();
+  return 0U;
+}
+
+// ====================================================================
+// SetSingleColorHsv::Execute
+// ====================================================================
+
+std::uint32_t prism::SetSingleColorHsv::Execute() {
+  if (controller == nullptr || strip == nullptr) {
+    return 0U;
+  }
+  const color::RgbColor rgb = color::HsvToRgb(color);
+  StripLed* led = strip->Led(index);
+  if (led != nullptr) {
+    led->SetColor(rgb);
+  }
+  controller->RequestShow();
+  return 0U;
+}
+
+// ====================================================================
 // Delay::Execute
 // ====================================================================
 
@@ -151,6 +204,10 @@ const char* prism::InstructionToString(InstructionTag tag) {
       return "SetMultipleColor";
     case InstructionTag::kSetSingleColor:
       return "SetSingleColor";
+    case InstructionTag::kSetMultipleColorHsv:
+      return "SetMultipleColorHsv";
+    case InstructionTag::kSetSingleColorHsv:
+      return "SetSingleColorHsv";
     case InstructionTag::kDelay:
       return "Delay";
   }
@@ -163,6 +220,28 @@ const char* prism::InstructionToString(InstructionTag tag) {
 
 void prism::ControllerInstruction::ToString(char* buf, std::size_t size) const {
   std::snprintf(buf, size, "%s", prism::InstructionToString(tag_));
+}
+
+// ====================================================================
+// SetMultipleColorHsv::ToString
+// ====================================================================
+
+void prism::SetMultipleColorHsv::ToString(char* buf, std::size_t size) const {
+  std::snprintf(buf, size, "SetMultipleColorHsv(h=%u s=%u v=%u [%u..%u))",
+                static_cast<unsigned>(color.h), static_cast<unsigned>(color.s),
+                static_cast<unsigned>(color.v),
+                static_cast<unsigned>(range.start),
+                static_cast<unsigned>(range.end));
+}
+
+// ====================================================================
+// SetSingleColorHsv::ToString
+// ====================================================================
+
+void prism::SetSingleColorHsv::ToString(char* buf, std::size_t size) const {
+  std::snprintf(buf, size, "SetSingleColorHsv(h=%u s=%u v=%u @%u)",
+                static_cast<unsigned>(color.h), static_cast<unsigned>(color.s),
+                static_cast<unsigned>(color.v), static_cast<unsigned>(index));
 }
 
 // ====================================================================

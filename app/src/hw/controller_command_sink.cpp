@@ -1,9 +1,11 @@
 #include "controller_command_sink.hpp"
 
+#include <cstdint>
 #include <cstring>
 
 #include "hw/controller_command.hpp"
 #include "protocol.hpp"
+#include "tags.hpp"
 
 namespace app::hw {
 
@@ -20,6 +22,10 @@ void ControllerCommandSink::Register(protocol::Protocol& protocol) {
                       &HandleResetInstructions);
   protocol.AddHandler(protocol::Tag::kRun, &HandleRun);
   protocol.AddHandler(protocol::Tag::kDelay, &HandleDelay);
+  protocol.AddHandler(protocol::Tag::kSetSingleColorHsv,
+                      &HandleSetSingleColorHsv);
+  protocol.AddHandler(protocol::Tag::kSetMultipleColorHsv,
+                      &HandleSetMultipleColorHsv);
 }
 
 void ControllerCommandSink::SetMailbox(ControllerCommandMailbox* mailbox) {
@@ -75,6 +81,55 @@ void ControllerCommandSink::HandleSetSingleColor(void* context,
   msg.set_single.g = data[1];
   msg.set_single.b = data[2];
   msg.set_single.index = data[3];
+
+  self.mailbox_->Send(&msg);
+}
+
+void ControllerCommandSink::HandleSetSingleColorHsv(void* context,
+                                                    const uint8_t* data,
+                                                    uint16_t length) {
+  static_cast<void>(context);
+  auto& self = Instance();
+  if (self.mailbox_ == nullptr) {
+    return;
+  }
+
+  // Wire format: h (1), s (1), v (1), index (1) = 4 bytes.
+  if (length < 4U) {
+    return;
+  }
+
+  ControllerCommandMessage msg;
+  msg.cmd = ControllerCommand::kSetSingleColorHsv;
+  msg.set_single_hsv.h = data[0];
+  msg.set_single_hsv.s = data[1];
+  msg.set_single_hsv.v = data[2];
+  msg.set_single_hsv.index = data[3];
+
+  self.mailbox_->Send(&msg);
+}
+
+void ControllerCommandSink::HandleSetMultipleColorHsv(void* context,
+                                                      const uint8_t* data,
+                                                      uint16_t length) {
+  static_cast<void>(context);
+  auto& self = Instance();
+  if (self.mailbox_ == nullptr) {
+    return;
+  }
+
+  // Wire format: h (1), s (1), v (1), start (1), end (1) = 5 bytes.
+  if (length < 5U) {
+    return;
+  }
+
+  ControllerCommandMessage msg;
+  msg.cmd = ControllerCommand::kSetMultipleColorHsv;
+  msg.set_multiple_hsv.h = data[0];
+  msg.set_multiple_hsv.s = data[1];
+  msg.set_multiple_hsv.v = data[2];
+  msg.set_multiple_hsv.range.start = data[3];
+  msg.set_multiple_hsv.range.end = data[4];
 
   self.mailbox_->Send(&msg);
 }

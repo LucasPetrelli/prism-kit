@@ -1,10 +1,13 @@
 #include <array>
+#include <cstdarg>
 #include <cstdint>
 
 #include "app/app.hpp"
+#include "hw/controller_command.hpp"
 #include "hw/controller_command_sink.hpp"
 #include "oshal/debug_port.hpp"
 #include "oshal/event.hpp"
+#include "oshal/timed_event.hpp"
 #include "prism/color.hpp"
 #include "prism/controller.hpp"
 #include "prism/debug.hpp"
@@ -15,7 +18,7 @@ namespace {
 
 /// @brief Rainbow colours for the 7 WS2812 LEDs at startup, with green
 ///     components attenuated for perceptual balance.
-constexpr std::array<prism::RgbColor, 7U> kRainbowColors = {{
+constexpr std::array<prism::color::RgbColor, 7U> kRainbowColors = {{
   {255U, 0U, 0U},    // Red
   {255U, 40U, 0U},   // Orange
   {180U, 60U, 0U},   // Yellow
@@ -117,6 +120,16 @@ void AppTask::UpdateInstructions() {
       case app::hw::ControllerCommand::kRun:
         controller_.Run();
         break;
+      case app::hw::ControllerCommand::kSetMultipleColorHsv: {
+        const prism::SetMultipleColorHsv instr{msg.set_multiple_hsv};
+        controller_.AddInstruction(&instr);
+        break;
+      }
+      case app::hw::ControllerCommand::kSetSingleColorHsv: {
+        const prism::SetSingleColorHsv instr{msg.set_single_hsv};
+        controller_.AddInstruction(&instr);
+        break;
+      }
       case app::hw::ControllerCommand::kDelay: {
         const prism::Delay instr{msg.delay_ms};
         controller_.AddInstruction(&instr);

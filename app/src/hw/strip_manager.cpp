@@ -1,8 +1,14 @@
 #include "strip_manager.hpp"
 
+#include <cstddef>
+
 #include "bal/rgb_led.hpp"
+#include "bal/ws2812_strip.hpp"
 #include "oshal/debug_port.hpp"
+#include "oshal/event.hpp"
 #include "oshal/status.h"
+#include "prism/color.hpp"
+#include "prism/strip.hpp"
 
 namespace app::hw {
 
@@ -14,13 +20,14 @@ bool StripLedView::IsReady() const {
   return (manager_ != nullptr) ? manager_->IsReady() : false;
 }
 
-int StripLedView::SetColor(const prism::RgbColor& color) {
+int StripLedView::SetColor(const prism::color::RgbColor& color) {
   return (manager_ != nullptr) ? manager_->SetLedColor(index_, color)
                                : STATUS_ERR_NOT_READY;
 }
 
-prism::RgbColor StripLedView::Color() const {
-  return (manager_ != nullptr) ? manager_->LedColor(index_) : prism::RgbColor{};
+prism::color::RgbColor StripLedView::Color() const {
+  return (manager_ != nullptr) ? manager_->LedColor(index_)
+                               : prism::color::RgbColor{};
 }
 
 /* ========================================================================
@@ -69,7 +76,7 @@ const prism::StripLed* StripManager::Led(std::size_t index) const {
   return &led_views_[index];
 }
 
-int StripManager::Fill(const prism::RgbColor& color) {
+int StripManager::Fill(const prism::color::RgbColor& color) {
   if (!ready_) {
     return STATUS_ERR_NOT_READY;
   }
@@ -105,7 +112,8 @@ bool StripManager::TryApplyLatest() {
 
 // ---- Internal helpers used by StripLedView -----------------------------
 
-int StripManager::SetLedColor(std::size_t index, const prism::RgbColor& color) {
+int StripManager::SetLedColor(std::size_t index,
+                              const prism::color::RgbColor& color) {
   if (!ready_) {
     return STATUS_ERR_NOT_READY;
   }
@@ -118,9 +126,9 @@ int StripManager::SetLedColor(std::size_t index, const prism::RgbColor& color) {
   return STATUS_OK;
 }
 
-prism::RgbColor StripManager::LedColor(std::size_t index) const {
+prism::color::RgbColor StripManager::LedColor(std::size_t index) const {
   if (index >= led_count_) {
-    return prism::RgbColor{};
+    return prism::color::RgbColor{};
   }
 
   return staged_frame_.colors[index];
@@ -139,7 +147,7 @@ int StripManager::ApplyFrame(const SharedFrame& frame) {
       return STATUS_ERR_DEVICE_UNAVAILABLE;
     }
 
-    const prism::RgbColor& color = frame.colors[index];
+    const prism::color::RgbColor& color = frame.colors[index];
     const int set_ret =
       pixel->SetColor(bal::RgbColor{color.red, color.green, color.blue});
     if (set_ret < 0) {

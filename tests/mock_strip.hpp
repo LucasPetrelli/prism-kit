@@ -13,8 +13,8 @@ namespace prism::test {
 class MockStripLed : public prism::StripLed {
  public:
   MOCK_METHOD(bool, IsReady, (), (const, override));
-  MOCK_METHOD(int, SetColor, (const prism::RgbColor&), (override));
-  MOCK_METHOD(prism::RgbColor, Color, (), (const, override));
+  MOCK_METHOD(int, SetColor, (const prism::color::RgbColor&), (override));
+  MOCK_METHOD(prism::color::RgbColor, Color, (), (const, override));
   MOCK_METHOD(std::size_t, Index, (), (const, override));
 };
 
@@ -34,7 +34,7 @@ class MockStrip : public prism::Strip {
   MOCK_METHOD(std::size_t, LedCount, (), (const, override));
   MOCK_METHOD(prism::StripLed*, Led, (std::size_t), (override));
   MOCK_METHOD(const prism::StripLed*, Led, (std::size_t), (const, override));
-  MOCK_METHOD(int, Fill, (const prism::RgbColor&), (override));
+  MOCK_METHOD(int, Fill, (const prism::color::RgbColor&), (override));
   MOCK_METHOD(int, Show, (), (override));
 
   /// @brief Return the mutable mock led at the given index.

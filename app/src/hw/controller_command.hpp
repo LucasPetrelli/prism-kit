@@ -14,6 +14,10 @@ enum class ControllerCommand : std::uint8_t {
   kSetMultipleColor,
   /// @brief Set a single pixel to one color (SetSingleColor).
   kSetSingleColor,
+  /// @brief Set a range of pixels from an HSV color (SetMultipleColorHsv).
+  kSetMultipleColorHsv,
+  /// @brief Set a single pixel from an HSV color (SetSingleColorHsv).
+  kSetSingleColorHsv,
   /// @brief Clear all queued instructions (ResetInstructions).
   kResetInstructions,
   /// @brief Execute all queued instructions (Run).
@@ -34,13 +38,17 @@ struct ControllerCommandMessage {
 
   /// @brief Payload data for the command.
   ///
-  /// Only meaningful when cmd is kSetMultipleColor or kSetSingleColor.
+  /// Only meaningful when cmd is a Set* command.
   /// For kResetInstructions and kRun the payload is unused.
   union {
     /// @brief Payload for a SetMultipleColor instruction.
     prism::SetMultipleColorPayload set_multiple;
     /// @brief Payload for a SetSingleColor instruction.
     prism::SetSingleColorPayload set_single;
+    /// @brief Payload for a SetMultipleColorHsv instruction.
+    prism::SetMultipleColorHsvPayload set_multiple_hsv;
+    /// @brief Payload for a SetSingleColorHsv instruction.
+    prism::SetSingleColorHsvPayload set_single_hsv;
     /// @brief Delay duration in milliseconds (for kDelay commands).
     std::uint32_t delay_ms;
   };

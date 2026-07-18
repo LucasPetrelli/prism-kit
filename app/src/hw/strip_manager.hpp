@@ -35,8 +35,8 @@ class StripLedView : public prism::StripLed {
   void SetManager(StripManager* manager) { manager_ = manager; }
 
   bool IsReady() const override;
-  int SetColor(const prism::RgbColor& color) override;
-  prism::RgbColor Color() const override;
+  int SetColor(const prism::color::RgbColor& color) override;
+  prism::color::RgbColor Color() const override;
   std::size_t Index() const override { return index_; }
 
  private:
@@ -76,7 +76,7 @@ class StripManager : public prism::Strip {
   prism::StripLed* Led(std::size_t index) override;
   const prism::StripLed* Led(std::size_t index) const override;
 
-  int Fill(const prism::RgbColor& color) override;
+  int Fill(const prism::color::RgbColor& color) override;
 
   /// @brief Commit the staged frame into the mailbox for the HW task.
   /// @return STATUS_OK on success, or a negative status code.
@@ -111,12 +111,12 @@ class StripManager : public prism::Strip {
   /// @param index Zero-based pixel index.
   /// @param color Requested logical RGB colour.
   /// @return STATUS_OK on success, or a negative status code.
-  int SetLedColor(std::size_t index, const prism::RgbColor& color);
+  int SetLedColor(std::size_t index, const prism::color::RgbColor& color);
 
   /// @brief Return the currently staged colour for a single pixel.
   /// @param index Zero-based pixel index.
   /// @return Staged RGB colour (default-constructed if out of range).
-  prism::RgbColor LedColor(std::size_t index) const;
+  prism::color::RgbColor LedColor(std::size_t index) const;
 
  private:
   /// @brief Translate a committed frame into BAL strip mutations and flush.

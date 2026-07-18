@@ -41,6 +41,14 @@ enum class Tag : uint16_t {
   /// @brief Pause instruction execution for a fixed duration.
   /// Payload: delay_ms (4 bytes, uint32_t little-endian).
   kDelay = 0x0104,
+
+  /// @brief Set a single pixel from an HSV color.
+  /// Payload: h, s, v, index (4 bytes).
+  kSetSingleColorHsv = 0x0105,
+
+  /// @brief Set a range of pixels from an HSV color.
+  /// Payload: h, s, v, start, end (5 bytes).
+  kSetMultipleColorHsv = 0x0106,
 };
 
 }  // namespace protocol

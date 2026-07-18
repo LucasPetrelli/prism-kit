@@ -10,6 +10,8 @@ Wire format (matches ``protocol::Frame`` in ``protocol/include/frame.hpp``):
 - ResetInstructions tag: 0x0102 (``protocol::Tag::kResetInstructions``)
 - Run tag: 0x0103 (``protocol::Tag::kRun``)
 - Delay tag: 0x0104 (``protocol::Tag::kDelay``)
+- SetSingleColorHsv tag: 0x0105 (``protocol::Tag::kSetSingleColorHsv``)
+- SetMultipleColorHsv tag: 0x0106 (``protocol::Tag::kSetMultipleColorHsv``)
 - Checksum: XOR of tag + length + data bytes.
 """
 
@@ -26,6 +28,8 @@ TAG_SET_SINGLE_COLOR = 0x0101
 TAG_RESET_INSTRUCTIONS = 0x0102
 TAG_RUN = 0x0103
 TAG_DELAY = 0x0104
+TAG_SET_SINGLE_COLOR_HSV = 0x0105
+TAG_SET_MULTIPLE_COLOR_HSV = 0x0106
 
 
 def build_frame(tag: int, payload: bytes) -> bytes:
@@ -99,6 +103,30 @@ def build_delay_frame(delay_ms: int) -> bytes:
     frame triggers execution.
     """
     return build_frame(TAG_DELAY, delay_ms.to_bytes(4, "little"))
+
+
+def build_set_single_color_hsv_frame(h: int, s: int, v: int, index: int) -> bytes:
+    """Build a ``kSetSingleColorHsv`` frame.
+
+    Payload: ``h(1) s(1) v(1) index(1)`` (4 bytes).
+
+    Sends a single-pixel HSV colour command to the prism-kit firmware.
+    The firmware converts HSV to RGB on execution.
+    """
+    return build_frame(TAG_SET_SINGLE_COLOR_HSV, bytes([h, s, v, index]))
+
+
+def build_set_multiple_color_hsv_frame(
+    h: int, s: int, v: int, start: int, end: int
+) -> bytes:
+    """Build a ``kSetMultipleColorHsv`` frame.
+
+    Payload: ``h(1) s(1) v(1) start(1) end(1)`` (5 bytes).
+
+    Sets a half-open range ``[start, end)`` of pixels from an HSV colour.
+    The firmware converts HSV to RGB on execution.
+    """
+    return build_frame(TAG_SET_MULTIPLE_COLOR_HSV, bytes([h, s, v, start, end]))
 
 
 def build_run_frame() -> bytes:

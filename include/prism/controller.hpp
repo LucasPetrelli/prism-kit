@@ -27,6 +27,10 @@ enum class InstructionTag : std::uint8_t {
   kSetMultipleColor,
   /// @brief Single-pixel instruction (SetSingleColor).
   kSetSingleColor,
+  /// @brief HSV range-fill instruction (SetMultipleColorHsv).
+  kSetMultipleColorHsv,
+  /// @brief HSV single-pixel instruction (SetSingleColorHsv).
+  kSetSingleColorHsv,
   /// @brief Time-delay instruction (Delay).
   kDelay,
 };
@@ -58,6 +62,22 @@ struct SetSingleColorPayload {
   std::uint8_t g;
   std::uint8_t b;
   std::uint8_t index;
+};
+
+/// @brief Wire-format payload for a SetSingleColorHsv instruction.
+struct SetSingleColorHsvPayload {
+  std::uint8_t h;
+  std::uint8_t s;
+  std::uint8_t v;
+  std::uint8_t index;
+};
+
+/// @brief Wire-format payload for a SetMultipleColorHsv instruction.
+struct SetMultipleColorHsvPayload {
+  std::uint8_t h;
+  std::uint8_t s;
+  std::uint8_t v;
+  Range range;
 };
 
 class Controller;
@@ -117,7 +137,7 @@ class SetMultipleColor : public ControllerInstruction {
   void ToString(char* buf, std::size_t size) const override;
 
   /// @brief RGB color to apply.
-  RgbColor color{};
+  color::RgbColor color{};
   /// @brief Zero-based [start, end) pixel range.
   Range range{0U, 0U};
 };
@@ -142,9 +162,65 @@ class SetSingleColor : public ControllerInstruction {
   void ToString(char* buf, std::size_t size) const override;
 
   /// @brief RGB color to apply.
-  RgbColor color{};
+  color::RgbColor color{};
   /// @brief Zero-based pixel index within the strip.
   std::uint8_t index{0U};
+};
+
+/// @brief Instruction that sets a single pixel from an HSV color.
+///
+/// The HSV color is converted to RGB on execute so the underlying Strip
+/// interface always receives RGB.
+class SetSingleColorHsv : public ControllerInstruction {
+ public:
+  SetSingleColorHsv() { tag_ = InstructionTag::kSetSingleColorHsv; }
+
+  /// @brief Construct from a serialized wire-format payload.
+  /// @param payload Source payload to unpack.
+  explicit SetSingleColorHsv(const SetSingleColorHsvPayload& payload)
+      : color{payload.h, payload.s, payload.v}, index(payload.index) {
+    tag_ = InstructionTag::kSetSingleColorHsv;
+  }
+
+  /// @brief Execute the HSV-to-RGB conversion and set the pixel.
+  /// @return 0 (instant instruction — always completes immediately).
+  std::uint32_t Execute() override;
+
+  /// @brief Write a description including HSV and index into a buffer.
+  void ToString(char* buf, std::size_t size) const override;
+
+  /// @brief HSV color to convert and apply.
+  color::HsvColor color{};
+  /// @brief Zero-based pixel index within the strip.
+  std::uint8_t index{0U};
+};
+
+/// @brief Instruction that sets a range of pixels from an HSV color.
+///
+/// The HSV color is converted to RGB on execute so the underlying Strip
+/// interface always receives RGB.
+class SetMultipleColorHsv : public ControllerInstruction {
+ public:
+  SetMultipleColorHsv() { tag_ = InstructionTag::kSetMultipleColorHsv; }
+
+  /// @brief Construct from a serialized wire-format payload.
+  /// @param payload Source payload to unpack.
+  explicit SetMultipleColorHsv(const SetMultipleColorHsvPayload& payload)
+      : color{payload.h, payload.s, payload.v}, range(payload.range) {
+    tag_ = InstructionTag::kSetMultipleColorHsv;
+  }
+
+  /// @brief Execute the HSV-to-RGB conversion and fill the range.
+  /// @return 0 (instant instruction — always completes immediately).
+  std::uint32_t Execute() override;
+
+  /// @brief Write a description including HSV and range into a buffer.
+  void ToString(char* buf, std::size_t size) const override;
+
+  /// @brief HSV color to convert and apply.
+  color::HsvColor color{};
+  /// @brief Zero-based [start, end) pixel range.
+  Range range{0U, 0U};
 };
 
 /// @brief Delay that blocks instruction execution for a fixed duration.
@@ -190,6 +266,10 @@ struct InstructionMemorySlot {
     SetMultipleColor set_multiple_color;
     /// @brief Active member: single-pixel instruction.
     SetSingleColor set_single_color;
+    /// @brief Active member: HSV range-fill instruction.
+    SetMultipleColorHsv set_multiple_color_hsv;
+    /// @brief Active member: HSV single-pixel instruction.
+    SetSingleColorHsv set_single_color_hsv;
     /// @brief Active member: time-delay instruction.
     Delay delay;
   };

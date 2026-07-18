@@ -21,7 +21,7 @@ struct SharedFrame {
   /// @brief Number of valid pixels in @ref colors.
   std::size_t led_count = 0U;
   /// @brief Staged logical RGB colors for the committed frame.
-  std::array<prism::RgbColor, kSharedFrameCapacity> colors = {};
+  std::array<prism::color::RgbColor, kSharedFrameCapacity> colors = {};
 };
 
 }  // namespace app::hw
