@@ -26,7 +26,6 @@ Checks: >
   -bugprone-easily-swappable-parameters,
   -bugprone-narrowing-conversions,
   -bugprone-reserved-identifier,
-  -misc-include-cleaner,
   -misc-const-correctness,
   -misc-header-include-cycle,
   -misc-misplaced-const,

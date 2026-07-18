@@ -1,9 +1,8 @@
 #include <cstddef>
+#include <cstdint>
 
 #include "bal/led.hpp"
 #include "bal/ws2812_strip.hpp"
-#include "hw/command_manager.hpp"
-#include "hw/hw_constants.hpp"
 #include "hw/hw_coordinator.hpp"
 #include "hw/hw_task.hpp"
 #include "hw/shared_frame.hpp"
