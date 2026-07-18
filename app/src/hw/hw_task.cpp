@@ -1,9 +1,12 @@
 #include "hw_task.hpp"
 
+#include "bal/led.hpp"
 #include "bal/ws2812_strip.hpp"
 #include "hw/command_manager.hpp"
 #include "hw/controller_command_sink.hpp"
 #include "hw/hw_constants.hpp"
+#include "oshal/debug_port.hpp"
+#include "oshal/serial_port.hpp"
 #include "oshal/status.h"
 
 namespace {
@@ -50,6 +53,12 @@ bool HwTask::LoopTrampoline(void* context) {
 
 bool HwTask::Setup() {
   auto& cmd_mgr = CommandManager::Instance();
+
+  /* Configure the HW managers before the loop begins dispatching. */
+  GetStrip().Configure(&bal::GetWs2812Strip(), bal::GetWs2812Strip().LedCount(),
+                       bal::GetWs2812Strip().Name());
+  cmd_mgr.Configure(oshal::command_port, &oshal::debug_port, &event_group_);
+  GetStatusLed().Configure(&bal::StatusLed(), kTaskIdleSleepMs);
 
   /* Register controller-command protocol handlers before the loop begins
    * dispatching frames.  The sink's mailbox pointer may still be null

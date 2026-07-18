@@ -50,17 +50,8 @@ int Initialize() {
     return STATUS_ERR_DEVICE_UNAVAILABLE;
   }
 
-  /* Configure the HW managers before starting the executor task.
-   * StripManager implements prism::Strip — APP code calls Fill()/Show()
-   * on it directly, and Show() posts the committed frame to the internal
-   * mailbox for the app_hw task to drain. */
-  auto& hw = app::hw::HwTask::Instance();
-  hw.GetStrip().Configure(&backend_strip, led_count, backend_strip.Name());
-  app::hw::CommandManager::Instance().Configure(
-    oshal::command_port, &oshal::debug_port, &hw.EventGroup());
-  hw.GetStatusLed().Configure(&status_led, app::hw::kTaskIdleSleepMs);
-
-  /* Start the HW executor before publishing any committed strip frame. */
+  /* HwTask::Setup() configures the HW managers when the executor task
+   * starts.  Start the HW executor to kick that off. */
   const int start_ret = app::hw::StartHwExecutor();
   if (start_ret < 0) {
     return start_ret;
