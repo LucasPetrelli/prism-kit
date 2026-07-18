@@ -8,6 +8,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "mock_strip.hpp"
+#include "prism/color.hpp"
 
 // ====================================================================
 // Test fixture
@@ -62,7 +63,7 @@ TEST_F(ControllerTest, SetSingleColorDispatchesToCorrectLed) {
   prism::InstructionMemorySlot slot;
   slot.Set(&instr);
 
-  EXPECT_CALL(*mock_strip_.mutable_led(static_cast<std::size_t>(target_index)),
+  EXPECT_CALL(*mock_strip_.MutableLed(static_cast<std::size_t>(target_index)),
               SetColor(expected_rgb))
     .WillOnce(testing::Return(0));
   EXPECT_CALL(mock_strip_, Show()).Times(0);
@@ -107,9 +108,9 @@ TEST_F(ControllerTest, SetMultipleColorFillsRange) {
   slot.Set(&instr);
 
   // Pixels 1 and 2 get set_color; pixel 0 does not.
-  EXPECT_CALL(*mock_strip_.mutable_led(1U), SetColor(expected_rgb))
+  EXPECT_CALL(*mock_strip_.MutableLed(1U), SetColor(expected_rgb))
     .WillOnce(testing::Return(0));
-  EXPECT_CALL(*mock_strip_.mutable_led(2U), SetColor(expected_rgb))
+  EXPECT_CALL(*mock_strip_.MutableLed(2U), SetColor(expected_rgb))
     .WillOnce(testing::Return(0));
   EXPECT_CALL(mock_strip_, Show()).Times(0);
 
@@ -191,7 +192,7 @@ TEST_F(ControllerTest, SlotExecuteDispatchesCorrectly) {
   prism::InstructionMemorySlot slot;
   slot.Set(&single);
 
-  EXPECT_CALL(*mock_strip_.mutable_led(5U), SetColor(testing::_))
+  EXPECT_CALL(*mock_strip_.MutableLed(5U), SetColor(testing::_))
     .WillOnce(testing::Return(0));
   EXPECT_CALL(mock_strip_, Show()).Times(0);
 
@@ -212,7 +213,7 @@ TEST_F(ControllerTest, SlotCanBeReused) {
   prism::InstructionMemorySlot slot;
   slot.Set(&single);
 
-  EXPECT_CALL(*mock_strip_.mutable_led(2U), SetColor(testing::_))
+  EXPECT_CALL(*mock_strip_.MutableLed(2U), SetColor(testing::_))
     .WillOnce(testing::Return(0));
   EXPECT_CALL(mock_strip_, Show()).Times(0);
   slot.Execute();
@@ -230,9 +231,9 @@ TEST_F(ControllerTest, SlotCanBeReused) {
 
   slot.Set(&multi);
 
-  EXPECT_CALL(*mock_strip_.mutable_led(0U), SetColor(testing::_))
+  EXPECT_CALL(*mock_strip_.MutableLed(0U), SetColor(testing::_))
     .WillOnce(testing::Return(0));
-  EXPECT_CALL(*mock_strip_.mutable_led(1U), SetColor(testing::_))
+  EXPECT_CALL(*mock_strip_.MutableLed(1U), SetColor(testing::_))
     .WillOnce(testing::Return(0));
   EXPECT_CALL(mock_strip_, Show()).Times(0);
   slot.Execute();
@@ -290,7 +291,7 @@ TEST_F(ControllerTest, DelayBetweenTwoSets) {
   controller_.AddInstruction(&second);
 
   // Run 1 at t=1: first Set executes; Delay blocks and returns 50.
-  EXPECT_CALL(*mock_strip_.mutable_led(0U), SetColor(red)).Times(1);
+  EXPECT_CALL(*mock_strip_.MutableLed(0U), SetColor(red)).Times(1);
   EXPECT_CALL(mock_strip_, Show()).Times(1);
 
   controller_.Run();
@@ -299,7 +300,7 @@ TEST_F(ControllerTest, DelayBetweenTwoSets) {
 
   // Run 2 at t=51: elapsed >= 50, Delay completes; second Set executes.
   g_fake_time = 51U;
-  EXPECT_CALL(*mock_strip_.mutable_led(1U), SetColor(blue)).Times(1);
+  EXPECT_CALL(*mock_strip_.MutableLed(1U), SetColor(blue)).Times(1);
   EXPECT_CALL(mock_strip_, Show()).Times(1);
 
   controller_.Run();
@@ -341,7 +342,7 @@ TEST_F(ControllerTest, TwoDelaysBetweenSets) {
   controller_.AddInstruction(&c);
 
   // Run 1 at t=1: first Set runs; delay1 blocks (30 ms).
-  EXPECT_CALL(*mock_strip_.mutable_led(0U), SetColor(red)).Times(1);
+  EXPECT_CALL(*mock_strip_.MutableLed(0U), SetColor(red)).Times(1);
   EXPECT_CALL(mock_strip_, Show()).Times(1);
 
   controller_.Run();
@@ -350,7 +351,7 @@ TEST_F(ControllerTest, TwoDelaysBetweenSets) {
 
   // Run 2 at t=31: delay1 elapsed; second Set runs; delay2 blocks (70 ms).
   g_fake_time = 31U;
-  EXPECT_CALL(*mock_strip_.mutable_led(1U), SetColor(green)).Times(1);
+  EXPECT_CALL(*mock_strip_.MutableLed(1U), SetColor(green)).Times(1);
   EXPECT_CALL(mock_strip_, Show()).Times(1);
 
   controller_.Run();
@@ -359,7 +360,7 @@ TEST_F(ControllerTest, TwoDelaysBetweenSets) {
 
   // Run 3 at t=101: delay2 elapsed; third Set runs; all done.
   g_fake_time = 101U;
-  EXPECT_CALL(*mock_strip_.mutable_led(2U), SetColor(blue)).Times(1);
+  EXPECT_CALL(*mock_strip_.MutableLed(2U), SetColor(blue)).Times(1);
   EXPECT_CALL(mock_strip_, Show()).Times(1);
 
   controller_.Run();

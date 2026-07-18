@@ -5,7 +5,6 @@
 #include <cstddef>
 
 #include "gmock/gmock.h"
-#include "prism/color.hpp"
 #include "prism/strip.hpp"
 
 namespace prism::test {
@@ -28,7 +27,7 @@ class MockStrip : public prism::Strip {
  public:
   static constexpr std::size_t kDefaultLedCount = 8U;
 
-  MockStrip() { init_defaults(); }
+  MockStrip() { InitDefaults(); }
 
   MOCK_METHOD(const char*, Name, (), (const, override));
   MOCK_METHOD(bool, IsReady, (), (const, override));
@@ -41,18 +40,18 @@ class MockStrip : public prism::Strip {
   /// @brief Return the mutable mock led at the given index.
   /// @param index Zero-based led index.
   /// @return Pointer to the led view, or nullptr when out of range.
-  MockStripLed* mutable_led(std::size_t index) {
+  MockStripLed* MutableLed(std::size_t index) {
     return (index < led_views_.size()) ? &led_views_[index] : nullptr;
   }
 
  private:
-  void init_defaults() {
+  void InitDefaults() {
     for (std::size_t i = 0; i < led_views_.size(); ++i) {
       ON_CALL(led_views_[i], Index()).WillByDefault(testing::Return(i));
       ON_CALL(led_views_[i], IsReady()).WillByDefault(testing::Return(true));
     }
     ON_CALL(*this, Led(testing::_))
-      .WillByDefault(testing::Invoke(this, &MockStrip::mutable_led));
+      .WillByDefault(testing::Invoke(this, &MockStrip::MutableLed));
     ON_CALL(*this, IsReady()).WillByDefault(testing::Return(true));
     ON_CALL(*this, LedCount()).WillByDefault(testing::Return(kDefaultLedCount));
   }
