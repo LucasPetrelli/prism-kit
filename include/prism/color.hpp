@@ -98,10 +98,13 @@ constexpr RgbColor HsvToRgb(HsvColor hsv) noexcept {
   }
 
   // Scale hue from 0–255 to 0–359 degrees.
+  // Wrap 360° back to 0° so sector stays in [0, 5].
   const std::uint16_t scaled_h =
     (static_cast<std::uint16_t>(hsv.h) * 360U) / 255U;
-  const std::uint8_t sector = static_cast<std::uint8_t>(scaled_h / 60U);
-  const std::uint8_t f = static_cast<std::uint8_t>(scaled_h % 60U);
+  const std::uint8_t sector =
+    static_cast<std::uint8_t>((scaled_h >= 360U) ? 0U : scaled_h / 60U);
+  const std::uint8_t f =
+    static_cast<std::uint8_t>((scaled_h >= 360U) ? 0U : scaled_h % 60U);
 
   const std::uint16_t v = hsv.v;
   const std::uint16_t s = hsv.s;
@@ -167,8 +170,9 @@ constexpr HsvColor RgbToHsv(RgbColor rgb) noexcept {
                60 / static_cast<std::int16_t>(delta)) +
               240;
     }
-    h = static_cast<std::uint8_t>(static_cast<std::uint16_t>(h_deg) * 255U /
-                                  360U);
+    // Round to nearest so h_deg=359 maps to 255 instead of 254.
+    h = static_cast<std::uint8_t>(
+      ((static_cast<std::uint16_t>(h_deg) * 255U) + 180U) / 360U);
   }
 
   return HsvColor{h, s, v};
