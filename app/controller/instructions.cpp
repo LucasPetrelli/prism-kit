@@ -30,11 +30,13 @@ void prism::InstructionMemorySlot::Set(const ControllerInstruction* instr) {
       ::new (&set_single_color_hsv)
         SetSingleColorHsv(*static_cast<const SetSingleColorHsv*>(instr));
       break;
-    case InstructionTag::kDelay:
-      ::new (&delay) Delay(*static_cast<const Delay*>(instr));
-      break;
   }
   tag = instr->Tag();
+}
+
+prism::Mark prism::InstructionMemorySlot::GetMark() const {
+  const ControllerInstruction* instr = Active();
+  return instr != nullptr ? instr->mark : Mark{0U};
 }
 
 void prism::InstructionMemorySlot::SetStrip(Strip* s) {
@@ -59,8 +61,6 @@ prism::ControllerInstruction* prism::InstructionMemorySlot::Active() {
       return &set_multiple_color_hsv;
     case InstructionTag::kSetSingleColorHsv:
       return &set_single_color_hsv;
-    case InstructionTag::kDelay:
-      return &delay;
   }
   return nullptr;
 }
@@ -76,8 +76,6 @@ const prism::ControllerInstruction* prism::InstructionMemorySlot::Active()
       return &set_multiple_color_hsv;
     case InstructionTag::kSetSingleColorHsv:
       return &set_single_color_hsv;
-    case InstructionTag::kDelay:
-      return &delay;
   }
   return nullptr;
 }
@@ -95,6 +93,25 @@ void prism::InstructionMemorySlot::Destroy() {
     Active()->~ControllerInstruction();
     tag = {};
   }
+}
+
+// ====================================================================
+// PendingInstructionQueueView
+// ====================================================================
+
+void prism::PendingInstructionQueueView::Insert(std::uint32_t slot_idx) {
+  // Insertion-sort by ascending mark.  Linear scan is fine because
+  // sorted_count_ is capped at Controller::kMaxInstruction.
+  std::uint32_t ins = 0U;
+  while (ins < sorted_count_ && instructions_[sorted_order_[ins]].GetMark() <=
+                                  instructions_[slot_idx].GetMark()) {
+    ++ins;
+  }
+  for (std::uint32_t i = sorted_count_; i > ins; --i) {
+    sorted_order_[i] = sorted_order_[i - 1U];
+  }
+  sorted_order_[ins] = slot_idx;
+  ++sorted_count_;
 }
 
 // ====================================================================
@@ -168,33 +185,6 @@ std::uint32_t prism::SetSingleColorHsv::Execute() {
 }
 
 // ====================================================================
-// Delay::Execute
-// ====================================================================
-
-std::uint32_t prism::Delay::Execute() {
-  if (controller == nullptr) {
-    return 0U;
-  }
-
-  if (start_time_ms_ == 0U) {
-    // First call — capture start time, block, return full duration.
-    start_time_ms_ = controller->GetTimestamp();
-    controller->Block();
-    return delay_ms_;
-  }
-
-  const std::uint32_t now = controller->GetTimestamp();
-  const std::uint32_t elapsed = now - start_time_ms_;
-
-  if (elapsed >= delay_ms_) {
-    controller->Unblock();
-    return 0U;
-  }
-
-  return delay_ms_ - elapsed;
-}
-
-// ====================================================================
 // ToString
 // ====================================================================
 
@@ -208,8 +198,6 @@ const char* prism::InstructionToString(InstructionTag tag) {
       return "SetMultipleColorHsv";
     case InstructionTag::kSetSingleColorHsv:
       return "SetSingleColorHsv";
-    case InstructionTag::kDelay:
-      return "Delay";
   }
   return "Unknown";
 }
@@ -260,12 +248,4 @@ void prism::SetMultipleColor::ToString(char* buf, std::size_t size) const {
 void prism::SetSingleColor::ToString(char* buf, std::size_t size) const {
   std::snprintf(buf, size, "SetSingleColor(r=%u g=%u b=%u idx=%u)", color.red,
                 color.green, color.blue, index);
-}
-
-// ====================================================================
-// Delay::ToString
-// ====================================================================
-
-void prism::Delay::ToString(char* buf, std::size_t size) const {
-  std::snprintf(buf, size, "Delay(%u ms)", delay_ms_);
 }

@@ -14,12 +14,12 @@
 prism::Controller::Controller()
     : strip_(nullptr),
       instruction_count_(0U),
-      head_index_(0U),
       executing_count_(0U),
-      block_count_(0U),
       get_timestamp_(nullptr),
       schedule_next_run_(nullptr),
-      debug_(nullptr) {}
+      debug_(nullptr) {
+  pending_.SetInstructions(instructions_);
+}
 
 void prism::Controller::SetStrip(Strip* strip) {
   DebugLog("SetStrip(%p, name=\"%s\")", reinterpret_cast<void*>(strip),
@@ -40,23 +40,6 @@ void prism::Controller::SetScheduleCallback(ScheduleCallback callback) {
 void prism::Controller::SetDebug(Debug* d) {
   debug_ = d;
   DebugLog("SetDebug(%p)", reinterpret_cast<void*>(d));
-}
-
-void prism::Controller::Block() {
-  DebugLog("Block cnt=%u", block_count_ + 1U);
-  ++block_count_;
-}
-
-void prism::Controller::Unblock() {
-  DebugLog("Unblock cnt=%u", (block_count_ > 0U) ? block_count_ - 1U : 0U);
-  if (block_count_ > 0U) {
-    --block_count_;
-  }
-}
-
-bool prism::Controller::IsBlocked() const {
-  DebugLog("IsBlocked => %u", block_count_ > 0U);
-  return block_count_ > 0U;
 }
 
 void prism::Controller::RequestShow() {
@@ -82,20 +65,28 @@ void prism::Controller::AddInstruction(const ControllerInstruction* instr) {
     DebugLog("AddInstruction queue full (%u)", kMaxInstruction);
     return;
   }
-  DebugLog("AddInstruction tag=%hhu", static_cast<std::uint8_t>(instr->Tag()));
-  auto& slot = instructions_[instruction_count_];
+  DebugLog("AddInstruction tag=%hhu mark=%u",
+           static_cast<std::uint8_t>(instr->Tag()),
+           static_cast<unsigned>(instr->mark));
+
+  // Store the instruction at the next free slot.
+  const std::uint32_t slot_idx = instruction_count_;
+  auto& slot = instructions_[slot_idx];
   slot.Set(instr);
   slot.SetStrip(strip_);
   slot.SetController(this);
   ++instruction_count_;
+
+  // Insert into the mark-sorted pending queue.
+  pending_.Insert(slot_idx);
 }
 
 void prism::Controller::ResetInstructions() {
   DebugLog("ResetInstructions");
   instruction_count_ = 0U;
-  head_index_ = 0U;
   executing_count_ = 0U;
-  block_count_ = 0U;
+  has_run_ = false;
+  pending_.Reset();
 }
 
 void prism::Controller::Run() {
@@ -103,8 +94,24 @@ void prism::Controller::Run() {
   show_requested_ = false;
   min_scheduled_timeout_ = 0U;
 
+  // First Run() snapshots the start time; marks are relative offsets.
+  if (!has_run_) {
+    start_time_ = GetTimestamp();
+    has_run_ = true;
+  }
+
   DrainExecuting();
   PickNewInstructions();
+
+  // Look-ahead: if there is a pending instruction whose mark hasn't
+  // been reached yet, schedule a wakeup for when it becomes due.
+  if (pending_.HasNext()) {
+    const std::uint32_t elapsed = GetElapsed();
+    const Mark next_mark = pending_.PeekMark();
+    if (next_mark > elapsed) {
+      ScheduleTimeout(next_mark - elapsed);
+    }
+  }
 
   if (min_scheduled_timeout_ > 0U && schedule_next_run_ != nullptr) {
     DebugLog("schedule_next_run_(%u)", min_scheduled_timeout_);
@@ -121,9 +128,7 @@ void prism::Controller::DrainExecuting() {
   std::uint32_t i = 0U;
   while (i < executing_count_) {
     const std::uint32_t idx = executing_[i];
-    char desc[64];
-    instructions_[idx].ToString(desc, sizeof(desc));
-    DebugLog("DrainExecuting[%u] idx=%u (%s)", i, idx, desc);
+    DebugLogDrain(i, idx);
     const std::uint32_t result = instructions_[idx].Execute();
     if (result == 0U) {
       // Instruction completed — swap with last and shrink.
@@ -138,25 +143,40 @@ void prism::Controller::DrainExecuting() {
 }
 
 void prism::Controller::PickNewInstructions() {
-  while (!IsBlocked() && head_index_ < instruction_count_) {
-    char desc[64];
-    instructions_[head_index_].ToString(desc, sizeof(desc));
-    DebugLog("PickNewInstructions head=%u (%s)", head_index_, desc);
-    const std::uint32_t result = instructions_[head_index_].Execute();
-    if (result == 0U) {
-      // Instant instruction completed.
-      ++head_index_;
-    } else {
+  const std::uint32_t elapsed = GetElapsed();
+  while (pending_.HasNext() && (pending_.PeekMark() <= elapsed)) {
+    const std::uint32_t idx = pending_.Peek();
+    DebugLogPick(idx, elapsed);
+    const std::uint32_t result = instructions_[idx].Execute();
+    pending_.Advance();
+    if (result != 0U) {
       // Timed instruction: save index in executing array.
       if (executing_count_ < kMaxExecuting) {
-        executing_[executing_count_++] = head_index_;
+        executing_[executing_count_++] = idx;
       }
-      ++head_index_;
       ScheduleTimeout(result);
-      // Loop continues as long as !IsBlocked().  A blocking timed
-      // instruction (e.g. Delay) will stop the loop naturally.
     }
   }
+}
+
+void prism::Controller::DebugLogDrain(std::uint32_t i,
+                                      std::uint32_t idx) const {
+  char desc[64];
+  instructions_[idx].ToString(desc, sizeof(desc));
+  DebugLog("DrainExecuting[%u] idx=%u (%s)", i, idx, desc);
+}
+
+void prism::Controller::DebugLogPick(std::uint32_t idx,
+                                     std::uint32_t elapsed) const {
+  char desc[64];
+  instructions_[idx].ToString(desc, sizeof(desc));
+  DebugLog("PickNewInstructions idx=%u mark=%u elapsed=%u (%s)", idx,
+           static_cast<unsigned>(instructions_[idx].GetMark()),
+           static_cast<unsigned>(elapsed), desc);
+}
+
+std::uint32_t prism::Controller::GetElapsed() const {
+  return GetTimestamp() - start_time_;
 }
 
 void prism::Controller::DebugLog(const char* format, ...) const {

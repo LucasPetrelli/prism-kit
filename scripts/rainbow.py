@@ -82,7 +82,7 @@ def run_rainbow_sequence(
                         r, g, b = RAINBOW_COLORS[led_idx]
                     else:
                         r, g, b = 0, 0, 0
-                    port.write(build_set_single_color_frame(r, g, b, led_idx))
+                    port.write(build_set_single_color_frame(r, g, b, led_idx, mark=0))
 
                 port.write(build_run_frame())
                 time.sleep(step_delay)

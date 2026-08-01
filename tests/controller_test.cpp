@@ -31,8 +31,9 @@ std::uint32_t FakeTimestamp() { return g_fake_time; }
 class ControllerTest : public ::testing::Test {
  protected:
   void SetUp() override {
+    g_fake_time = 0U;
     controller_.SetStrip(&mock_strip_);
-    controller_.SetTimestampCallback([] { return 0U; });
+    controller_.SetTimestampCallback(FakeTimestamp);
     controller_.SetScheduleCallback(OnScheduleNextRun);
     g_last_scheduled_delay = 0U;
   }
@@ -347,156 +348,203 @@ TEST_F(ControllerTest, SlotCanBeReused) {
 }
 
 // ====================================================================
-// Delay instruction tests
+// Mark-based timeline tests
 // ====================================================================
 
-/// @brief A single Delay blocks the controller for its duration, then
-///     completes on the second Run() call.
-TEST_F(ControllerTest, SingleDelayBlocksAndCompletes) {
-  g_fake_time = 1U;
-  controller_.SetTimestampCallback(FakeTimestamp);
+/// @brief AddInstruction inserts instructions in ascending mark order.
+/// Verified by observing execution order: instructions with earlier marks
+/// execute first, regardless of insertion order.
+TEST_F(ControllerTest, InstructionsSortedByMark) {
+  prism::SetSingleColor a;
+  prism::SetSingleColor b;
+  prism::SetSingleColor c;
+  a.mark = 100U;
+  a.color = prism::color::ToRgb(prism::color::Preset::kPureRed);
+  a.strip = &mock_strip_;
+  a.index = 0U;
+  b.mark = 50U;
+  b.color = prism::color::ToRgb(prism::color::Preset::kPureGreen);
+  b.strip = &mock_strip_;
+  b.index = 1U;
+  c.mark = 0U;
+  c.color = prism::color::ToRgb(prism::color::Preset::kPureBlue);
+  c.strip = &mock_strip_;
+  c.index = 2U;
 
-  prism::Delay delay(100U);
-  controller_.AddInstruction(&delay);
+  // Insert out of order: 100, 50, 0.
+  controller_.AddInstruction(&a);
+  controller_.AddInstruction(&b);
+  controller_.AddInstruction(&c);
 
+  // At t=0 only mark=0 should execute.
+  g_fake_time = 0U;
+  EXPECT_CALL(*mock_strip_.MutableLed(2U), SetColor(testing::_)).Times(1);
+  EXPECT_CALL(*mock_strip_.MutableLed(1U), SetColor(testing::_)).Times(0);
+  EXPECT_CALL(*mock_strip_.MutableLed(0U), SetColor(testing::_)).Times(0);
+  EXPECT_CALL(mock_strip_, Show()).Times(1);
+  controller_.Run();
+  testing::Mock::VerifyAndClearExpectations(&mock_strip_);
+
+  // At t=50 only mark=50 should execute.
+  g_fake_time = 50U;
+  EXPECT_CALL(*mock_strip_.MutableLed(2U), SetColor(testing::_)).Times(0);
+  EXPECT_CALL(*mock_strip_.MutableLed(1U), SetColor(testing::_)).Times(1);
+  EXPECT_CALL(*mock_strip_.MutableLed(0U), SetColor(testing::_)).Times(0);
+  EXPECT_CALL(mock_strip_, Show()).Times(1);
+  controller_.Run();
+  testing::Mock::VerifyAndClearExpectations(&mock_strip_);
+
+  // At t=100 only mark=100 should execute.
+  g_fake_time = 100U;
+  EXPECT_CALL(*mock_strip_.MutableLed(2U), SetColor(testing::_)).Times(0);
+  EXPECT_CALL(*mock_strip_.MutableLed(1U), SetColor(testing::_)).Times(0);
+  EXPECT_CALL(*mock_strip_.MutableLed(0U), SetColor(testing::_)).Times(1);
+  EXPECT_CALL(mock_strip_, Show()).Times(1);
+  controller_.Run();
+}
+
+/// @brief PickNewInstructions honours the mark: instructions with
+///     mark > current time are left in the queue.
+TEST_F(ControllerTest, PickNewInstructionsHonorsMark) {
+  prism::SetSingleColor late;
+  late.mark = 100U;
+  late.color = prism::color::ToRgb(prism::color::Preset::kPureRed);
+  late.strip = &mock_strip_;
+  late.index = 0U;
+
+  controller_.AddInstruction(&late);
+
+  // At t=0, mark=100 is in the future — no instruction should run.
+  g_fake_time = 0U;
+  EXPECT_CALL(mock_strip_, Show()).Times(0);
+  controller_.Run();
+  EXPECT_EQ(g_last_scheduled_delay, 100U);  // look-ahead to mark
+
+  // Advance time to mark — instruction should execute.
+  g_fake_time = 100U;
+  EXPECT_CALL(*mock_strip_.MutableLed(0U),
+              SetColor(prism::color::ToRgb(prism::color::Preset::kPureRed)))
+    .Times(1);
+  EXPECT_CALL(mock_strip_, Show()).Times(1);
+  controller_.Run();
+}
+
+/// @brief Look-ahead: when executing instructions have a shorter remaining
+///     duration than the next pending mark, the executing timeout wins.
+TEST_F(ControllerTest, LookAheadTimeoutFromExecuting) {
+  // Instructions at marks 0 and 100.  The mark=0 one is instant, so the
+  // look-ahead should target the mark=100 instruction.
+  // At t=0 there's no executing, so look-ahead should return 100.
+  prism::SetSingleColor early;
+  early.mark = 0U;
+  early.color = prism::color::ToRgb(prism::color::Preset::kPureGreen);
+  early.strip = &mock_strip_;
+  early.index = 0U;
+  controller_.AddInstruction(&early);
+
+  prism::SetSingleColor later;
+  later.mark = 100U;
+  later.color = prism::color::ToRgb(prism::color::Preset::kPureBlue);
+  later.strip = &mock_strip_;
+  later.index = 1U;
+  controller_.AddInstruction(&later);
+
+  g_fake_time = 0U;
+  EXPECT_CALL(*mock_strip_.MutableLed(0U), SetColor(testing::_)).Times(1);
+  EXPECT_CALL(mock_strip_, Show()).Times(1);
+
+  controller_.Run();
+  // mark=100 - now(0) = 100ms look-ahead
+  EXPECT_EQ(g_last_scheduled_delay, 100U);
+}
+
+/// @brief Look-ahead from a pending mark when no executing instructions.
+TEST_F(ControllerTest, LookAheadTimeoutFromMarkWhenNoExecuting) {
+  prism::SetSingleColor instr;
+  instr.mark = 75U;
+  instr.color = prism::color::ToRgb(prism::color::Preset::kPureRed);
+  instr.strip = &mock_strip_;
+  instr.index = 0U;
+  controller_.AddInstruction(&instr);
+
+  g_fake_time = 0U;
   EXPECT_CALL(mock_strip_, Show()).Times(0);
 
-  // Run 1 at t=1: Delay blocks and returns 100.
   controller_.Run();
-  EXPECT_TRUE(controller_.IsBlocked());
-  EXPECT_EQ(g_last_scheduled_delay, 100U);
-
-  // Run 2 at t=101: elapsed >= 100, Delay completes.
-  g_fake_time = 101U;
-  controller_.Run();
-  EXPECT_FALSE(controller_.IsBlocked());
+  EXPECT_EQ(g_last_scheduled_delay, 75U);
 }
 
-/// @brief A Delay between two SetSingleColor instructions pauses execution:
-///     the first Set runs, then Delay blocks.  A second Run() completes the
-///     Delay and runs the second Set.
-TEST_F(ControllerTest, DelayBetweenTwoSets) {
-  g_fake_time = 1U;
-  controller_.SetTimestampCallback(FakeTimestamp);
+/// @brief Run() still works correctly with mixed marks.
+TEST_F(ControllerTest, RunStillWorksWithMarks) {
+  // Multiple instructions at various marks — all should execute
+  // in order as time advances.
+  prism::SetSingleColor instr0;
+  prism::SetSingleColor instr1;
+  prism::SetSingleColor instr2;
+  instr0.mark = 0U;
+  instr0.color = prism::color::ToRgb(prism::color::Preset::kPureRed);
+  instr0.strip = &mock_strip_;
+  instr0.index = 0U;
 
-  constexpr prism::color::RgbColor red = {255U, 0U, 0U};
-  constexpr prism::color::RgbColor blue = {0U, 0U, 255U};
+  instr1.mark = 50U;
+  instr1.color = prism::color::ToRgb(prism::color::Preset::kPureGreen);
+  instr1.strip = &mock_strip_;
+  instr1.index = 1U;
 
-  prism::SetSingleColor first;
-  first.color = red;
-  first.strip = &mock_strip_;
-  first.index = 0U;
-  controller_.AddInstruction(&first);
+  instr2.mark = 100U;
+  instr2.color = prism::color::ToRgb(prism::color::Preset::kPureBlue);
+  instr2.strip = &mock_strip_;
+  instr2.index = 2U;
 
-  prism::Delay delay(50U);
-  controller_.AddInstruction(&delay);
+  controller_.AddInstruction(&instr0);
+  controller_.AddInstruction(&instr1);
+  controller_.AddInstruction(&instr2);
 
-  prism::SetSingleColor second;
-  second.color = blue;
-  second.strip = &mock_strip_;
-  second.index = 1U;
-  controller_.AddInstruction(&second);
-
-  // Run 1 at t=1: first Set executes; Delay blocks and returns 50.
-  EXPECT_CALL(*mock_strip_.MutableLed(0U), SetColor(red)).Times(1);
+  // Run 1 at t=0: only mark=0 executes.
+  g_fake_time = 0U;
+  EXPECT_CALL(*mock_strip_.MutableLed(0U), SetColor(testing::_)).Times(1);
+  EXPECT_CALL(*mock_strip_.MutableLed(1U), SetColor(testing::_)).Times(0);
+  EXPECT_CALL(*mock_strip_.MutableLed(2U), SetColor(testing::_)).Times(0);
   EXPECT_CALL(mock_strip_, Show()).Times(1);
-
   controller_.Run();
-  EXPECT_TRUE(controller_.IsBlocked());
-  EXPECT_EQ(g_last_scheduled_delay, 50U);
+  EXPECT_EQ(g_last_scheduled_delay, 50U);  // look-ahead to mark=50
 
-  // Run 2 at t=51: elapsed >= 50, Delay completes; second Set executes.
-  g_fake_time = 51U;
-  EXPECT_CALL(*mock_strip_.MutableLed(1U), SetColor(blue)).Times(1);
+  testing::Mock::VerifyAndClearExpectations(&mock_strip_);
+
+  // Run 2 at t=50: mark=50 executes.
+  g_fake_time = 50U;
+  EXPECT_CALL(*mock_strip_.MutableLed(0U), SetColor(testing::_)).Times(0);
+  EXPECT_CALL(*mock_strip_.MutableLed(1U), SetColor(testing::_)).Times(1);
+  EXPECT_CALL(*mock_strip_.MutableLed(2U), SetColor(testing::_)).Times(0);
   EXPECT_CALL(mock_strip_, Show()).Times(1);
-
   controller_.Run();
-  EXPECT_FALSE(controller_.IsBlocked());
+  EXPECT_EQ(g_last_scheduled_delay, 50U);  // look-ahead to mark=100
+
+  testing::Mock::VerifyAndClearExpectations(&mock_strip_);
+
+  // Run 3 at t=100: mark=100 executes.  No more instructions.
+  g_fake_time = 100U;
+  g_last_scheduled_delay = 0U;  // reset so we can verify no schedule
+  EXPECT_CALL(*mock_strip_.MutableLed(0U), SetColor(testing::_)).Times(0);
+  EXPECT_CALL(*mock_strip_.MutableLed(1U), SetColor(testing::_)).Times(0);
+  EXPECT_CALL(*mock_strip_.MutableLed(2U), SetColor(testing::_)).Times(1);
+  EXPECT_CALL(mock_strip_, Show()).Times(1);
+  controller_.Run();
+  EXPECT_EQ(g_last_scheduled_delay, 0U);  // no more instructions
 }
 
-/// @brief Two delays interleaved with three SetSingleColor instructions:
-///     each Run() advances one step through the sequence.
-TEST_F(ControllerTest, TwoDelaysBetweenSets) {
-  g_fake_time = 1U;
-  controller_.SetTimestampCallback(FakeTimestamp);
-
-  constexpr prism::color::RgbColor red = {255U, 0U, 0U};
-  constexpr prism::color::RgbColor green = {0U, 255U, 0U};
-  constexpr prism::color::RgbColor blue = {0U, 0U, 255U};
-
+/// @brief ResetInstructions clears state including marks.
+TEST_F(ControllerTest, ResetInstructionsClearsStateWithMarks) {
   prism::SetSingleColor a;
-  a.color = red;
+  a.mark = 10U;
+  a.color = prism::color::ToRgb(prism::color::Preset::kPureRed);
   a.strip = &mock_strip_;
   a.index = 0U;
   controller_.AddInstruction(&a);
 
-  prism::Delay delay1(30U);
-  controller_.AddInstruction(&delay1);
+  controller_.ResetInstructions();
 
-  prism::SetSingleColor b;
-  b.color = green;
-  b.strip = &mock_strip_;
-  b.index = 1U;
-  controller_.AddInstruction(&b);
-
-  prism::Delay delay2(70U);
-  controller_.AddInstruction(&delay2);
-
-  prism::SetSingleColor c;
-  c.color = blue;
-  c.strip = &mock_strip_;
-  c.index = 2U;
-  controller_.AddInstruction(&c);
-
-  // Run 1 at t=1: first Set runs; delay1 blocks (30 ms).
-  EXPECT_CALL(*mock_strip_.MutableLed(0U), SetColor(red)).Times(1);
-  EXPECT_CALL(mock_strip_, Show()).Times(1);
-
+  g_fake_time = 100U;
+  EXPECT_CALL(mock_strip_, Show()).Times(0);
   controller_.Run();
-  EXPECT_TRUE(controller_.IsBlocked());
-  EXPECT_EQ(g_last_scheduled_delay, 30U);
-
-  // Run 2 at t=31: delay1 elapsed; second Set runs; delay2 blocks (70 ms).
-  g_fake_time = 31U;
-  EXPECT_CALL(*mock_strip_.MutableLed(1U), SetColor(green)).Times(1);
-  EXPECT_CALL(mock_strip_, Show()).Times(1);
-
-  controller_.Run();
-  EXPECT_TRUE(controller_.IsBlocked());
-  EXPECT_EQ(g_last_scheduled_delay, 70U);
-
-  // Run 3 at t=101: delay2 elapsed; third Set runs; all done.
-  g_fake_time = 101U;
-  EXPECT_CALL(*mock_strip_.MutableLed(2U), SetColor(blue)).Times(1);
-  EXPECT_CALL(mock_strip_, Show()).Times(1);
-
-  controller_.Run();
-  EXPECT_FALSE(controller_.IsBlocked());
-}
-
-/// @brief A Delay whose start and subsequent Execute() calls happen at
-///     different timestamps returns only the remaining time.  If elapsed
-///     exceeds the delay, it completes.
-TEST_F(ControllerTest, DelayRespectsElapsedTime) {
-  g_fake_time = 1000U;
-  controller_.SetTimestampCallback(FakeTimestamp);
-
-  prism::Delay delay(2000U);
-  controller_.AddInstruction(&delay);
-
-  // Run 1 at t=1000: first call — block and return full 2000ms.
-  controller_.Run();
-  EXPECT_TRUE(controller_.IsBlocked());
-  EXPECT_EQ(g_last_scheduled_delay, 2000U);
-
-  // Run 2 at t=2000: elapsed=1000ms, remaining=1000ms.
-  g_fake_time = 2000U;
-  controller_.Run();
-  EXPECT_TRUE(controller_.IsBlocked());
-  EXPECT_EQ(g_last_scheduled_delay, 1000U);
-
-  // Run 3 at t=3000: elapsed=2000ms, done.
-  g_fake_time = 3000U;
-  controller_.Run();
-  EXPECT_FALSE(controller_.IsBlocked());
 }

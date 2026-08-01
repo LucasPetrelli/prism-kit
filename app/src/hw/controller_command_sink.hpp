@@ -60,9 +60,6 @@ class ControllerCommandSink {
   /// @brief Handler for the Run tag.
   static void HandleRun(void* context, const uint8_t* data, uint16_t length);
 
-  /// @brief Handler for the Delay tag.
-  static void HandleDelay(void* context, const uint8_t* data, uint16_t length);
-
   /// @brief Handler for the SetSingleColorHsv tag.
   static void HandleSetSingleColorHsv(void* context, const uint8_t* data,
                                       uint16_t length);

@@ -22,8 +22,6 @@ enum class ControllerCommand : std::uint8_t {
   kResetInstructions,
   /// @brief Execute all queued instructions (Run).
   kRun,
-  /// @brief Pause instruction execution for a fixed duration (Delay).
-  kDelay,
 };
 
 /// @brief IPC message sent from the HW thread (protocol handlers) to the APP
@@ -38,7 +36,8 @@ struct ControllerCommandMessage {
 
   /// @brief Payload data for the command.
   ///
-  /// Only meaningful when cmd is a Set* command.
+  /// The ``mark`` field inside each payload identifies the absolute ms
+  /// timestamp at which the instruction should start executing.
   /// For kResetInstructions and kRun the payload is unused.
   union {
     /// @brief Payload for a SetMultipleColor instruction.
@@ -49,8 +48,6 @@ struct ControllerCommandMessage {
     prism::SetMultipleColorHsvPayload set_multiple_hsv;
     /// @brief Payload for a SetSingleColorHsv instruction.
     prism::SetSingleColorHsvPayload set_single_hsv;
-    /// @brief Delay duration in milliseconds (for kDelay commands).
-    std::uint32_t delay_ms;
   };
 };
 

@@ -88,9 +88,9 @@ bool AppTask::Setup() {
       ? led_count_
       : static_cast<std::uint8_t>(kRainbowColors.size());
   for (std::uint8_t i = 0U; i < count; ++i) {
-    const prism::SetSingleColorPayload payload{kRainbowColors[i].red,
-                                               kRainbowColors[i].green,
-                                               kRainbowColors[i].blue, i};
+    const prism::SetSingleColorPayload payload{
+      /* mark = */ 0U, kRainbowColors[i].red, kRainbowColors[i].green,
+      kRainbowColors[i].blue, i};
     prism::SetSingleColor instr{payload};
     controller_.AddInstruction(&instr);
   }
@@ -127,11 +127,6 @@ void AppTask::UpdateInstructions() {
       }
       case app::hw::ControllerCommand::kSetSingleColorHsv: {
         const prism::SetSingleColorHsv instr{msg.set_single_hsv};
-        controller_.AddInstruction(&instr);
-        break;
-      }
-      case app::hw::ControllerCommand::kDelay: {
-        const prism::Delay instr{msg.delay_ms};
         controller_.AddInstruction(&instr);
         break;
       }

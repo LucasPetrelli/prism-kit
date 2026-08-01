@@ -25,7 +25,6 @@ import sys
 sys.path.insert(0, str(__import__("pathlib").Path(__file__).resolve().parent.parent))
 
 from scripts.modules.protocol import (  # noqa: E402
-    build_delay_frame,
     build_reset_instructions_frame,
     build_run_frame,
     build_set_multiple_color_frame,
@@ -79,13 +78,15 @@ def run_rainbow2_sequence(
             # ── Queue the full sequence ────────────────────────────
             port.write(build_reset_instructions_frame())
 
-            # SetRange: all LEDs to off (black).
-            port.write(build_set_multiple_color_frame(0, 0, 0, 0, total_leds))
+            # SetRange: all LEDs to off (black) at mark=0.
+            port.write(build_set_multiple_color_frame(0, 0, 0, 0, total_leds, mark=0))
 
             for led_idx in range(total_leds):
                 r, g, b = RAINBOW_COLORS[led_idx]
-                port.write(build_set_single_color_frame(r, g, b, led_idx))
-                port.write(build_delay_frame(step_delay_ms))
+                # Each step fires at its own mark (abs ms).  The device handles
+                # all timing internally — no host-side sleep needed.
+                mark = led_idx * step_delay_ms
+                port.write(build_set_single_color_frame(r, g, b, led_idx, mark=mark))
 
             # ── Go ─────────────────────────────────────────────────
             port.write(build_run_frame())
