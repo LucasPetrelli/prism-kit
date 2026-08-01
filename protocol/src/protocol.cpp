@@ -2,8 +2,12 @@
 
 #include <algorithm>
 #include <cstdarg>
+#include <cstdint>
 #include <cstdio>
 #include <cstring>
+
+#include "frame.hpp"
+#include "tags.hpp"
 
 namespace protocol {
 

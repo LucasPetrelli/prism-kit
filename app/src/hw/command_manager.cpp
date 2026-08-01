@@ -1,7 +1,12 @@
 #include "command_manager.hpp"
 
 #include <cstdarg>
+#include <cstdint>
 #include <cstdio>
+
+#include "oshal/debug_port.hpp"
+#include "oshal/event.hpp"
+#include "oshal/serial_port.hpp"
 
 namespace {
 

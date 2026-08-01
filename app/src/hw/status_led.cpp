@@ -1,5 +1,9 @@
 #include "status_led.hpp"
 
+#include <cstdint>
+
+#include "bal/led.hpp"
+
 namespace app::hw {
 
 void StatusLed::Configure(bal::Led* led, std::uint32_t idle_sleep_ms) {

@@ -1,5 +1,8 @@
 #include "hw_task.hpp"
 
+#include <cstddef>
+#include <cstdint>
+
 #include "bal/led.hpp"
 #include "bal/ws2812_strip.hpp"
 #include "hw/command_manager.hpp"
@@ -8,6 +11,7 @@
 #include "oshal/debug_port.hpp"
 #include "oshal/serial_port.hpp"
 #include "oshal/status.h"
+#include "oshal/task.hpp"
 
 namespace {
 
