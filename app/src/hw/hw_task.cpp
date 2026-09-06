@@ -26,7 +26,7 @@ HwTask& HwTask::Instance() { return g_hw_task_instance; }
 int HwTask::Start(const char* name, std::size_t stack_size_bytes,
                   int priority) {
   if (task_.IsValid()) {
-    return STATUS_OK;
+    return task_.IsRunning() ? STATUS_OK : STATUS_ERR_NOT_READY;
   }
 
   oshal::TaskConfig config;
@@ -36,10 +36,15 @@ int HwTask::Start(const char* name, std::size_t stack_size_bytes,
   config.context = this;
   config.stack_size_bytes = stack_size_bytes;
   config.priority = priority;
+  config.diagnostics.print_start = true;
+  config.diagnostics.print_exit = true;
+  config.diagnostics.print_runtime = true;
+  config.diagnostics.runtime_interval_ms =
+    oshal::kTaskRuntimeDiagnosticsDefaultIntervalMs;
   return oshal::TaskHandle::Create(task_, config);
 }
 
-bool HwTask::IsRunning() const { return task_.IsValid(); }
+bool HwTask::IsRunning() const { return task_.IsRunning(); }
 
 bool HwTask::HasExited() const { return task_.HasExited(); }
 

@@ -1,6 +1,8 @@
 #ifndef APP_HW_HW_TASK_HPP_
 #define APP_HW_HW_TASK_HPP_
 
+#include <cstddef>
+
 #include "hw/status_led.hpp"
 #include "hw/strip_manager.hpp"
 #include "oshal/event.hpp"
@@ -30,8 +32,8 @@ class HwTask {
   /// @return STATUS_OK on success, or a negative status code.
   int Start(const char* name, std::size_t stack_size_bytes, int priority);
 
-  /// @brief Query whether the underlying task handle is valid.
-  /// @return true when the task has been created.
+  /// @brief Query whether the underlying task is still running.
+  /// @return true while the task is active, otherwise false.
   bool IsRunning() const;
 
   /// @brief Query whether the task has exited.
