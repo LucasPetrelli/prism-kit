@@ -443,11 +443,12 @@ def capture_console(
     debug_marker: str = "",
     command_marker: str = "",
     quiet: bool = False,
+    stop_early: bool = True,
 ) -> tuple[dict[str, list[str]], set[str], set[str], dict[str, str]]:
     """Open serial ports and capture console output.
 
-    Reads lines from every port until the capture timeout or until
-    ``_should_stop_capturing()`` returns True.
+    Reads lines from every port until the capture timeout or, when
+    ``stop_early`` is true, until ``_should_stop_capturing()`` returns True.
 
     Returns ``(captured_lines, seen_required, seen_optional, role_ports)``.
 
@@ -504,7 +505,7 @@ def capture_console(
                 if command_marker and command_marker in line:
                     role_ports["command"] = device
 
-            if _should_stop_capturing(
+            if stop_early and _should_stop_capturing(
                 seen_required=seen_required,
                 required_markers=required_markers,
                 check_roles=check_roles,

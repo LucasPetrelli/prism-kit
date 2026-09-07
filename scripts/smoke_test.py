@@ -20,6 +20,7 @@ from pathlib import Path
 import sys
 import threading
 import time
+from typing import Sequence
 
 # Ensure the repo root is on sys.path so package imports resolve correctly
 # both when running directly (uv run scripts/smoke_test.py) and via entry
@@ -40,15 +41,20 @@ from scripts.modules.serial_utils import (
     group_ports_by_device,
     print_captured_lines,
 )
-from scripts import rainbow
+from scripts import rainbow2
 
 DEFAULT_BAUDRATE = 115200
 DEFAULT_WAIT_FOR_PORT_SECONDS = 10.0
 DEFAULT_CAPTURE_TIMEOUT_SECONDS = 12.0
+DEFAULT_RAINBOW_STEP_DELAY_MS = 1000
 DEFAULT_PORT_MATCH_TOKENS = ("Prism Kit",)
 DEFAULT_DEBUG_MARKER = "DebugPort online on"
 DEFAULT_OPTIONAL_MARKERS = ("Booting Zephyr OS build",)
 DEFAULT_REQUIRED_MARKERS = (DEFAULT_DEBUG_MARKER,)
+DEFAULT_TASK_MARKERS = {
+    "app_main": ("Task app_main start", "[Task] app_main:"),
+    "app_hw": ("Task app_hw start", "[Task] app_hw:"),
+}
 DEFAULT_LOOPBACK_PAYLOAD = bytes.fromhex("01020304")
 
 
@@ -126,20 +132,26 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--quiet",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Suppress live console lines while capturing. Default: enabled.",
+    )
+    parser.add_argument(
+        "--dump-logs",
         action="store_true",
-        help="Do not stream console lines while capturing.",
+        help="Dump captured console logs after the smoke-test phases.",
     )
     parser.add_argument(
         "--skip-rainbow",
         action="store_true",
-        help="Skip the visual LED rainbow sequence test.",
+        help="Skip the visual LED rainbow2 sequence test.",
     )
     parser.add_argument(
         "--rainbow-step-delay",
         type=int,
-        default=100,
+        default=DEFAULT_RAINBOW_STEP_DELAY_MS,
         help=(
-            "Milliseconds between rainbow sequence steps. " "Default: %(default)s ms."
+            "Milliseconds between rainbow2 sequence steps. " "Default: %(default)s ms."
         ),
     )
     return parser.parse_args()
@@ -269,12 +281,10 @@ class SmokeTest:
 
         rainbow_ok = True
         if not self.args.skip_rainbow:
-            rainbow_ok = self._run_rainbow_sequence()
+            rainbow_ok = self._run_rainbow2_sequence()
 
-        # Always dump the debug console content at the end — it may
-        # contain clues about why the loopback test or rainbow sequence
-        # succeeded or failed.
-        self._dump_debug_console()
+        if self.args.dump_logs:
+            self._dump_debug_console()
 
         if not loopback_ok or not rainbow_ok:
             return 1
@@ -369,8 +379,11 @@ class SmokeTest:
 
     def _capture_console(self) -> None:
         required_markers = [str(m) for m in self.args.require]
-        if not self.args.no_default_requirements:
+        if not self.args.no_default_requirements and "debug" not in self.role_ports:
             required_markers.extend(DEFAULT_REQUIRED_MARKERS)
+        task_markers = [
+            marker for markers in DEFAULT_TASK_MARKERS.values() for marker in markers
+        ]
         (
             self.captured_lines,
             seen_required,
@@ -384,12 +397,25 @@ class SmokeTest:
             required_markers=required_markers,
             optional_markers=DEFAULT_OPTIONAL_MARKERS,
             debug_marker=(
-                DEFAULT_DEBUG_MARKER if not self.args.no_default_requirements else ""
+                DEFAULT_DEBUG_MARKER
+                if not self.args.no_default_requirements
+                and "debug" not in self.role_ports
+                else ""
             ),
             command_marker="",
             quiet=self.args.quiet,
+            stop_early=False,
         )
         self.seen_required = seen_required
+        self.seen_optional.update(
+            marker
+            for marker in task_markers
+            if any(
+                marker in line
+                for lines in self.captured_lines.values()
+                for line in lines
+            )
+        )
         # Merge console-captured roles into any roles already resolved by
         # interface number.  Interface-number resolution takes priority.
         for role in ("debug", "command"):
@@ -400,22 +426,43 @@ class SmokeTest:
 
     def _validate_markers(self) -> bool:
         required_markers = [str(m) for m in self.args.require]
-        if not self.args.no_default_requirements:
+        if not self.args.no_default_requirements and "debug" not in self.role_ports:
             required_markers.extend(DEFAULT_REQUIRED_MARKERS)
-        if self.seen_required.issuperset(required_markers):
+        missing_markers = [
+            marker for marker in required_markers if marker not in self.seen_required
+        ]
+        missing_tasks = []
+        if not self.args.no_default_requirements:
+            missing_tasks = [
+                task_name
+                for task_name, markers in DEFAULT_TASK_MARKERS.items()
+                if not any(marker in self.seen_optional for marker in markers)
+            ]
+        if not missing_markers and not missing_tasks:
             return True
 
-        print(
-            "Smoke test failed. Missing required console markers:\n"
-            f"{format_missing_markers(required_markers, self.seen_required)}",
-            file=sys.stderr,
-        )
-        if any(self.captured_lines.values()):
+        print("Smoke test failed. Missing required console evidence:", file=sys.stderr)
+        if missing_markers:
+            print(
+                format_missing_markers(required_markers, self.seen_required),
+                file=sys.stderr,
+            )
+        for task_name in missing_tasks:
+            print(
+                f"- task {task_name} start or runtime diagnostic",
+                file=sys.stderr,
+            )
+        if self.args.dump_logs and any(self.captured_lines.values()):
             print("Captured console output:", file=sys.stderr)
             print_captured_lines(self.captured_lines, sys.stderr)
-        else:
+        elif not any(self.captured_lines.values()):
             print(
                 "No console output was captured before the timeout expired.",
+                file=sys.stderr,
+            )
+        else:
+            print(
+                "Captured console output omitted; rerun with --dump-logs.",
                 file=sys.stderr,
             )
         return False
@@ -433,12 +480,17 @@ class SmokeTest:
 
         if "debug" not in self.role_ports:
             print(
-                "Smoke test failed. Debug port marker was not observed.",
+                "Smoke test failed. Debug port could not be identified.",
                 file=sys.stderr,
             )
-            if any(self.captured_lines.values()):
+            if self.args.dump_logs and any(self.captured_lines.values()):
                 print("Captured console output:", file=sys.stderr)
                 print_captured_lines(self.captured_lines, sys.stderr)
+            elif any(self.captured_lines.values()):
+                print(
+                    "Captured console output omitted; rerun with --dump-logs.",
+                    file=sys.stderr,
+                )
             return False
 
         return True
@@ -523,13 +575,13 @@ class SmokeTest:
 
         return True
 
-    # ── Phase: run rainbow sequence ────────────────────────────────
+    # ── Phase: run rainbow2 sequence ───────────────────────────────
 
-    def _run_rainbow_sequence(self) -> bool:
-        """Run the visual rainbow LED chase while capturing debug output.
+    def _run_rainbow2_sequence(self) -> bool:
+        """Run the device-timed rainbow2 sequence while capturing debug output.
 
         Delegates the command-port frame sequence to
-        :func:`rainbow.run_rainbow_sequence` while a background thread
+        :func:`rainbow2.run_rainbow2_sequence` while a background thread
         drains the debug port so firmware log output is captured.
         """
         command_device = self._resolve_command_device()
@@ -580,21 +632,31 @@ class SmokeTest:
         reader = threading.Thread(target=_read_debug, daemon=True)
         reader.start()
 
+        rainbow_ok = False
         try:
-            if not rainbow.run_rainbow_sequence(
+            rainbow_ok = rainbow2.run_rainbow2_sequence(
                 self.serial,
                 command_device,
                 self.args.baudrate,
                 step_delay_ms=self.args.rainbow_step_delay,
-            ):
+            )
+            if rainbow_ok:
+                observation_seconds = max(
+                    1.0,
+                    (6 * self.args.rainbow_step_delay / 1000.0) + 0.5,
+                )
+                stop_reader.wait(observation_seconds)
+            else:
                 print(
-                    "Smoke test failed — rainbow sequence did not succeed.",
+                    "Smoke test failed — rainbow2 sequence did not succeed.",
                     file=sys.stderr,
                 )
-                return False
         finally:
             stop_reader.set()
             reader.join(timeout=1.0)
+
+        if not rainbow_ok:
+            return False
 
         if reader_error is not None:
             print(
@@ -602,12 +664,14 @@ class SmokeTest:
                 file=sys.stderr,
             )
 
-        if captured:
+        if self.args.dump_logs and captured:
             print("Debug output during rainbow sequence:")
             for line in captured:
                 print(f"  {line}")
             if debug_device:
                 self.captured_lines.setdefault(debug_device, []).extend(captured)
+        elif captured and debug_device:
+            self.captured_lines.setdefault(debug_device, []).extend(captured)
 
         return True
 
