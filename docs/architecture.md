@@ -21,9 +21,14 @@ OSHAL owns the Zephyr-facing boundary. In phase 2 it provides:
 - a startup handoff hook contract,
 - a C++ task-execution contract layered over Zephyr threads,
 - generic GPIO, PWM, and WS2812 transport interface contracts,
-- a SAMD21-specific resource surface that publishes the concrete PA17 GPIO and
-    PA8 TCC0/WO[0] PWM-plus-transport bindings for this build,
+- an optional neutral resource set selected by board integration, with the
+    SAMD21 backend decoding its platform-specific GPIO and PWM descriptions,
 - and the time/sleep contract APP currently needs.
+
+The Zephyr-only binding schemas and vendor prefix live under
+`oshal/dts/bindings/`. The application CMake registers `oshal/` as a Zephyr
+`DTS_ROOT` before configuration. BAL owns the board overlay that instantiates
+those schemas; the project root does not own a separate binding directory.
 
 The backend is currently Zephyr-based and uses the SAMD21 PWM-plus-DMA path as
 the first timing-specific WS2812 engine while keeping the public transport
@@ -36,9 +41,10 @@ integration point needs to create or manage tasks directly.
 BAL owns board resources and the application bootstrap. The Zephyr root entry
 still hands off to BAL instead of calling APP directly, but now does so through
 an OSHAL-declared handoff hook that the repository C++ composition layer
-implements. BAL also owns the board pin map that labels the physical SAMD21
-resources for the XIAO wiring, the fixed 7-pixel strip object, logical RGB
-pixel views, and the board-specific GRB ordering policy for that strip.
+implements. BAL also owns the XIAO board overlay and pin map that assign
+neutral OSHAL resource slots to the status LED and strip transport, the fixed
+7-pixel strip object, logical RGB pixel views, and the board-specific GRB
+ordering policy for that strip.
 
 ### APP
 
@@ -54,8 +60,7 @@ and starts backend-specific runtime helpers such as the current `app_hw` task.
 Zephyr startup
     |
         +--> OSHAL SYS_INIT at APPLICATION level
-            |
-            +--> validate physical hardware prerequisites
+            +--> publish platform startup status
     |
         +--> main() in oshal/src/zephyr_system.c
             |
@@ -65,7 +70,8 @@ Zephyr startup
                     |
                     +--> BAL bootstrap with APP task entry callback
                     |
-                        +--> map physical resources onto board-owned labels
+                        +--> map optional OSHAL resources onto board-owned labels
+                        +--> validate capabilities required by board policy
                         +--> initialize board pin-map consumers
                         +--> initialize board LED object(s)
                         +--> initialize WS2812 strip object(s)
@@ -82,12 +88,16 @@ Zephyr startup
 ## Why OSHAL Uses APPLICATION-Level SYS_INIT
 
 The repository wants a staged boot path, but also needs Zephyr's device model to
-have finished bringing up GPIO drivers first. `APPLICATION` is the best fit for
-that compromise:
+have finished bringing up platform services first. `APPLICATION` is the best
+fit for that compromise:
 
 - it still runs before `main()`,
 - it avoids racing driver initialization,
-- and it keeps the OSHAL stage explicit in the final init sequence.
+- and it keeps the platform stage explicit in the final init sequence.
+
+Board capability readiness does not run in OSHAL `SYS_INIT`. A board may omit
+an LED, PWM output, or frame transport entirely, so BAL validates only the
+optional capabilities selected by its own policy during bootstrap.
 
 If a future WS2812 backend genuinely needs earlier hardware setup, that work can
 move to a lower init level without changing the APP contract.

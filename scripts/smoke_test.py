@@ -46,12 +46,9 @@ DEFAULT_BAUDRATE = 115200
 DEFAULT_WAIT_FOR_PORT_SECONDS = 10.0
 DEFAULT_CAPTURE_TIMEOUT_SECONDS = 12.0
 DEFAULT_PORT_MATCH_TOKENS = ("Prism Kit",)
-DEFAULT_DEBUG_MARKER = "Task app_hw runtime:"
+DEFAULT_DEBUG_MARKER = "DebugPort online on"
 DEFAULT_OPTIONAL_MARKERS = ("Booting Zephyr OS build",)
-DEFAULT_REQUIRED_MARKERS = (
-    "Task app_hw runtime:",
-    "Task app_main runtime:",
-)
+DEFAULT_REQUIRED_MARKERS = (DEFAULT_DEBUG_MARKER,)
 DEFAULT_LOOPBACK_PAYLOAD = bytes.fromhex("01020304")
 
 
@@ -403,8 +400,8 @@ class SmokeTest:
 
     def _validate_markers(self) -> bool:
         required_markers = [str(m) for m in self.args.require]
-        if not required_markers:
-            return True
+        if not self.args.no_default_requirements:
+            required_markers.extend(DEFAULT_REQUIRED_MARKERS)
         if self.seen_required.issuperset(required_markers):
             return True
 

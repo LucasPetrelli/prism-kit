@@ -1,5 +1,10 @@
 cmake_minimum_required(VERSION 3.20.0)
 
+# OSHAL owns the Zephyr-specific Devicetree bindings. Register that root before
+# Zephyr configures its Devicetree search paths; non-Zephyr OSHAL backends do
+# not consume this application CMake file.
+set(DTS_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/oshal" ${DTS_ROOT})
+
 # Zephyr remains the build owner. This repository contributes sources,
 # configuration, and documentation on top of the standard Zephyr application
 # model instead of creating a parallel bare-metal build flow.
