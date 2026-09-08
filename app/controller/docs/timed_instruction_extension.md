@@ -56,7 +56,7 @@ repeat :Examine "under execution" list;
     if (Instruction ready to run?) then (yes)
       :Run instruction;
       if (Instruction returned value?) then (0)
-        :Instruction done, iterate over
+        :Instruction done, iterate over;
       else (non-zero)
         :Store instruction in "under execution" list;
         :Arm TimedEvent for returned duration;
