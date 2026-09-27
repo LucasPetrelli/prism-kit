@@ -53,7 +53,8 @@ bool ControllerCommandSink::Register(protocol::Protocol& protocol) {
          protocol.AddHandler(protocol::Tag::kSetMultipleColorHsvGrouped,
                              &HandleSetMultipleColorHsvGrouped) &&
          protocol.AddHandler(protocol::Tag::kRunGroup, &HandleRunGroup) &&
-         protocol.AddHandler(protocol::Tag::kStart, &HandleStart);
+         protocol.AddHandler(protocol::Tag::kStart, &HandleStart) &&
+         protocol.AddHandler(protocol::Tag::kFade, &HandleFade);
 }
 
 void ControllerCommandSink::SetMailbox(ControllerCommandMailbox* mailbox) {
@@ -319,6 +320,23 @@ void ControllerCommandSink::HandleStart(void* context, const uint8_t* data,
   msg.cmd = ControllerCommand::kStart;
   msg.start.root_additional_repeats = ReadLe16(data);
   QueueCommand(context, msg, "Start");
+}
+
+void ControllerCommandSink::HandleFade(void* context, const uint8_t* data,
+                                       uint16_t length) {
+  if (!HasExactPayload(context, data, length, sizeof(prism::FadePayload),
+                       "Fade")) {
+    return;
+  }
+
+  ControllerCommandMessage msg{};
+  msg.cmd = ControllerCommand::kFade;
+  msg.fade.mark = ReadLe16(data);
+  msg.fade.percent = ReadLe16(data + 2);
+  msg.fade.duration_ms = ReadLe16(data + 4);
+  msg.fade.index = data[6];
+  msg.fade.group_id = ReadLe32(data + 7);
+  QueueCommand(context, msg, "Fade");
 }
 
 }  // namespace app::hw

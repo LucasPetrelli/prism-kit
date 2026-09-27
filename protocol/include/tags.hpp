@@ -73,6 +73,11 @@ enum class Tag : uint16_t {
   /// @brief Start or replay the retained program with a root repeat policy.
   /// Payload: root_additional_repeats:u16 (2 bytes).
   kStart = 0x010C,
+
+  /// @brief Fade one pixel's staged HSV Value within a controller group.
+  /// Payload: mark:u16, percent:u16, duration_ms:u16, index:u8,
+  ///     group_id:u32 (11 bytes).
+  kFade = 0x010D,
 };
 
 }  // namespace protocol

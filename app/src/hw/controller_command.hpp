@@ -34,6 +34,8 @@ enum class ControllerCommand : std::uint8_t {
   kRunGroup,
   /// @brief Start the retained program with a root repeat policy.
   kStart,
+  /// @brief Fade one staged pixel's HSV Value in a specified group.
+  kFade,
 };
 
 /// @brief Grouped RGB range fields copied from the protocol payload.
@@ -123,6 +125,8 @@ struct ControllerCommandMessage {
     RunGroupCommandPayload run_group;
     /// @brief Payload for an explicit Start command.
     StartCommandPayload start;
+    /// @brief Payload for a one-pixel Fade instruction.
+    prism::FadePayload fade;
   };
 };
 
@@ -131,7 +135,7 @@ struct ControllerCommandMessage {
 /// @note Change the capacity here (second template argument) — it is the
 ///     single source of truth for all consumers.
 using ControllerCommandMailbox =
-  oshal::EventMailbox<sizeof(ControllerCommandMessage), 20>;
+  oshal::EventMailbox<sizeof(ControllerCommandMessage), 32>;
 
 }  // namespace app::hw
 

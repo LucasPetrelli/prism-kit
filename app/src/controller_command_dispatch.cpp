@@ -109,6 +109,12 @@ ControllerCommandResult DispatchControllerCommand(
     case app::hw::ControllerCommand::kStart:
       StartAndTick(controller, message.start.root_additional_repeats, result);
       break;
+    case app::hw::ControllerCommand::kFade: {
+      const prism::Fade instruction{message.fade};
+      result.mutation_attempted = true;
+      result.mutation_status = controller.AddInstruction(&instruction);
+      break;
+    }
     default:
       result.mutation_attempted = true;
       result.mutation_status = prism::ControllerStatus::kInvalidArgument;

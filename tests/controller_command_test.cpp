@@ -26,7 +26,7 @@
 namespace {
 
 constexpr std::size_t kMaxMessageSize = 64U;
-constexpr std::size_t kMaxQueueCapacity = 20U;
+constexpr std::size_t kMaxQueueCapacity = 32U;
 constexpr std::size_t kMaxFakeMailboxes = 16U;
 constexpr std::size_t kMaxFakeEvents = 16U;
 
@@ -50,6 +50,7 @@ std::vector<std::uint8_t> g_received_wire;
 std::size_t g_received_offset{0U};
 std::string g_protocol_debug;
 std::uint32_t g_fake_time{0U};
+std::uint32_t g_last_scheduled_delay{0U};
 
 FakeMailbox* FindMailbox(void* backend) {
   const auto found = std::find_if(
@@ -97,7 +98,9 @@ int CaptureProtocolDebug(const char* format, ...) {
 
 std::uint32_t FakeTimestamp() { return g_fake_time; }
 
-void IgnoreSchedule(std::uint32_t delay_ms) { static_cast<void>(delay_ms); }
+void CaptureSchedule(std::uint32_t delay_ms) {
+  g_last_scheduled_delay = delay_ms;
+}
 
 void IgnoreFrame(void* context, const std::uint8_t* data,
                  std::uint16_t length) {
@@ -293,8 +296,8 @@ class ControllerCommandProtocolTest : public ::testing::Test {
   app::hw::ControllerCommandSink* sink_{nullptr};
 };
 
-TEST_F(ControllerCommandProtocolTest, RegistersTwelveCommandsWithLoopback) {
-  EXPECT_EQ(protocol::kMaxHandlers, 13U);
+TEST_F(ControllerCommandProtocolTest, RegistersThirteenCommandsWithLoopback) {
+  EXPECT_EQ(protocol::kMaxHandlers, 14U);
   EXPECT_FALSE(
     protocol_.AddHandler(static_cast<protocol::Tag>(0x0200U), &IgnoreFrame));
   EXPECT_FALSE(sink_->Register(protocol_));
@@ -316,6 +319,22 @@ TEST_F(ControllerCommandProtocolTest, RemovedDelayTagRemainsUnassigned) {
   protocol::Protocol protocol_without_commands{TestProtocolConfig()};
   EXPECT_TRUE(protocol_without_commands.AddHandler(
     static_cast<protocol::Tag>(0x0104U), &IgnoreFrame));
+}
+
+TEST_F(ControllerCommandProtocolTest, DecodesFadeFieldsLittleEndian) {
+  EXPECT_EQ(static_cast<std::uint16_t>(protocol::Tag::kFade), 0x010DU);
+  const std::vector<std::uint8_t> payload{
+    0x34U, 0x12U, 0x90U, 0x01U, 0xD0U, 0x07U, 0x5AU, 0x12U, 0x34U, 0x56U, 0x78U,
+  };
+  Send(protocol::Tag::kFade, payload);
+
+  const auto message = Receive();
+  EXPECT_EQ(message.cmd, app::hw::ControllerCommand::kFade);
+  EXPECT_EQ(message.fade.mark, 0x1234U);
+  EXPECT_EQ(message.fade.percent, 400U);
+  EXPECT_EQ(message.fade.duration_ms, 2000U);
+  EXPECT_EQ(message.fade.index, 0x5AU);
+  EXPECT_EQ(message.fade.group_id, 0x78563412U);
 }
 
 TEST_F(ControllerCommandProtocolTest, DecodesGroupedRgbRangeLittleEndian) {
@@ -412,13 +431,14 @@ TEST_F(ControllerCommandProtocolTest, RejectsShortAndOverlongNewPayloads) {
     protocol::Tag tag;
     std::uint16_t length;
   };
-  const std::array<PayloadSize, 6U> sizes{{
+  const std::array<PayloadSize, 7U> sizes{{
     {protocol::Tag::kSetMultipleColorGrouped, 11U},
     {protocol::Tag::kSetSingleColorGrouped, 10U},
     {protocol::Tag::kSetSingleColorHsvGrouped, 10U},
     {protocol::Tag::kSetMultipleColorHsvGrouped, 11U},
     {protocol::Tag::kRunGroup, 12U},
     {protocol::Tag::kStart, 2U},
+    {protocol::Tag::kFade, 11U},
   }};
 
   for (const auto& size : sizes) {
@@ -499,9 +519,10 @@ class ControllerCommandDispatchTest : public ::testing::Test {
  protected:
   void SetUp() override {
     g_fake_time = 0U;
+    g_last_scheduled_delay = 0U;
     controller_.SetStrip(&strip_);
     controller_.SetTimestampCallback(FakeTimestamp);
-    controller_.SetScheduleCallback(IgnoreSchedule);
+    controller_.SetScheduleCallback(CaptureSchedule);
   }
 
   prism::test::MockStrip strip_;
@@ -586,6 +607,62 @@ TEST_F(ControllerCommandDispatchTest,
   result = app::DispatchControllerCommand(controller_, start);
   EXPECT_EQ(result.start_status, prism::ControllerStatus::kSuccess);
   EXPECT_EQ(result.initial_run_status, prism::ControllerStatus::kSuccess);
+}
+
+TEST_F(ControllerCommandDispatchTest,
+       FadeCommandPreservesGroupedFieldsThroughExecution) {
+  constexpr std::uint8_t kIndex = 1U;
+  constexpr prism::GroupId kGroupId = 0x78563412U;
+  constexpr prism::color::RgbColor kStart{160U, 80U, 40U};
+  constexpr prism::color::RgbColor kTarget{40U, 20U, 10U};
+
+  app::hw::ControllerCommandMessage fade{};
+  fade.cmd = app::hw::ControllerCommand::kFade;
+  fade.fade = {5U, 25U, 20U, kIndex, kGroupId};
+  auto result = app::DispatchControllerCommand(controller_, fade);
+  ASSERT_TRUE(result.mutation_attempted);
+  ASSERT_EQ(result.mutation_status, prism::ControllerStatus::kSuccess);
+
+  app::hw::ControllerCommandMessage start_child{};
+  start_child.cmd = app::hw::ControllerCommand::kRunGroup;
+  start_child.run_group = {0U, 0U, kGroupId, 0U};
+  ASSERT_EQ(
+    app::DispatchControllerCommand(controller_, start_child).mutation_status,
+    prism::ControllerStatus::kSuccess);
+
+  auto* led = strip_.MutableLed(kIndex);
+  EXPECT_CALL(*led, Color()).Times(0);
+  EXPECT_CALL(*led, SetColor(testing::_)).Times(0);
+  EXPECT_CALL(strip_, Show()).Times(0);
+
+  app::hw::ControllerCommandMessage start{};
+  start.cmd = app::hw::ControllerCommand::kStart;
+  start.start.root_additional_repeats = 0U;
+  result = app::DispatchControllerCommand(controller_, start);
+  ASSERT_EQ(result.start_status, prism::ControllerStatus::kSuccess);
+  ASSERT_EQ(result.initial_run_status, prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(g_last_scheduled_delay, 5U);
+  testing::Mock::VerifyAndClearExpectations(led);
+  testing::Mock::VerifyAndClearExpectations(&strip_);
+
+  g_fake_time = 5U;
+  g_last_scheduled_delay = 0U;
+  EXPECT_CALL(*led, Color()).WillOnce(testing::Return(kStart));
+  EXPECT_CALL(*led, SetColor(testing::_)).Times(0);
+  EXPECT_CALL(strip_, Show()).Times(0);
+  EXPECT_EQ(app::RunControllerProgress(controller_),
+            prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(g_last_scheduled_delay, 15U);
+  testing::Mock::VerifyAndClearExpectations(led);
+  testing::Mock::VerifyAndClearExpectations(&strip_);
+
+  g_fake_time = 25U;
+  g_last_scheduled_delay = 0U;
+  EXPECT_CALL(*led, SetColor(kTarget)).WillOnce(testing::Return(0));
+  EXPECT_CALL(strip_, Show()).WillOnce(testing::Return(0));
+  EXPECT_EQ(app::RunControllerProgress(controller_),
+            prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(g_last_scheduled_delay, 0U);
 }
 
 TEST_F(ControllerCommandDispatchTest, FailedStartDoesNotRun) {
