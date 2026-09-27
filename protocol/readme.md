@@ -34,7 +34,7 @@ parser re-synchronises.
 | `kHeaderSize`         | 4       | Tag + Length                      |
 | `kChecksumSize`       | 1       |                                   |
 | `kMaxFrameDataLength` | 256     | Max data payload bytes            |
-| `kMaxHandlers`        | 8       | Max registered `FrameHandler`s    |
+| `kMaxHandlers`        | 13      | Max registered `FrameHandler`s, including loopback |
 
 ## Tags
 
@@ -137,3 +137,5 @@ back with the same tag and identical data. This validates the entire
 serialisation, transport, and deserialisation pipeline end-to-end.
 No explicit registration is needed.
 
+The fixed handler table holds 13 entries total, including the built-in
+loopback handler.

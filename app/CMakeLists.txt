@@ -8,6 +8,7 @@ target_include_directories(app PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include
                                    ${PROJECT_SOURCE_DIR}/include)
 
 target_sources(app PRIVATE src/blink_app.cpp
+                         src/controller_command_dispatch.cpp
                          src/hw/hw_task.cpp
                          src/hw/status_led.cpp
                          src/hw/strip_manager.cpp

@@ -17,9 +17,9 @@ namespace app::hw {
 ///
 /// ## Two-phase initialisation
 ///
-/// 1. Register(protocol) — called from HwTask::Setup().  Registers the four
-///    static frame handlers on the given Protocol.  The mailbox pointer may
-///    still be null at this point; handlers check and silently drop frames.
+/// 1. Register(protocol) — called from HwTask::Setup(). Registers all
+///    controller-command handlers and reports any table or duplicate-tag
+///    failure. The mailbox pointer may still be null at this point.
 /// 2. SetMailbox(mailbox) — called from AppTask::Setup() after the APP
 ///    thread's EventMailbox is ready.  Enables the outbound path.
 class ControllerCommandSink {
@@ -31,11 +31,11 @@ class ControllerCommandSink {
   ControllerCommandSink(const ControllerCommandSink&) = delete;
   ControllerCommandSink& operator=(const ControllerCommandSink&) = delete;
 
-  /// @brief Register the four controller-command frame handlers on a protocol
-  ///     engine.
+  /// @brief Register all legacy and grouped controller-command handlers.
   /// @param protocol Protocol instance to register handlers with.
   /// @pre Called once during HwTask::Setup().
-  void Register(protocol::Protocol& protocol);
+  /// @return True only when every handler is registered.
+  bool Register(protocol::Protocol& protocol);
 
   /// @brief Set the mailbox that parsed commands are forwarded into.
   /// @param mailbox Non-owning pointer to an EventMailbox owned by AppTask.
@@ -67,6 +67,49 @@ class ControllerCommandSink {
   /// @brief Handler for the SetMultipleColorHsv tag.
   static void HandleSetMultipleColorHsv(void* context, const uint8_t* data,
                                         uint16_t length);
+
+  /// @brief Queue one decoded command and report mailbox failure via protocol.
+  /// @param context Protocol instance supplied by AddHandler.
+  /// @param message Fully decoded command to copy into the mailbox.
+  /// @param command_name Short command name for diagnostics.
+  static void QueueCommand(void* context,
+                           const ControllerCommandMessage& message,
+                           const char* command_name);
+
+  /// @brief Validate an exact-length new command payload before decoding.
+  /// @param context Protocol instance supplied by AddHandler.
+  /// @param data Payload pointer.
+  /// @param length Payload length in bytes.
+  /// @param expected_length Required payload length.
+  /// @param command_name Short command name for diagnostics.
+  /// @return True only when the pointer is non-null and the size is exact.
+  static bool HasExactPayload(void* context, const uint8_t* data,
+                              uint16_t length, uint16_t expected_length,
+                              const char* command_name);
+
+  /// @brief Handler for grouped RGB range instructions.
+  static void HandleSetMultipleColorGrouped(void* context, const uint8_t* data,
+                                            uint16_t length);
+
+  /// @brief Handler for grouped RGB single-pixel instructions.
+  static void HandleSetSingleColorGrouped(void* context, const uint8_t* data,
+                                          uint16_t length);
+
+  /// @brief Handler for grouped HSV single-pixel instructions.
+  static void HandleSetSingleColorHsvGrouped(void* context, const uint8_t* data,
+                                             uint16_t length);
+
+  /// @brief Handler for grouped HSV range instructions.
+  static void HandleSetMultipleColorHsvGrouped(void* context,
+                                               const uint8_t* data,
+                                               uint16_t length);
+
+  /// @brief Handler for a child-group activation instruction.
+  static void HandleRunGroup(void* context, const uint8_t* data,
+                             uint16_t length);
+
+  /// @brief Handler for a root Start repeat policy.
+  static void HandleStart(void* context, const uint8_t* data, uint16_t length);
 
   /// @brief Non-owning pointer to the EventMailbox owned by AppTask.
   ///     Null until SetMailbox() is called; handlers silently drop frames

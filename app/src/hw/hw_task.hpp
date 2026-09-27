@@ -60,6 +60,10 @@ class HwTask {
   HwTask() = default;
 
  private:
+#if defined(PRISM_CONTROLLER_TESTING)
+  friend class HwTaskSetupTestAccess;
+#endif
+
   /// @brief One-time setup — prints the startup banner.
   /// @return True when the HW executor loop may begin.
   bool Setup();

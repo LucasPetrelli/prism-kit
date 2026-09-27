@@ -72,7 +72,11 @@ bool HwTask::Setup() {
   /* Register controller-command protocol handlers before the loop begins
    * dispatching frames.  The sink's mailbox pointer may still be null
    * (AppTask sets it later) — handlers check and silently drop frames. */
-  ControllerCommandSink::Instance().Register(cmd_mgr.Protocol());
+  if (!ControllerCommandSink::Instance().Register(cmd_mgr.Protocol())) {
+    oshal::debug_port.Printf(
+      "[APP_HW] Controller-command protocol registration failed\n");
+    return false;
+  }
 
   return cmd_mgr.PrintBanner(bal::GetWs2812Strip().Name());
 }

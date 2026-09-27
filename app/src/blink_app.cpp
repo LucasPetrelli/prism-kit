@@ -3,6 +3,7 @@
 #include <cstdint>
 
 #include "app/app.hpp"
+#include "controller_command_dispatch.hpp"
 #include "hw/controller_command.hpp"
 #include "hw/controller_command_sink.hpp"
 #include "oshal/debug_port.hpp"
@@ -40,6 +41,14 @@ class PrismDebugPort final : public prism::Debug {
  private:
   oshal::DebugPort& port_;
 };
+
+void LogControllerFailure(const char* operation,
+                          prism::ControllerStatus status) {
+  if (status != prism::ControllerStatus::kSuccess) {
+    oshal::debug_port.Printf("[APP] %s failed: status=%u\n", operation,
+                             static_cast<unsigned>(status));
+  }
+}
 
 }  // namespace
 
@@ -93,9 +102,22 @@ bool AppTask::Setup() {
       /* mark = */ 0U, kRainbowColors[i].red, kRainbowColors[i].green,
       kRainbowColors[i].blue, i};
     prism::SetSingleColor instr{payload};
-    controller_.AddInstruction(&instr);
+    LogControllerFailure("default AddInstruction",
+                         controller_.AddInstruction(&instr));
   }
-  controller_.Run();
+
+  app::hw::ControllerCommandMessage start_message{};
+  start_message.cmd = app::hw::ControllerCommand::kStart;
+  start_message.start.root_additional_repeats = 0U;
+  const auto start_result =
+    app::DispatchControllerCommand(controller_, start_message);
+  if (start_result.start_attempted) {
+    LogControllerFailure("default Start", start_result.start_status);
+  }
+  if (start_result.initial_run_attempted) {
+    LogControllerFailure("default initial Run",
+                         start_result.initial_run_status);
+  }
   return true;
 }
 
@@ -104,33 +126,15 @@ prism::Controller& AppTask::GetController() { return controller_; }
 void AppTask::UpdateInstructions() {
   app::hw::ControllerCommandMessage msg;
   while (command_mailbox_.Receive(&msg)) {
-    switch (msg.cmd) {
-      case app::hw::ControllerCommand::kSetMultipleColor: {
-        const prism::SetMultipleColor instr{msg.set_multiple};
-        controller_.AddInstruction(&instr);
-        break;
-      }
-      case app::hw::ControllerCommand::kSetSingleColor: {
-        const prism::SetSingleColor instr{msg.set_single};
-        controller_.AddInstruction(&instr);
-        break;
-      }
-      case app::hw::ControllerCommand::kResetInstructions:
-        controller_.ResetInstructions();
-        break;
-      case app::hw::ControllerCommand::kRun:
-        controller_.Run();
-        break;
-      case app::hw::ControllerCommand::kSetMultipleColorHsv: {
-        const prism::SetMultipleColorHsv instr{msg.set_multiple_hsv};
-        controller_.AddInstruction(&instr);
-        break;
-      }
-      case app::hw::ControllerCommand::kSetSingleColorHsv: {
-        const prism::SetSingleColorHsv instr{msg.set_single_hsv};
-        controller_.AddInstruction(&instr);
-        break;
-      }
+    const auto result = app::DispatchControllerCommand(controller_, msg);
+    if (result.mutation_attempted) {
+      LogControllerFailure("controller mutation", result.mutation_status);
+    }
+    if (result.start_attempted) {
+      LogControllerFailure("controller Start", result.start_status);
+    }
+    if (result.initial_run_attempted) {
+      LogControllerFailure("controller initial Run", result.initial_run_status);
     }
   }
 }
@@ -153,7 +157,8 @@ bool AppTask::Loop() {
    * Note that UpdateInstructions() may have already called Run() via a
    * kRun command; a second Run() is idempotent and harmless. */
   if (events & kTimeoutEventMask) {
-    controller_.Run();
+    LogControllerFailure("controller Run",
+                         app::RunControllerProgress(controller_));
   }
 
   return true;
