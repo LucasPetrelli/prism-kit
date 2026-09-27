@@ -13,7 +13,9 @@ Wire format (matches ``protocol::Frame`` in ``protocol/include/frame.hpp``):
 - SetMultipleColorHsv tag: 0x0106 (``protocol::Tag::kSetMultipleColorHsv``)
 - SetMultipleColorGrouped tag: 0x0107
 - SetSingleColorGrouped tag: 0x0108
+- RunGroup tag: 0x010B
 - Start tag: 0x010C
+- Fade tag: 0x010D
 - Delay was 0x0104 — removed; use mark gaps instead.
 - Checksum: XOR of tag + length + data bytes.
 """
@@ -34,7 +36,9 @@ TAG_SET_SINGLE_COLOR_HSV = 0x0105
 TAG_SET_MULTIPLE_COLOR_HSV = 0x0106
 TAG_SET_MULTIPLE_COLOR_GROUPED = 0x0107
 TAG_SET_SINGLE_COLOR_GROUPED = 0x0108
+TAG_RUN_GROUP = 0x010B
 TAG_START = 0x010C
+TAG_FADE = 0x010D
 
 
 def build_frame(tag: int, payload: bytes) -> bytes:
@@ -136,6 +140,48 @@ def build_set_single_color_grouped_frame(
         + group_id.to_bytes(4, "little")
     )
     return build_frame(TAG_SET_SINGLE_COLOR_GROUPED, payload)
+
+
+def build_run_group_frame(
+    parent_group_id: int,
+    mark: int,
+    target_group_id: int,
+    additional_repeats: int,
+) -> bytes:
+    """Build a ``kRunGroup`` frame.
+
+    Payload: ``parent_group_id(4 LE) mark(2 LE) target_group_id(4 LE)
+    additional_repeats(2 LE)``. ``0xFFFF`` requests forever repeats.
+    """
+    payload = (
+        parent_group_id.to_bytes(4, "little")
+        + mark.to_bytes(2, "little")
+        + target_group_id.to_bytes(4, "little")
+        + additional_repeats.to_bytes(2, "little")
+    )
+    return build_frame(TAG_RUN_GROUP, payload)
+
+
+def build_fade_grouped_frame(
+    mark: int,
+    percent: int,
+    duration_ms: int,
+    index: int,
+    group_id: int,
+) -> bytes:
+    """Build a group-aware one-pixel Fade frame.
+
+    Payload: ``mark(2 LE) percent(2 LE) duration_ms(2 LE) index(1)
+    group_id(4 LE)``.
+    """
+    payload = (
+        mark.to_bytes(2, "little")
+        + percent.to_bytes(2, "little")
+        + duration_ms.to_bytes(2, "little")
+        + bytes([index])
+        + group_id.to_bytes(4, "little")
+    )
+    return build_frame(TAG_FADE, payload)
 
 
 def build_reset_instructions_frame() -> bytes:
