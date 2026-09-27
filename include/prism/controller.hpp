@@ -9,9 +9,8 @@
 
 namespace prism {
 
-/// @brief Callback returning a monotonically-increasing timestamp in
-///     milliseconds.
-/// @return Current timestamp value.
+/// @brief Callback returning a 32-bit timestamp in milliseconds.
+/// @return Current counter value; active intervals must stay below half range.
 using TimestampCallback = std::uint32_t (*)();
 
 /// @brief Callback invoked when a timed instruction yields a non-zero
@@ -36,7 +35,8 @@ enum class ControllerStatus : std::uint8_t {
   kCapacityExhausted,
   /// @brief Alias for the capacity failure.
   kCapacity = kCapacityExhausted,
-  /// @brief The retained program failed pre-run validation.
+  /// @brief Program preflight failed or a repeat-boundary invariant was
+  ///     violated at runtime.
   kInvalidProgram,
   /// @brief A requested child group is already active.
   kAlreadyActiveGroup,
@@ -59,9 +59,8 @@ struct GroupRecord {
 
 /// @brief Fixed runtime storage reserved for one group activation.
 ///
-/// Step 1 initializes and resets this record; nested scheduling consumes the
-/// cursor, origin, repeat, and outstanding-work fields in the later runtime
-/// step.
+/// The controller resets this record for each pass while retaining its
+/// immutable group metadata.
 struct GroupRuntime {
   /// @brief Immutable group metadata copied at validation time.
   GroupRecord record{};
@@ -75,6 +74,12 @@ struct GroupRuntime {
   std::uint32_t active_count{0U};
   /// @brief Number of child activations still outstanding.
   std::uint32_t child_count{0U};
+  /// @brief Whether this pass observed a positive scheduling boundary.
+  bool positive_boundary_observed{false};
+  /// @brief Parent runtime index, or kMaxGroups for the root.
+  std::uint32_t parent_group_index{kMaxGroups};
+  /// @brief Nesting depth used to advance children before their parents.
+  std::uint8_t depth{0U};
   /// @brief Whether this runtime currently represents an active invocation.
   bool active{false};
 
@@ -85,8 +90,8 @@ struct GroupRuntime {
 
 /// @brief High-level animation controller for a Prism Kit strip.
 ///
-/// Accepts preset-color instructions, enqueues them in a fixed-capacity
-/// ring, and executes them sequentially when Run() is called.
+/// Accepts fixed-capacity group programs and advances their timelines when
+/// Run() is called.
 class Controller {
  public:
   /// @brief Maximum number of queued instructions.
@@ -116,29 +121,31 @@ class Controller {
   /// @return Success, invalid argument, busy, or capacity-exhausted status.
   ControllerStatus AddInstruction(const ControllerInstruction* instr);
 
-  /// @brief Start or replay the retained program from the root group.
+  /// @brief Initialize or replay the retained program from the root group.
   /// @param root_additional_repeats Additional root passes; the forever
   ///     sentinel is permitted only here.
-  /// @return Success, busy, capacity, or invalid-program status.
+  /// @return Success, busy, capacity, or invalid-program status. No
+  ///     instruction executes until the caller invokes Run().
   ControllerStatus Start(LoopCount root_additional_repeats = 0U);
 
   /// @brief Clear all queued instructions and abort active runtimes.
   void ResetInstructions();
 
-  /// @brief Iterate through instructions: drain executing array first, then
-  ///     pick new instructions whose mark <= current timestamp.
+  /// @brief Advance active group timelines and schedule the next progress tick.
   ///
-  /// @pre A valid timestamp callback must be registered before calling Run().
-  /// @return Success or a controller/program-validation failure.
+  /// Calls while idle or completed are harmless no-ops; Run() never starts an
+  /// editable program implicitly.
+  /// @pre A valid timestamp callback must be registered before an active run.
+  /// @return Success or the first runtime group-execution failure this tick.
   ControllerStatus Run();
 
   /// @brief Register a timestamp callback for timing-aware execution.
   /// @param callback Function returning the current timestamp in milliseconds.
   void SetTimestampCallback(TimestampCallback callback);
 
-  /// @brief Query the current monotonically-increasing timestamp.
-  /// @return Current timestamp in milliseconds from the registered callback,
-  ///     or 0 if none is set.
+  /// @brief Query the current 32-bit timestamp.
+  /// @return Counter value in milliseconds, wrapping at uint32 overflow, or 0
+  ///     if no callback is registered.
   std::uint32_t GetTimestamp() const;
 
   /// @brief Register a schedule callback for timed-instruction re-arming.
@@ -158,6 +165,16 @@ class Controller {
  private:
   /// @brief Fixed scratch storage used while constructing a validated model.
   struct GroupBuildState;
+
+  /// @brief Fixed bookkeeping for one timed instruction under execution.
+  struct ExecutingInstruction {
+    /// @brief Index of the instruction slot being resumed.
+    std::uint32_t instruction_index{0U};
+    /// @brief Index of the owning group runtime.
+    std::uint32_t runtime_index{0U};
+    /// @brief Absolute timestamp at which the instruction is next ready.
+    std::uint32_t deadline{0U};
+  };
 
   /// @brief Lifecycle state of the retained instruction program.
   enum class ProgramState : std::uint8_t {
@@ -212,20 +229,57 @@ class Controller {
   static std::uint32_t FindGroup(const GroupRecord* groups,
                                  std::uint32_t group_count, GroupId id);
 
-  /// @brief Reset all active slots before a new program activation.
-  void ResetInstructionReplayState();
+  /// @brief Reset replay state for all instructions in one group.
+  /// @param runtime_index Index into the validated runtime table.
+  void ResetGroupInstructionReplayState(std::uint32_t runtime_index);
 
-  /// @brief Run timed instructions in the executing_ array, removing
-  ///     completed entries (swap-with-last).
-  void DrainExecuting();
+  /// @brief Record a positive boundary for a runtime and its active ancestors.
+  /// @param runtime_index Group runtime where the boundary was observed.
+  void ObservePositiveBoundary(std::uint32_t runtime_index);
 
-  /// @brief Consume pending instructions whose mark <= current timestamp.
-  ///     Multiple instructions may share the same mark (all execute at
-  ///     the same time).  Stops at the first whose mark is in the future
-  ///     — the sorted invariant guarantees all remaining instructions
-  ///     have marks >= that future mark, so none qualify until time
-  ///     advances.
-  void PickNewInstructions();
+  /// @brief Initialize one group invocation and reset its instruction state.
+  /// @param group_index Group runtime to activate.
+  /// @param timestamp Local-time origin for this invocation.
+  /// @param additional_repeats Number of passes after the first.
+  /// @param parent_group_index Parent runtime, or kMaxGroups for the root.
+  /// @return True when the runtime index is valid and activation was recorded.
+  bool StartGroupRuntime(std::uint32_t group_index, std::uint32_t timestamp,
+                         LoopCount additional_repeats,
+                         std::uint32_t parent_group_index);
+
+  /// @brief Resume timed instructions whose deadlines have arrived.
+  /// @param timestamp Timestamp shared by the current progress tick.
+  /// @param run_status First failure observed during this tick.
+  /// @return True if any timed instruction was resumed or removed.
+  bool DrainExecuting(std::uint32_t timestamp, ControllerStatus& run_status);
+
+  /// @brief Complete or repeat groups with no outstanding work.
+  /// @param timestamp Timestamp shared by the current progress tick.
+  /// @param run_status First failure observed during this tick.
+  /// @return True if any group completion or repeat transition occurred.
+  bool CompleteReadyGroups(std::uint32_t timestamp,
+                           ControllerStatus& run_status);
+
+  /// @brief Execute a due instruction or activate its child group.
+  /// @param runtime_index Index of the owning group runtime.
+  /// @param slot_index Index of the due instruction slot.
+  /// @param timestamp Timestamp shared by the current progress tick.
+  /// @param run_status First failure observed during this tick.
+  /// @return True only when a child starts and should run before its parent.
+  bool DispatchDueInstruction(std::uint32_t runtime_index,
+                              std::uint32_t slot_index, std::uint32_t timestamp,
+                              ControllerStatus& run_status);
+
+  /// @brief Execute newly due instructions, prioritizing deeper child groups.
+  /// @param timestamp Timestamp shared by the current progress tick.
+  /// @param run_status First failure observed during this tick.
+  /// @return True if any instruction was consumed or a child was activated.
+  bool PickDueInstructions(std::uint32_t timestamp,
+                           ControllerStatus& run_status);
+
+  /// @brief Schedule the earliest mark or timed-instruction deadline.
+  /// @param timestamp Timestamp shared by the current progress tick.
+  void ScheduleNextRun(std::uint32_t timestamp);
 
   /// @brief Record a timeout for the end-of-run schedule callback.
   /// @param ms Timeout in milliseconds.  Only the smallest value across all
@@ -243,16 +297,11 @@ class Controller {
   /// @param idx  Index into instructions_[] for the instruction being drained.
   void DebugLogDrain(std::uint32_t i, std::uint32_t idx) const;
 
-  /// @brief Log a pick-new-instruction step with mark and instruction desc.
+  /// @brief Log a due-instruction step with mark and group-local elapsed time.
   /// @param idx     Index into instructions_[] for the instruction being
   /// picked.
-  /// @param elapsed Milliseconds since the first Run() call (marks are
-  ///     relative offsets from that point).
+  /// @param elapsed Milliseconds since the owning group's activation.
   void DebugLogPick(std::uint32_t idx, std::uint32_t elapsed) const;
-
-  /// @brief Milliseconds elapsed since the first Run() call.
-  /// @pre has_run_ is true.
-  std::uint32_t GetElapsed() const;
 
   /// @brief Non-owning pointer to the bound strip, or nullptr.
   Strip* strip_;
@@ -260,21 +309,13 @@ class Controller {
   InstructionMemorySlot instructions_[kMaxInstruction];
   /// @brief Number of active instructions in the queue.
   std::uint32_t instruction_count_;
-  /// @brief Mark-sorted view over pending instruction indices.
-  PendingInstructionQueueView pending_;
-  /// @brief Indices of instruction slots currently under execution (timed).
-  std::uint32_t executing_[kMaxExecuting]{};
+  /// @brief Timed instructions and their group-relative completion tracking.
+  ExecutingInstruction executing_[kMaxExecuting]{};
   /// @brief Number of entries in executing_.
   std::uint32_t executing_count_{0U};
 
   /// @brief Set by instructions via RequestShow(); cleared at each Run().
   bool show_requested_{false};
-  /// @brief True after the first Run() call — used to snapshot the start
-  ///     timestamp so marks are treated as offsets from that point.
-  bool has_run_{false};
-  /// @brief Timestamp captured on the first Run() call.  Marks are
-  ///     relative offsets from this value.
-  std::uint32_t start_time_{0U};
   /// @brief Timestamp callback for timing-aware execution, or nullptr.
   TimestampCallback get_timestamp_;
   /// @brief Schedule callback for timed-instruction re-arming, or nullptr.
@@ -285,9 +326,7 @@ class Controller {
   std::uint32_t min_scheduled_timeout_{0U};
   /// @brief Current editable, active, or completed program state.
   ProgramState state_{ProgramState::kEditable};
-  /// @brief Root repeat policy retained for the active invocation.
-  LoopCount root_additional_repeats_{0U};
-  /// @brief Fixed shared instruction indexes grouped by GroupRecord.
+  /// @brief Fixed shared instruction indexes grouped and sorted by mark.
   std::uint32_t group_indices_[kMaxInstructions]{};
   /// @brief Compact group metadata built at Start().
   GroupRecord groups_[kMaxGroups]{};

@@ -48,6 +48,10 @@ enum class InstructionTag : std::uint8_t {
   kSetSingleColorHsv,
   /// @brief Start a non-root group timeline.
   kRunGroup,
+#if defined(PRISM_CONTROLLER_TESTING)
+  /// @brief Host-test-only timed instruction.
+  kTestTimed,
+#endif
 };
 
 /// @brief Return a human-readable name for an instruction tag.
@@ -139,7 +143,8 @@ class ControllerInstruction {
 
   /// @brief Execute this instruction against its bound strip.
   /// @return 0 if the instruction completed, or a positive duration in
-  ///     milliseconds after which Execute() should be called again.
+  ///     milliseconds after which Execute() should be called again. Positive
+  ///     durations must be less than half the uint32 timestamp range.
   virtual std::uint32_t Execute() = 0;
 
   /// @brief Return the tag identifying this instruction's concrete type.
@@ -325,11 +330,8 @@ class RunGroupInstruction : public ControllerInstruction {
     group_id = payload.group_id;
   }
 
-  /// @brief Execute the instruction.
-  ///
-  /// Nested activation is intentionally supplied by the later GroupRuntime
-  /// step.  The stored instruction is otherwise instantaneous at this step.
-  /// @return 0 until nested group execution is implemented.
+  /// @brief Direct execution is a no-op; Controller::Run handles activation.
+  /// @return 0 when called outside the controller's group scheduler.
   std::uint32_t Execute() override;
 
   /// @brief Write a description including target and repeat policy.
@@ -355,6 +357,47 @@ class RunGroupInstruction : public ControllerInstruction {
   LoopCount additional_repeats{0U};
 };
 
+#if defined(PRISM_CONTROLLER_TESTING)
+namespace test {
+
+/// @brief Fixed-storage timed instruction available only to host tests.
+class TimedInstruction : public ControllerInstruction {
+ public:
+  /// @brief Construct a one-yield instruction for controller timing tests.
+  /// @param delay_ms Duration returned on the first execution.
+  /// @param execution_count Optional non-owning counter; it must outlive every
+  ///     stored copy of this instruction.
+  /// @param yield_on_first_execution Whether Execute() yields its advertised
+  ///     positive boundary on the first call.
+  TimedInstruction(std::uint32_t delay_ms, std::uint32_t* execution_count,
+                   bool yield_on_first_execution = true);
+
+  /// @brief Yield once, then complete on the next execution.
+  /// @return The configured delay on the first call, then zero.
+  std::uint32_t Execute() override;
+
+  /// @brief Write a description for controller debug logs.
+  /// @param buf Destination buffer.
+  /// @param size Buffer capacity.
+  void ToString(char* buf, std::size_t size) const override;
+
+  /// @brief Reset the yield state before a group pass is replayed.
+  void ResetForReplay() override;
+
+  /// @brief Report whether the configured delay provides a repeat boundary.
+  /// @return True when the configured delay is positive.
+  bool HasPositiveSchedulingBoundary() const override;
+
+ private:
+  std::uint32_t delay_ms_{0U};
+  std::uint32_t* execution_count_{nullptr};
+  bool yield_on_first_execution_{true};
+  bool yielded_{false};
+};
+
+}  // namespace test
+#endif
+
 /// @brief Variant storage for one instruction slot with active-member tracking.
 ///
 /// Tracks which member is active via tag_ so that set(), execute() and
@@ -371,6 +414,10 @@ struct InstructionMemorySlot {
     SetSingleColorHsv set_single_color_hsv;
     /// @brief Active member: child-group activation instruction.
     RunGroupInstruction run_group;
+#if defined(PRISM_CONTROLLER_TESTING)
+    /// @brief Active member: host-test timed instruction.
+    test::TimedInstruction test_timed;
+#endif
   };
 
   /// @brief Tag identifying the currently-active member.

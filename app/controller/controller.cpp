@@ -11,6 +11,24 @@
 static_assert(prism::kMaxGroups <= 32U,
               "Group graph masks require at most 32 groups");
 
+namespace {
+
+constexpr std::uint32_t kTimestampHalfRange = 0x80000000U;
+
+bool DeadlineReached(std::uint32_t timestamp, std::uint32_t deadline) {
+  return timestamp - deadline < kTimestampHalfRange;
+}
+
+void LatchRunStatus(prism::ControllerStatus& run_status,
+                    prism::ControllerStatus status) {
+  if (run_status == prism::ControllerStatus::kSuccess &&
+      status != prism::ControllerStatus::kSuccess) {
+    run_status = status;
+  }
+}
+
+}  // namespace
+
 struct prism::Controller::GroupBuildState {
   GroupRecord groups[Controller::kMaxGroups]{};
   std::uint32_t instruction_indices[prism::kMaxInstructions]{};
@@ -30,9 +48,7 @@ prism::Controller::Controller()
       executing_count_(0U),
       get_timestamp_(nullptr),
       schedule_next_run_(nullptr),
-      debug_(nullptr) {
-  pending_.SetInstructions(instructions_);
-}
+      debug_(nullptr) {}
 
 std::uint32_t prism::Controller::FindGroup(const GroupRecord* groups,
                                            std::uint32_t group_count,
@@ -107,11 +123,32 @@ prism::ControllerStatus prism::Controller::BuildGroupIndexPool(
     }
   }
 
-  // Preserve insertion order inside each group's shared index range.
+  // Group ranges retain insertion order before a stable mark sort below.
   for (std::uint32_t i = 0U; i < instruction_count_; ++i) {
     const std::uint32_t group_index =
       FindGroup(build.groups, build.group_count, instructions_[i].GetGroupId());
     build.instruction_indices[build.index_write_positions[group_index]++] = i;
+  }
+
+  // Each runtime advances one cursor, so keep its compact range mark-sorted.
+  // Strict comparison preserves insertion order when marks are equal.
+  for (std::uint32_t group_index = 0U; group_index < build.group_count;
+       ++group_index) {
+    const GroupRecord& group = build.groups[group_index];
+    const std::uint32_t end = group.index_begin + group.instruction_count;
+    for (std::uint32_t i = group.index_begin + 1U; i < end; ++i) {
+      const std::uint32_t instruction_index = build.instruction_indices[i];
+      const Mark mark = instructions_[instruction_index].GetMark();
+      std::uint32_t insert = i;
+      while (insert > group.index_begin &&
+             instructions_[build.instruction_indices[insert - 1U]].GetMark() >
+               mark) {
+        build.instruction_indices[insert] =
+          build.instruction_indices[insert - 1U];
+        --insert;
+      }
+      build.instruction_indices[insert] = instruction_index;
+    }
   }
   return ControllerStatus::kSuccess;
 }
@@ -226,10 +263,50 @@ void prism::Controller::CommitGroupBuild(const GroupBuildState& build) {
   }
 }
 
-void prism::Controller::ResetInstructionReplayState() {
-  for (std::uint32_t i = 0U; i < instruction_count_; ++i) {
-    instructions_[i].ResetForReplay();
+void prism::Controller::ResetGroupInstructionReplayState(
+  std::uint32_t runtime_index) {
+  const GroupRecord& record = runtimes_[runtime_index].record;
+  for (std::uint32_t i = 0U; i < record.instruction_count; ++i) {
+    instructions_[group_indices_[record.index_begin + i]].ResetForReplay();
   }
+}
+
+void prism::Controller::ObservePositiveBoundary(std::uint32_t runtime_index) {
+  for (std::uint32_t depth = 0U;
+       depth < group_count_ && runtime_index < group_count_; ++depth) {
+    GroupRuntime& runtime = runtimes_[runtime_index];
+    if (!runtime.active) {
+      return;
+    }
+    runtime.positive_boundary_observed = true;
+    runtime_index = runtime.parent_group_index;
+  }
+}
+
+bool prism::Controller::StartGroupRuntime(std::uint32_t group_index,
+                                          std::uint32_t timestamp,
+                                          LoopCount additional_repeats,
+                                          std::uint32_t parent_group_index) {
+  if (group_index >= group_count_ ||
+      (parent_group_index != kMaxGroups &&
+       (parent_group_index >= group_count_ ||
+        !runtimes_[parent_group_index].active))) {
+    return false;
+  }
+  GroupRuntime& runtime = runtimes_[group_index];
+  runtime.Reset();
+  runtime.start_time = timestamp;
+  runtime.repeats_remaining = additional_repeats;
+  runtime.parent_group_index = parent_group_index;
+  if (parent_group_index == kMaxGroups) {
+    runtime.depth = 0U;
+  } else {
+    runtime.depth =
+      static_cast<std::uint8_t>(runtimes_[parent_group_index].depth + 1U);
+  }
+  runtime.active = true;
+  ResetGroupInstructionReplayState(group_index);
+  return true;
 }
 
 void prism::Controller::SetStrip(Strip* strip) {
@@ -316,27 +393,25 @@ prism::ControllerStatus prism::Controller::Start(
     return status;
   }
 
-  ResetInstructionReplayState();
   executing_count_ = 0U;
-  pending_.Reset();
-  const std::uint32_t root_index =
-    FindGroup(groups_, group_count_, GroupId{0U});
-  if (root_index != kMaxGroups) {
-    const GroupRecord& root = groups_[root_index];
-    for (std::uint32_t i = 0U; i < root.instruction_count; ++i) {
-      pending_.Insert(group_indices_[root.index_begin + i]);
-    }
-  }
-
-  root_additional_repeats_ = root_additional_repeats;
-  start_time_ = GetTimestamp();
-  has_run_ = true;
   show_requested_ = false;
   min_scheduled_timeout_ = 0U;
-  state_ =
-    (root_index == kMaxGroups || groups_[root_index].instruction_count == 0U)
-      ? ProgramState::kCompleted
-      : ProgramState::kActive;
+  const std::uint32_t root_index =
+    FindGroup(groups_, group_count_, GroupId{0U});
+  if (root_index == kMaxGroups) {
+    return ControllerStatus::kInvalidProgram;
+  }
+  const std::uint32_t timestamp = GetTimestamp();
+  if (groups_[root_index].instruction_count == 0U) {
+    runtimes_[root_index].Reset();
+    state_ = ProgramState::kCompleted;
+    return ControllerStatus::kSuccess;
+  }
+  if (!StartGroupRuntime(root_index, timestamp, root_additional_repeats,
+                         kMaxGroups)) {
+    return ControllerStatus::kInvalidProgram;
+  }
+  state_ = ProgramState::kActive;
   return ControllerStatus::kSuccess;
 }
 
@@ -347,9 +422,9 @@ void prism::Controller::ResetInstructions() {
   }
   instruction_count_ = 0U;
   executing_count_ = 0U;
-  has_run_ = false;
   state_ = ProgramState::kEditable;
-  root_additional_repeats_ = 0U;
+  show_requested_ = false;
+  min_scheduled_timeout_ = 0U;
   group_count_ = 0U;
   for (std::uint32_t i = 0U; i < kMaxGroups; ++i) {
     groups_[i] = GroupRecord{};
@@ -358,37 +433,226 @@ void prism::Controller::ResetInstructions() {
   for (std::uint32_t i = 0U; i < kMaxInstructions; ++i) {
     group_indices_[i] = 0U;
   }
-  pending_.Reset();
 }
 
 prism::ControllerStatus prism::Controller::Run() {
-  if (state_ == ProgramState::kEditable) {
-    if (instruction_count_ == 0U) {
-      return ControllerStatus::kSuccess;
-    }
-    // Keep the pre-Start call pattern working for existing local users while
-    // the APP start-command migration is completed in a later step.
-    const ControllerStatus status = Start(0U);
-    if (status != ControllerStatus::kSuccess) {
-      return status;
-    }
-  }
   if (state_ != ProgramState::kActive) {
     return ControllerStatus::kSuccess;
   }
 
+  const std::uint32_t timestamp = GetTimestamp();
   DebugLog("Run");
   show_requested_ = false;
   min_scheduled_timeout_ = 0U;
 
-  DrainExecuting();
-  PickNewInstructions();
+  ControllerStatus run_status = ControllerStatus::kSuccess;
+  bool progressed = false;
+  do {
+    progressed = DrainExecuting(timestamp, run_status);
+    progressed = CompleteReadyGroups(timestamp, run_status) || progressed;
+    progressed = PickDueInstructions(timestamp, run_status) || progressed;
+  } while (progressed);
 
-  // Look-ahead: if there is a pending instruction whose mark hasn't
-  // been reached yet, schedule a wakeup for when it becomes due.
-  if (pending_.HasNext()) {
-    const std::uint32_t elapsed = GetElapsed();
-    const Mark next_mark = pending_.PeekMark();
+  ScheduleNextRun(timestamp);
+  if (show_requested_ && strip_ != nullptr) {
+    DebugLog("strip->Show()");
+    strip_->Show();
+  }
+
+  return run_status;
+}
+
+bool prism::Controller::DrainExecuting(std::uint32_t timestamp,
+                                       ControllerStatus& run_status) {
+  bool progressed = false;
+  std::uint32_t i = 0U;
+  while (i < executing_count_) {
+    const ExecutingInstruction instruction = executing_[i];
+    if (instruction.instruction_index >= instruction_count_ ||
+        instruction.runtime_index >= group_count_ ||
+        !runtimes_[instruction.runtime_index].active) {
+      DebugLog("Discarding timed instruction with invalid runtime");
+      LatchRunStatus(run_status, ControllerStatus::kInvalidProgram);
+      --executing_count_;
+      executing_[i] = executing_[executing_count_];
+      progressed = true;
+      continue;
+    }
+    if (!DeadlineReached(timestamp, instruction.deadline)) {
+      ++i;
+      continue;
+    }
+
+    ObservePositiveBoundary(instruction.runtime_index);
+    DebugLogDrain(i, instruction.instruction_index);
+    const std::uint32_t delay =
+      instructions_[instruction.instruction_index].Execute();
+    progressed = true;
+    if (delay != 0U) {
+      executing_[i].deadline = timestamp + delay;
+      ++i;
+      continue;
+    }
+
+    GroupRuntime& runtime = runtimes_[instruction.runtime_index];
+    if (runtime.active_count == 0U) {
+      DebugLog("Timed instruction completion count underflow");
+      LatchRunStatus(run_status, ControllerStatus::kInvalidProgram);
+    } else {
+      --runtime.active_count;
+    }
+    --executing_count_;
+    executing_[i] = executing_[executing_count_];
+  }
+  return progressed;
+}
+
+bool prism::Controller::CompleteReadyGroups(std::uint32_t timestamp,
+                                            ControllerStatus& run_status) {
+  bool progressed = false;
+  for (std::uint32_t i = 0U; i < group_count_; ++i) {
+    GroupRuntime& runtime = runtimes_[i];
+    if (!runtime.active || runtime.cursor < runtime.record.instruction_count ||
+        runtime.active_count != 0U || runtime.child_count != 0U) {
+      continue;
+    }
+
+    progressed = true;
+    const LoopCount repeats_remaining = runtime.repeats_remaining;
+    const std::uint32_t parent_group_index = runtime.parent_group_index;
+    if (repeats_remaining != 0U && runtime.positive_boundary_observed) {
+      const LoopCount next_repeats =
+        repeats_remaining == kForeverLoopCount
+          ? kForeverLoopCount
+          : static_cast<LoopCount>(repeats_remaining - 1U);
+      if (!StartGroupRuntime(i, timestamp, next_repeats, parent_group_index)) {
+        DebugLog("Unable to restart group runtime=%u", i);
+        LatchRunStatus(run_status, ControllerStatus::kInvalidProgram);
+        runtime.Reset();
+      }
+      continue;
+    }
+    if (repeats_remaining != 0U) {
+      DebugLog("Repeated group %u completed without observing a boundary", i);
+      LatchRunStatus(run_status, ControllerStatus::kInvalidProgram);
+    }
+
+    runtime.Reset();
+    if (i == 0U) {
+      state_ = ProgramState::kCompleted;
+      continue;
+    }
+    if (parent_group_index >= group_count_ ||
+        !runtimes_[parent_group_index].active ||
+        runtimes_[parent_group_index].child_count == 0U) {
+      DebugLog("Group completion has no active parent runtime=%u", i);
+      LatchRunStatus(run_status, ControllerStatus::kInvalidProgram);
+      continue;
+    }
+    --runtimes_[parent_group_index].child_count;
+  }
+  return progressed;
+}
+
+bool prism::Controller::DispatchDueInstruction(std::uint32_t runtime_index,
+                                               std::uint32_t slot_index,
+                                               std::uint32_t timestamp,
+                                               ControllerStatus& run_status) {
+  if (instructions_[slot_index].IsRunGroup()) {
+    const GroupId target_id = instructions_[slot_index].GetTargetGroupId();
+    const std::uint32_t target_index =
+      FindGroup(groups_, group_count_, target_id);
+    if (target_index == kMaxGroups || target_index == 0U) {
+      DebugLog("RunGroup target %u is invalid",
+               static_cast<unsigned>(target_id));
+      LatchRunStatus(run_status, ControllerStatus::kInvalidProgram);
+      return false;
+    }
+    if (runtimes_[target_index].active) {
+      DebugLog("RunGroup target %u is already active",
+               static_cast<unsigned>(target_id));
+      LatchRunStatus(run_status, ControllerStatus::kAlreadyActiveGroup);
+      return false;
+    }
+    if (!StartGroupRuntime(target_index, timestamp,
+                           instructions_[slot_index].GetAdditionalRepeats(),
+                           runtime_index)) {
+      DebugLog("Unable to start group runtime=%u", target_index);
+      LatchRunStatus(run_status, ControllerStatus::kInvalidProgram);
+      return false;
+    }
+    ++runtimes_[runtime_index].child_count;
+    return true;
+  }
+
+  const std::uint32_t delay = instructions_[slot_index].Execute();
+  if (delay == 0U) {
+    return false;
+  }
+  if (executing_count_ >= kMaxExecuting) {
+    DebugLog("Timed instruction capacity exhausted");
+    LatchRunStatus(run_status, ControllerStatus::kCapacityExhausted);
+    return false;
+  }
+  executing_[executing_count_++] = {slot_index, runtime_index,
+                                    timestamp + delay};
+  ++runtimes_[runtime_index].active_count;
+  return false;
+}
+
+bool prism::Controller::PickDueInstructions(std::uint32_t timestamp,
+                                            ControllerStatus& run_status) {
+  bool progressed = false;
+  for (std::uint32_t depth = group_count_; depth > 0U; --depth) {
+    const std::uint32_t target_depth = depth - 1U;
+    for (std::uint32_t runtime_index = 0U; runtime_index < group_count_;
+         ++runtime_index) {
+      GroupRuntime& runtime = runtimes_[runtime_index];
+      if (!runtime.active || runtime.depth != target_depth) {
+        continue;
+      }
+
+      const std::uint32_t elapsed = timestamp - runtime.start_time;
+      while (runtime.cursor < runtime.record.instruction_count) {
+        const std::uint32_t slot_index =
+          group_indices_[runtime.record.index_begin + runtime.cursor];
+        if (instructions_[slot_index].GetMark() > elapsed) {
+          break;
+        }
+
+        if (instructions_[slot_index].GetMark() > 0U) {
+          ObservePositiveBoundary(runtime_index);
+        }
+        ++runtime.cursor;
+        progressed = true;
+        DebugLogPick(slot_index, elapsed);
+        if (DispatchDueInstruction(runtime_index, slot_index, timestamp,
+                                   run_status)) {
+          return true;
+        }
+      }
+    }
+  }
+  return progressed;
+}
+
+void prism::Controller::ScheduleNextRun(std::uint32_t timestamp) {
+  for (std::uint32_t i = 0U; i < executing_count_; ++i) {
+    const std::uint32_t deadline = executing_[i].deadline;
+    if (!DeadlineReached(timestamp, deadline)) {
+      ScheduleTimeout(deadline - timestamp);
+    }
+  }
+
+  for (std::uint32_t i = 0U; i < group_count_; ++i) {
+    const GroupRuntime& runtime = runtimes_[i];
+    if (!runtime.active || runtime.cursor >= runtime.record.instruction_count) {
+      continue;
+    }
+    const std::uint32_t elapsed = timestamp - runtime.start_time;
+    const std::uint32_t slot_index =
+      group_indices_[runtime.record.index_begin + runtime.cursor];
+    const Mark next_mark = instructions_[slot_index].GetMark();
     if (next_mark > elapsed) {
       ScheduleTimeout(next_mark - elapsed);
     }
@@ -397,51 +661,6 @@ prism::ControllerStatus prism::Controller::Run() {
   if (min_scheduled_timeout_ > 0U && schedule_next_run_ != nullptr) {
     DebugLog("schedule_next_run_(%u)", min_scheduled_timeout_);
     schedule_next_run_(min_scheduled_timeout_);
-  }
-
-  if (show_requested_ && strip_ != nullptr) {
-    DebugLog("strip->Show()");
-    strip_->Show();
-  }
-
-  if (!pending_.HasNext() && executing_count_ == 0U) {
-    state_ = ProgramState::kCompleted;
-  }
-  return ControllerStatus::kSuccess;
-}
-
-void prism::Controller::DrainExecuting() {
-  std::uint32_t i = 0U;
-  while (i < executing_count_) {
-    const std::uint32_t idx = executing_[i];
-    DebugLogDrain(i, idx);
-    const std::uint32_t result = instructions_[idx].Execute();
-    if (result == 0U) {
-      // Instruction completed — swap with last and shrink.
-      --executing_count_;
-      executing_[i] = executing_[executing_count_];
-    } else {
-      // Still pending: register timeout for end-of-run scheduling.
-      ScheduleTimeout(result);
-      ++i;
-    }
-  }
-}
-
-void prism::Controller::PickNewInstructions() {
-  const std::uint32_t elapsed = GetElapsed();
-  while (pending_.HasNext() && (pending_.PeekMark() <= elapsed)) {
-    const std::uint32_t idx = pending_.Peek();
-    DebugLogPick(idx, elapsed);
-    const std::uint32_t result = instructions_[idx].Execute();
-    pending_.Advance();
-    if (result != 0U) {
-      // Timed instruction: save index in executing array.
-      if (executing_count_ < kMaxExecuting) {
-        executing_[executing_count_++] = idx;
-      }
-      ScheduleTimeout(result);
-    }
   }
 }
 
@@ -456,13 +675,9 @@ void prism::Controller::DebugLogPick(std::uint32_t idx,
                                      std::uint32_t elapsed) const {
   char desc[64];
   instructions_[idx].ToString(desc, sizeof(desc));
-  DebugLog("PickNewInstructions idx=%u mark=%u elapsed=%u (%s)", idx,
+  DebugLog("PickDueInstructions idx=%u mark=%u elapsed=%u (%s)", idx,
            static_cast<unsigned>(instructions_[idx].GetMark()),
            static_cast<unsigned>(elapsed), desc);
-}
-
-std::uint32_t prism::Controller::GetElapsed() const {
-  return GetTimestamp() - start_time_;
 }
 
 void prism::Controller::DebugLog(const char* format, ...) const {

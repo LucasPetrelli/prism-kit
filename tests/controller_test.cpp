@@ -250,6 +250,7 @@ TEST_F(ControllerTest, RunIteratesAllSlots) {
   b.index = 2U;
   controller_.AddInstruction(&b);
 
+  ASSERT_EQ(controller_.Start(), prism::ControllerStatus::kSuccess);
   // Controller calls show() once after all instructions.
   EXPECT_CALL(mock_strip_, Show()).Times(1);
 
@@ -260,6 +261,37 @@ TEST_F(ControllerTest, RunIteratesAllSlots) {
 TEST_F(ControllerTest, RunOnEmptyControllerIsNoop) {
   EXPECT_CALL(mock_strip_, Show()).Times(0);
   controller_.Run();
+}
+
+/// @brief Run() does not implicitly start a loaded program.
+TEST_F(ControllerTest, RunOnLoadedEditableProgramIsNoop) {
+  prism::SetSingleColor instruction;
+  instruction.mark = 0U;
+  ASSERT_EQ(controller_.AddInstruction(&instruction),
+            prism::ControllerStatus::kSuccess);
+
+  EXPECT_CALL(*mock_strip_.MutableLed(0U), SetColor(testing::_)).Times(0);
+  EXPECT_CALL(mock_strip_, Show()).Times(0);
+  EXPECT_EQ(controller_.Run(), prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(controller_.AddInstruction(&instruction),
+            prism::ControllerStatus::kSuccess);
+}
+
+/// @brief Start initializes the root but leaves the initial tick to its caller.
+TEST_F(ControllerTest, StartDefersMarkZeroWorkUntilRun) {
+  prism::SetSingleColor instruction;
+  instruction.mark = 0U;
+  ASSERT_EQ(controller_.AddInstruction(&instruction),
+            prism::ControllerStatus::kSuccess);
+
+  EXPECT_CALL(*mock_strip_.MutableLed(0U), SetColor(testing::_)).Times(0);
+  EXPECT_CALL(mock_strip_, Show()).Times(0);
+  ASSERT_EQ(controller_.Start(), prism::ControllerStatus::kSuccess);
+  testing::Mock::VerifyAndClearExpectations(&mock_strip_);
+
+  EXPECT_CALL(*mock_strip_.MutableLed(0U), SetColor(testing::_)).Times(1);
+  EXPECT_CALL(mock_strip_, Show()).Times(1);
+  EXPECT_EQ(controller_.Run(), prism::ControllerStatus::kSuccess);
 }
 
 /// @brief ResetInstructions() clears the queue so Run() does nothing.
@@ -376,6 +408,7 @@ TEST_F(ControllerTest, InstructionsSortedByMark) {
   controller_.AddInstruction(&a);
   controller_.AddInstruction(&b);
   controller_.AddInstruction(&c);
+  ASSERT_EQ(controller_.Start(), prism::ControllerStatus::kSuccess);
 
   // At t=0 only mark=0 should execute.
   g_fake_time = 0U;
@@ -414,6 +447,7 @@ TEST_F(ControllerTest, PickNewInstructionsHonorsMark) {
   late.index = 0U;
 
   controller_.AddInstruction(&late);
+  ASSERT_EQ(controller_.Start(), prism::ControllerStatus::kSuccess);
 
   // At t=0, mark=100 is in the future — no instruction should run.
   g_fake_time = 0U;
@@ -449,6 +483,7 @@ TEST_F(ControllerTest, LookAheadTimeoutFromExecuting) {
   later.strip = &mock_strip_;
   later.index = 1U;
   controller_.AddInstruction(&later);
+  ASSERT_EQ(controller_.Start(), prism::ControllerStatus::kSuccess);
 
   g_fake_time = 0U;
   EXPECT_CALL(*mock_strip_.MutableLed(0U), SetColor(testing::_)).Times(1);
@@ -467,6 +502,7 @@ TEST_F(ControllerTest, LookAheadTimeoutFromMarkWhenNoExecuting) {
   instr.strip = &mock_strip_;
   instr.index = 0U;
   controller_.AddInstruction(&instr);
+  ASSERT_EQ(controller_.Start(), prism::ControllerStatus::kSuccess);
 
   g_fake_time = 0U;
   EXPECT_CALL(mock_strip_, Show()).Times(0);
@@ -500,6 +536,7 @@ TEST_F(ControllerTest, RunStillWorksWithMarks) {
   controller_.AddInstruction(&instr0);
   controller_.AddInstruction(&instr1);
   controller_.AddInstruction(&instr2);
+  ASSERT_EQ(controller_.Start(), prism::ControllerStatus::kSuccess);
 
   // Run 1 at t=0: only mark=0 executes.
   g_fake_time = 0U;
@@ -578,6 +615,23 @@ TEST_F(ControllerTest, RunGroupSlotStoresItsMembershipAndTarget) {
   EXPECT_EQ(slot.Execute(), 0U);
 }
 
+/// @brief The host-only timed variant yields and resets through fixed storage.
+TEST_F(ControllerTest, TimedTestInstructionSlotYieldsAndResets) {
+  std::uint32_t execution_count = 0U;
+  prism::test::TimedInstruction instruction{25U, &execution_count};
+  prism::InstructionMemorySlot slot;
+
+  ASSERT_TRUE(slot.Set(&instruction));
+  EXPECT_TRUE(slot.HasPositiveSchedulingBoundary());
+  EXPECT_EQ(slot.Execute(), 25U);
+  EXPECT_EQ(execution_count, 1U);
+
+  slot.ResetForReplay();
+  EXPECT_EQ(slot.Execute(), 25U);
+  EXPECT_EQ(slot.Execute(), 0U);
+  EXPECT_EQ(execution_count, 3U);
+}
+
 /// @brief Runtime reset clears activation state but retains group metadata.
 TEST_F(ControllerTest, GroupRuntimeResetRetainsItsRecord) {
   prism::GroupRuntime runtime{};
@@ -587,6 +641,9 @@ TEST_F(ControllerTest, GroupRuntimeResetRetainsItsRecord) {
   runtime.repeats_remaining = 7U;
   runtime.active_count = 1U;
   runtime.child_count = 2U;
+  runtime.positive_boundary_observed = true;
+  runtime.parent_group_index = 3U;
+  runtime.depth = 3U;
   runtime.active = true;
 
   runtime.Reset();
@@ -599,6 +656,9 @@ TEST_F(ControllerTest, GroupRuntimeResetRetainsItsRecord) {
   EXPECT_EQ(runtime.repeats_remaining, 0U);
   EXPECT_EQ(runtime.active_count, 0U);
   EXPECT_EQ(runtime.child_count, 0U);
+  EXPECT_FALSE(runtime.positive_boundary_observed);
+  EXPECT_EQ(runtime.parent_group_index, prism::kMaxGroups);
+  EXPECT_EQ(runtime.depth, 0U);
   EXPECT_FALSE(runtime.active);
 }
 
@@ -800,6 +860,728 @@ TEST_F(ControllerTest, ChildRunGroupRejectsForeverRepeats) {
   ASSERT_EQ(controller_.AddInstruction(&child),
             prism::ControllerStatus::kSuccess);
   EXPECT_EQ(controller_.Start(), prism::ControllerStatus::kInvalidProgram);
+}
+
+/// @brief Child marks use their activation origin while parents keep running.
+TEST_F(ControllerTest, ParentProgressesWhileChildUsesLocalMarks) {
+  prism::RunGroupPayload child_call_payload{};
+  child_call_payload.group_id = 0U;
+  child_call_payload.mark = 20U;
+  child_call_payload.target_id = 0x80000001U;
+  prism::RunGroupInstruction child_call{child_call_payload};
+  prism::SetSingleColor parent_instruction;
+  parent_instruction.mark = 25U;
+  parent_instruction.index = 0U;
+  prism::SetSingleColor child_instruction;
+  child_instruction.group_id = child_call_payload.target_id;
+  child_instruction.mark = 10U;
+  child_instruction.index = 1U;
+
+  ASSERT_EQ(controller_.AddInstruction(&child_call),
+            prism::ControllerStatus::kSuccess);
+  ASSERT_EQ(controller_.AddInstruction(&parent_instruction),
+            prism::ControllerStatus::kSuccess);
+  ASSERT_EQ(controller_.AddInstruction(&child_instruction),
+            prism::ControllerStatus::kSuccess);
+  ASSERT_EQ(controller_.Start(), prism::ControllerStatus::kSuccess);
+
+  EXPECT_CALL(mock_strip_, Show()).Times(0);
+  EXPECT_EQ(controller_.Run(), prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(g_last_scheduled_delay, 20U);
+
+  g_fake_time = 20U;
+  g_last_scheduled_delay = 0U;
+  EXPECT_CALL(mock_strip_, Show()).Times(0);
+  EXPECT_EQ(controller_.Run(), prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(g_last_scheduled_delay, 5U);
+
+  g_fake_time = 25U;
+  g_last_scheduled_delay = 0U;
+  EXPECT_CALL(*mock_strip_.MutableLed(0U), SetColor(testing::_)).Times(1);
+  EXPECT_CALL(*mock_strip_.MutableLed(1U), SetColor(testing::_)).Times(0);
+  EXPECT_CALL(mock_strip_, Show()).Times(1);
+  EXPECT_EQ(controller_.Run(), prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(g_last_scheduled_delay, 5U);
+  testing::Mock::VerifyAndClearExpectations(&mock_strip_);
+
+  g_fake_time = 30U;
+  g_last_scheduled_delay = 0U;
+  EXPECT_CALL(*mock_strip_.MutableLed(0U), SetColor(testing::_)).Times(0);
+  EXPECT_CALL(*mock_strip_.MutableLed(1U), SetColor(testing::_)).Times(1);
+  EXPECT_CALL(mock_strip_, Show()).Times(1);
+  EXPECT_EQ(controller_.Run(), prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(g_last_scheduled_delay, 0U);
+}
+
+/// @brief The earliest child deadline, parent mark, and root deadline wins.
+TEST_F(ControllerTest, SchedulesEarliestDeadlineAcrossActiveGroups) {
+  std::uint32_t root_calls = 0U;
+  std::uint32_t child_calls = 0U;
+  prism::test::TimedInstruction root_timed{100U, &root_calls};
+  prism::RunGroupPayload child_call_payload{};
+  child_call_payload.group_id = 0U;
+  child_call_payload.target_id = 0x80000002U;
+  prism::RunGroupInstruction child_call{child_call_payload};
+  prism::SetSingleColor parent_instruction;
+  parent_instruction.mark = 50U;
+  prism::test::TimedInstruction child_timed{40U, &child_calls};
+  child_timed.group_id = child_call_payload.target_id;
+
+  ASSERT_EQ(controller_.AddInstruction(&root_timed),
+            prism::ControllerStatus::kSuccess);
+  ASSERT_EQ(controller_.AddInstruction(&child_call),
+            prism::ControllerStatus::kSuccess);
+  ASSERT_EQ(controller_.AddInstruction(&parent_instruction),
+            prism::ControllerStatus::kSuccess);
+  ASSERT_EQ(controller_.AddInstruction(&child_timed),
+            prism::ControllerStatus::kSuccess);
+  ASSERT_EQ(controller_.Start(), prism::ControllerStatus::kSuccess);
+
+  EXPECT_CALL(mock_strip_, Show()).Times(0);
+  EXPECT_EQ(controller_.Run(), prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(root_calls, 1U);
+  EXPECT_EQ(child_calls, 1U);
+  EXPECT_EQ(g_last_scheduled_delay, 40U);
+
+  g_fake_time = 40U;
+  g_last_scheduled_delay = 0U;
+  EXPECT_CALL(mock_strip_, Show()).Times(0);
+  EXPECT_EQ(controller_.Run(), prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(root_calls, 1U);
+  EXPECT_EQ(child_calls, 2U);
+  EXPECT_EQ(g_last_scheduled_delay, 10U);
+
+  g_fake_time = 50U;
+  g_last_scheduled_delay = 0U;
+  EXPECT_CALL(*mock_strip_.MutableLed(0U), SetColor(testing::_)).Times(1);
+  EXPECT_CALL(mock_strip_, Show()).Times(1);
+  EXPECT_EQ(controller_.Run(), prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(root_calls, 1U);
+  EXPECT_EQ(g_last_scheduled_delay, 50U);
+
+  g_fake_time = 100U;
+  g_last_scheduled_delay = 0U;
+  EXPECT_CALL(mock_strip_, Show()).Times(0);
+  EXPECT_EQ(controller_.Run(), prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(root_calls, 2U);
+  EXPECT_EQ(g_last_scheduled_delay, 0U);
+}
+
+/// @brief A finite child repeat resets its timed instruction for each pass.
+TEST_F(ControllerTest, FiniteChildRepeatReplaysTimedInstruction) {
+  std::uint32_t child_calls = 0U;
+  prism::RunGroupPayload child_call_payload{};
+  child_call_payload.group_id = 0U;
+  child_call_payload.target_id = 0x80000003U;
+  child_call_payload.additional_repeats = 1U;
+  prism::RunGroupInstruction child_call{child_call_payload};
+  prism::test::TimedInstruction child_timed{10U, &child_calls};
+  child_timed.group_id = child_call_payload.target_id;
+
+  ASSERT_EQ(controller_.AddInstruction(&child_call),
+            prism::ControllerStatus::kSuccess);
+  ASSERT_EQ(controller_.AddInstruction(&child_timed),
+            prism::ControllerStatus::kSuccess);
+  ASSERT_EQ(controller_.Start(), prism::ControllerStatus::kSuccess);
+
+  EXPECT_EQ(controller_.Run(), prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(child_calls, 1U);
+  EXPECT_EQ(g_last_scheduled_delay, 10U);
+
+  g_fake_time = 10U;
+  g_last_scheduled_delay = 0U;
+  EXPECT_EQ(controller_.Run(), prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(child_calls, 3U);
+  EXPECT_EQ(g_last_scheduled_delay, 10U);
+
+  g_fake_time = 20U;
+  g_last_scheduled_delay = 0U;
+  EXPECT_EQ(controller_.Run(), prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(child_calls, 4U);
+  EXPECT_EQ(g_last_scheduled_delay, 0U);
+}
+
+/// @brief Root repeats replay timed state and start each pass at completion.
+TEST_F(ControllerTest, FiniteRootRepeatReplaysTimedInstruction) {
+  std::uint32_t execution_count = 0U;
+  prism::test::TimedInstruction timed{10U, &execution_count};
+  ASSERT_EQ(controller_.AddInstruction(&timed),
+            prism::ControllerStatus::kSuccess);
+  ASSERT_EQ(controller_.Start(1U), prism::ControllerStatus::kSuccess);
+
+  EXPECT_EQ(controller_.Run(), prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(execution_count, 1U);
+  EXPECT_EQ(g_last_scheduled_delay, 10U);
+
+  g_fake_time = 10U;
+  g_last_scheduled_delay = 0U;
+  EXPECT_EQ(controller_.Run(), prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(execution_count, 3U);
+  EXPECT_EQ(g_last_scheduled_delay, 10U);
+  EXPECT_EQ(controller_.Start(), prism::ControllerStatus::kBusy);
+
+  g_fake_time = 20U;
+  g_last_scheduled_delay = 0U;
+  EXPECT_EQ(controller_.Run(), prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(execution_count, 4U);
+  EXPECT_EQ(g_last_scheduled_delay, 0U);
+}
+
+/// @brief The forever sentinel repeats only across a positive time boundary.
+TEST_F(ControllerTest, RootForeverRepeatsAcrossTimedBoundary) {
+  std::uint32_t execution_count = 0U;
+  prism::test::TimedInstruction timed{5U, &execution_count};
+  ASSERT_EQ(controller_.AddInstruction(&timed),
+            prism::ControllerStatus::kSuccess);
+  ASSERT_EQ(controller_.Start(prism::kForeverLoopCount),
+            prism::ControllerStatus::kSuccess);
+
+  EXPECT_EQ(controller_.Run(), prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(execution_count, 1U);
+
+  g_fake_time = 5U;
+  g_last_scheduled_delay = 0U;
+  EXPECT_EQ(controller_.Run(), prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(execution_count, 3U);
+  EXPECT_EQ(g_last_scheduled_delay, 5U);
+
+  g_fake_time = 10U;
+  g_last_scheduled_delay = 0U;
+  EXPECT_EQ(controller_.Run(), prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(execution_count, 5U);
+  EXPECT_EQ(g_last_scheduled_delay, 5U);
+  EXPECT_EQ(controller_.Start(), prism::ControllerStatus::kBusy);
+}
+
+/// @brief A child-only boundary delays a repeated root until descendants end.
+TEST_F(ControllerTest,
+       NestedChildBoundaryDelaysRepeatedRootUntilChainCompletes) {
+  prism::RunGroupPayload root_call_payload{};
+  root_call_payload.group_id = 0U;
+  root_call_payload.target_id = 0x10000001U;
+  prism::RunGroupInstruction root_call{root_call_payload};
+  prism::RunGroupPayload nested_call_payload{};
+  nested_call_payload.group_id = root_call_payload.target_id;
+  nested_call_payload.target_id = 0xFFFFFFFFU;
+  prism::RunGroupInstruction nested_call{nested_call_payload};
+  prism::SetSingleColor leaf;
+  leaf.group_id = nested_call_payload.target_id;
+  leaf.mark = 5U;
+  leaf.index = 2U;
+
+  ASSERT_EQ(controller_.AddInstruction(&root_call),
+            prism::ControllerStatus::kSuccess);
+  ASSERT_EQ(controller_.AddInstruction(&nested_call),
+            prism::ControllerStatus::kSuccess);
+  ASSERT_EQ(controller_.AddInstruction(&leaf),
+            prism::ControllerStatus::kSuccess);
+  ASSERT_EQ(controller_.Start(1U), prism::ControllerStatus::kSuccess);
+
+  EXPECT_CALL(*mock_strip_.MutableLed(2U), SetColor(testing::_)).Times(0);
+  EXPECT_CALL(mock_strip_, Show()).Times(0);
+  EXPECT_EQ(controller_.Run(), prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(g_last_scheduled_delay, 5U);
+  testing::Mock::VerifyAndClearExpectations(&mock_strip_);
+
+  g_fake_time = 5U;
+  g_last_scheduled_delay = 0U;
+  EXPECT_CALL(*mock_strip_.MutableLed(2U), SetColor(testing::_)).Times(1);
+  EXPECT_CALL(mock_strip_, Show()).Times(1);
+  EXPECT_EQ(controller_.Run(), prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(g_last_scheduled_delay, 5U);
+  EXPECT_EQ(controller_.Start(), prism::ControllerStatus::kBusy);
+  testing::Mock::VerifyAndClearExpectations(&mock_strip_);
+
+  g_fake_time = 9U;
+  g_last_scheduled_delay = 0U;
+  EXPECT_CALL(*mock_strip_.MutableLed(2U), SetColor(testing::_)).Times(0);
+  EXPECT_CALL(mock_strip_, Show()).Times(0);
+  EXPECT_EQ(controller_.Run(), prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(g_last_scheduled_delay, 1U);
+  testing::Mock::VerifyAndClearExpectations(&mock_strip_);
+
+  g_fake_time = 10U;
+  g_last_scheduled_delay = 0U;
+  EXPECT_CALL(*mock_strip_.MutableLed(2U), SetColor(testing::_)).Times(1);
+  EXPECT_CALL(mock_strip_, Show()).Times(1);
+  EXPECT_EQ(controller_.Run(), prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(g_last_scheduled_delay, 0U);
+}
+
+/// @brief A duplicate active child fails without disturbing the first call.
+TEST_F(ControllerTest, ActiveGroupConflictLeavesFirstInvocationRunning) {
+  constexpr prism::GroupId child_group = 0x81000001U;
+  prism::RunGroupPayload first_payload{};
+  first_payload.group_id = 0U;
+  first_payload.target_id = child_group;
+  prism::RunGroupInstruction first_call{first_payload};
+  prism::RunGroupInstruction duplicate_call{first_payload};
+  prism::SetSingleColor child;
+  child.group_id = child_group;
+  child.mark = 10U;
+  child.index = 3U;
+
+  ASSERT_EQ(controller_.AddInstruction(&first_call),
+            prism::ControllerStatus::kSuccess);
+  ASSERT_EQ(controller_.AddInstruction(&duplicate_call),
+            prism::ControllerStatus::kSuccess);
+  ASSERT_EQ(controller_.AddInstruction(&child),
+            prism::ControllerStatus::kSuccess);
+  ASSERT_EQ(controller_.Start(), prism::ControllerStatus::kSuccess);
+
+  EXPECT_CALL(*mock_strip_.MutableLed(3U), SetColor(testing::_)).Times(0);
+  EXPECT_CALL(mock_strip_, Show()).Times(0);
+  EXPECT_EQ(controller_.Run(), prism::ControllerStatus::kAlreadyActiveGroup);
+  EXPECT_EQ(g_last_scheduled_delay, 10U);
+  testing::Mock::VerifyAndClearExpectations(&mock_strip_);
+
+  g_fake_time = 10U;
+  g_last_scheduled_delay = 0U;
+  EXPECT_CALL(*mock_strip_.MutableLed(3U), SetColor(testing::_)).Times(1);
+  EXPECT_CALL(mock_strip_, Show()).Times(1);
+  EXPECT_EQ(controller_.Run(), prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(g_last_scheduled_delay, 0U);
+}
+
+/// @brief Goal: stop a repeat whose only child boundary was rejected.
+/// @details Steps: Start B, then max-repeat A whose mark-0 call targets active
+///     B; verify A runs once, reports the conflict, and B keeps the root busy
+///     until its own future mark completes.
+TEST_F(ControllerTest, RepeatedGroupStopsWhenOnlyChildBoundaryConflicts) {
+  constexpr prism::GroupId group_a = 0x82000001U;
+  constexpr prism::GroupId group_b = 0x82000002U;
+  prism::RunGroupPayload start_b_payload{};
+  start_b_payload.group_id = 0U;
+  start_b_payload.target_id = group_b;
+  prism::RunGroupInstruction start_b{start_b_payload};
+  prism::RunGroupPayload start_a_payload{};
+  start_a_payload.group_id = 0U;
+  start_a_payload.target_id = group_a;
+  start_a_payload.additional_repeats = prism::kMaxFiniteLoopCount;
+  prism::RunGroupInstruction start_a{start_a_payload};
+  std::uint32_t a_passes = 0U;
+  prism::test::TimedInstruction count_a_pass{0U, &a_passes, false};
+  count_a_pass.group_id = group_a;
+  prism::RunGroupPayload conflict_payload{};
+  conflict_payload.group_id = group_a;
+  conflict_payload.target_id = group_b;
+  prism::RunGroupInstruction conflict_call{conflict_payload};
+  prism::SetSingleColor delayed_b;
+  delayed_b.group_id = group_b;
+  delayed_b.mark = 20U;
+  delayed_b.index = 4U;
+
+  ASSERT_EQ(controller_.AddInstruction(&start_b),
+            prism::ControllerStatus::kSuccess);
+  ASSERT_EQ(controller_.AddInstruction(&start_a),
+            prism::ControllerStatus::kSuccess);
+  ASSERT_EQ(controller_.AddInstruction(&count_a_pass),
+            prism::ControllerStatus::kSuccess);
+  ASSERT_EQ(controller_.AddInstruction(&conflict_call),
+            prism::ControllerStatus::kSuccess);
+  ASSERT_EQ(controller_.AddInstruction(&delayed_b),
+            prism::ControllerStatus::kSuccess);
+  ASSERT_EQ(controller_.Start(), prism::ControllerStatus::kSuccess);
+
+  EXPECT_CALL(*mock_strip_.MutableLed(4U), SetColor(testing::_)).Times(0);
+  EXPECT_CALL(mock_strip_, Show()).Times(0);
+  EXPECT_EQ(controller_.Run(), prism::ControllerStatus::kAlreadyActiveGroup);
+  EXPECT_EQ(a_passes, 1U);
+  EXPECT_EQ(g_last_scheduled_delay, 20U);
+  EXPECT_EQ(controller_.Start(), prism::ControllerStatus::kBusy);
+  testing::Mock::VerifyAndClearExpectations(&mock_strip_);
+
+  g_fake_time = 20U;
+  g_last_scheduled_delay = 0U;
+  EXPECT_CALL(*mock_strip_.MutableLed(4U), SetColor(delayed_b.color)).Times(1);
+  EXPECT_CALL(mock_strip_, Show()).Times(1);
+  EXPECT_EQ(controller_.Run(), prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(g_last_scheduled_delay, 0U);
+  EXPECT_EQ(controller_.Start(), prism::ControllerStatus::kSuccess);
+}
+
+/// @brief Goal: observe a failed child call's own positive mark when due.
+/// @details Steps: Keep B active while repeated A waits for mark 10; after A's
+///     call conflicts, verify it schedules its next pass from that boundary,
+///     then releases the root while B continues to mark 30.
+TEST_F(ControllerTest, FailedChildCallObservesItsPositiveMarkWhenDue) {
+  constexpr prism::GroupId group_a = 0x82000003U;
+  constexpr prism::GroupId group_b = 0x82000004U;
+  prism::RunGroupPayload start_b_payload{};
+  start_b_payload.group_id = 0U;
+  start_b_payload.target_id = group_b;
+  prism::RunGroupInstruction start_b{start_b_payload};
+  prism::RunGroupPayload start_a_payload{};
+  start_a_payload.group_id = 0U;
+  start_a_payload.target_id = group_a;
+  start_a_payload.additional_repeats = 1U;
+  prism::RunGroupInstruction start_a{start_a_payload};
+  prism::RunGroupPayload conflict_payload{};
+  conflict_payload.group_id = group_a;
+  conflict_payload.mark = 10U;
+  conflict_payload.target_id = group_b;
+  prism::RunGroupInstruction conflict_call{conflict_payload};
+  prism::SetSingleColor delayed_b;
+  delayed_b.group_id = group_b;
+  delayed_b.mark = 30U;
+  delayed_b.index = 5U;
+
+  ASSERT_EQ(controller_.AddInstruction(&start_b),
+            prism::ControllerStatus::kSuccess);
+  ASSERT_EQ(controller_.AddInstruction(&start_a),
+            prism::ControllerStatus::kSuccess);
+  ASSERT_EQ(controller_.AddInstruction(&conflict_call),
+            prism::ControllerStatus::kSuccess);
+  ASSERT_EQ(controller_.AddInstruction(&delayed_b),
+            prism::ControllerStatus::kSuccess);
+  ASSERT_EQ(controller_.Start(), prism::ControllerStatus::kSuccess);
+
+  EXPECT_CALL(*mock_strip_.MutableLed(5U), SetColor(testing::_)).Times(0);
+  EXPECT_CALL(mock_strip_, Show()).Times(0);
+  EXPECT_EQ(controller_.Run(), prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(g_last_scheduled_delay, 10U);
+  testing::Mock::VerifyAndClearExpectations(&mock_strip_);
+
+  g_fake_time = 10U;
+  g_last_scheduled_delay = 0U;
+  EXPECT_CALL(*mock_strip_.MutableLed(5U), SetColor(testing::_)).Times(0);
+  EXPECT_CALL(mock_strip_, Show()).Times(0);
+  EXPECT_EQ(controller_.Run(), prism::ControllerStatus::kAlreadyActiveGroup);
+  EXPECT_EQ(g_last_scheduled_delay, 10U);
+  EXPECT_EQ(controller_.Start(), prism::ControllerStatus::kBusy);
+  testing::Mock::VerifyAndClearExpectations(&mock_strip_);
+
+  g_fake_time = 20U;
+  g_last_scheduled_delay = 0U;
+  EXPECT_CALL(*mock_strip_.MutableLed(5U), SetColor(testing::_)).Times(0);
+  EXPECT_CALL(mock_strip_, Show()).Times(0);
+  EXPECT_EQ(controller_.Run(), prism::ControllerStatus::kAlreadyActiveGroup);
+  EXPECT_EQ(g_last_scheduled_delay, 10U);
+  testing::Mock::VerifyAndClearExpectations(&mock_strip_);
+
+  g_fake_time = 30U;
+  g_last_scheduled_delay = 0U;
+  EXPECT_CALL(*mock_strip_.MutableLed(5U), SetColor(delayed_b.color)).Times(1);
+  EXPECT_CALL(mock_strip_, Show()).Times(1);
+  EXPECT_EQ(controller_.Run(), prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(g_last_scheduled_delay, 0U);
+  EXPECT_EQ(controller_.Start(), prism::ControllerStatus::kSuccess);
+}
+
+/// @brief Goal: propagate a resumed descendant deadline to a repeated root.
+/// @details Steps: Start a child timed instruction beneath a repeated root;
+///     verify its deadline starts the next root pass, then completes the run
+///     after the second child pass.
+TEST_F(ControllerTest, ChildTimedBoundaryPropagatesToRepeatedRoot) {
+  constexpr prism::GroupId child_group = 0x82000005U;
+  std::uint32_t child_calls = 0U;
+  prism::RunGroupPayload child_call_payload{};
+  child_call_payload.group_id = 0U;
+  child_call_payload.target_id = child_group;
+  prism::RunGroupInstruction child_call{child_call_payload};
+  prism::test::TimedInstruction child_timed{5U, &child_calls};
+  child_timed.group_id = child_group;
+
+  ASSERT_EQ(controller_.AddInstruction(&child_call),
+            prism::ControllerStatus::kSuccess);
+  ASSERT_EQ(controller_.AddInstruction(&child_timed),
+            prism::ControllerStatus::kSuccess);
+  ASSERT_EQ(controller_.Start(1U), prism::ControllerStatus::kSuccess);
+
+  EXPECT_CALL(mock_strip_, Show()).Times(0);
+  EXPECT_EQ(controller_.Run(), prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(child_calls, 1U);
+  EXPECT_EQ(g_last_scheduled_delay, 5U);
+
+  g_fake_time = 5U;
+  g_last_scheduled_delay = 0U;
+  EXPECT_EQ(controller_.Run(), prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(child_calls, 3U);
+  EXPECT_EQ(g_last_scheduled_delay, 5U);
+
+  g_fake_time = 10U;
+  g_last_scheduled_delay = 0U;
+  EXPECT_EQ(controller_.Run(), prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(child_calls, 4U);
+  EXPECT_EQ(g_last_scheduled_delay, 0U);
+}
+
+/// @brief Goal: surface a repeated-boundary invariant failure without an error.
+/// @details Steps: Start a repeated test instruction that advertises a positive
+///     boundary but completes immediately; verify one execution,
+///     kInvalidProgram, and a completed/replayable program.
+TEST_F(ControllerTest, RepeatedBoundaryMismatchReturnsInvalidProgram) {
+  std::uint32_t execution_count = 0U;
+  prism::test::TimedInstruction no_yield{5U, &execution_count, false};
+  ASSERT_EQ(controller_.AddInstruction(&no_yield),
+            prism::ControllerStatus::kSuccess);
+  ASSERT_EQ(controller_.Start(1U), prism::ControllerStatus::kSuccess);
+
+  EXPECT_EQ(controller_.Run(), prism::ControllerStatus::kInvalidProgram);
+  EXPECT_EQ(execution_count, 1U);
+  EXPECT_EQ(controller_.Start(1U), prism::ControllerStatus::kSuccess);
+}
+
+/// @brief The worked timeline overlaps parent work and a child repeat.
+TEST_F(ControllerTest, WorkedTimelineKeepsParentAndChildPassesInSync) {
+  const auto red = prism::color::ToRgb(prism::color::Preset::kPureRed);
+  const auto blue = prism::color::ToRgb(prism::color::Preset::kPureBlue);
+  const prism::color::RgbColor yellow{255U, 255U, 0U};
+  const auto green = prism::color::ToRgb(prism::color::Preset::kPureGreen);
+  std::uint32_t delay_calls = 0U;
+
+  prism::SetSingleColor root_red;
+  root_red.mark = 100U;
+  root_red.color = red;
+  root_red.index = 0U;
+  prism::SetSingleColor root_blue;
+  root_blue.mark = 200U;
+  root_blue.color = blue;
+  root_blue.index = 0U;
+  prism::RunGroupPayload child_call_payload{};
+  child_call_payload.group_id = 0U;
+  child_call_payload.mark = 300U;
+  child_call_payload.target_id = 0x80000004U;
+  child_call_payload.additional_repeats = 1U;
+  prism::RunGroupInstruction child_call{child_call_payload};
+  prism::SetSingleColor child_yellow;
+  child_yellow.group_id = child_call_payload.target_id;
+  child_yellow.color = yellow;
+  child_yellow.index = 1U;
+  prism::SetSingleColor child_green;
+  child_green.group_id = child_call_payload.target_id;
+  child_green.mark = 100U;
+  child_green.color = green;
+  child_green.index = 1U;
+  prism::test::TimedInstruction delay{100U, &delay_calls};
+  delay.group_id = child_call_payload.target_id;
+  delay.mark = 100U;
+  prism::SetSingleColor final_root_red;
+  final_root_red.mark = 500U;
+  final_root_red.color = red;
+  final_root_red.index = 0U;
+
+  ASSERT_EQ(controller_.AddInstruction(&root_red),
+            prism::ControllerStatus::kSuccess);
+  ASSERT_EQ(controller_.AddInstruction(&root_blue),
+            prism::ControllerStatus::kSuccess);
+  ASSERT_EQ(controller_.AddInstruction(&child_call),
+            prism::ControllerStatus::kSuccess);
+  ASSERT_EQ(controller_.AddInstruction(&child_yellow),
+            prism::ControllerStatus::kSuccess);
+  ASSERT_EQ(controller_.AddInstruction(&child_green),
+            prism::ControllerStatus::kSuccess);
+  ASSERT_EQ(controller_.AddInstruction(&delay),
+            prism::ControllerStatus::kSuccess);
+  ASSERT_EQ(controller_.AddInstruction(&final_root_red),
+            prism::ControllerStatus::kSuccess);
+  ASSERT_EQ(controller_.Start(), prism::ControllerStatus::kSuccess);
+
+  auto* root_led = mock_strip_.MutableLed(0U);
+  auto* child_led = mock_strip_.MutableLed(1U);
+  EXPECT_CALL(*root_led, SetColor(testing::_)).Times(0);
+  EXPECT_CALL(*child_led, SetColor(testing::_)).Times(0);
+  EXPECT_CALL(mock_strip_, Show()).Times(0);
+  EXPECT_EQ(controller_.Run(), prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(g_last_scheduled_delay, 100U);
+  testing::Mock::VerifyAndClearExpectations(&mock_strip_);
+
+  g_fake_time = 100U;
+  g_last_scheduled_delay = 0U;
+  EXPECT_CALL(*root_led, SetColor(red)).Times(1);
+  EXPECT_CALL(*child_led, SetColor(testing::_)).Times(0);
+  EXPECT_CALL(mock_strip_, Show()).Times(1);
+  EXPECT_EQ(controller_.Run(), prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(g_last_scheduled_delay, 100U);
+  testing::Mock::VerifyAndClearExpectations(&mock_strip_);
+
+  g_fake_time = 200U;
+  g_last_scheduled_delay = 0U;
+  EXPECT_CALL(*root_led, SetColor(blue)).Times(1);
+  EXPECT_CALL(*child_led, SetColor(testing::_)).Times(0);
+  EXPECT_CALL(mock_strip_, Show()).Times(1);
+  EXPECT_EQ(controller_.Run(), prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(g_last_scheduled_delay, 100U);
+  testing::Mock::VerifyAndClearExpectations(&mock_strip_);
+
+  g_fake_time = 300U;
+  g_last_scheduled_delay = 0U;
+  EXPECT_CALL(*root_led, SetColor(testing::_)).Times(0);
+  EXPECT_CALL(*child_led, SetColor(yellow)).Times(1);
+  EXPECT_CALL(mock_strip_, Show()).Times(1);
+  EXPECT_EQ(controller_.Run(), prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(g_last_scheduled_delay, 100U);
+  testing::Mock::VerifyAndClearExpectations(&mock_strip_);
+
+  g_fake_time = 400U;
+  g_last_scheduled_delay = 0U;
+  EXPECT_CALL(*root_led, SetColor(testing::_)).Times(0);
+  EXPECT_CALL(*child_led, SetColor(green)).Times(1);
+  EXPECT_CALL(mock_strip_, Show()).Times(1);
+  EXPECT_EQ(controller_.Run(), prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(delay_calls, 1U);
+  EXPECT_EQ(g_last_scheduled_delay, 100U);
+  testing::Mock::VerifyAndClearExpectations(&mock_strip_);
+
+  g_fake_time = 500U;
+  g_last_scheduled_delay = 0U;
+  testing::InSequence child_before_parent;
+  EXPECT_CALL(*child_led, SetColor(yellow)).Times(1);
+  EXPECT_CALL(*root_led, SetColor(red)).Times(1);
+  EXPECT_CALL(mock_strip_, Show()).Times(1);
+  EXPECT_EQ(controller_.Run(), prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(delay_calls, 2U);
+  EXPECT_EQ(g_last_scheduled_delay, 100U);
+  testing::Mock::VerifyAndClearExpectations(&mock_strip_);
+
+  g_fake_time = 600U;
+  g_last_scheduled_delay = 0U;
+  EXPECT_CALL(*root_led, SetColor(testing::_)).Times(0);
+  EXPECT_CALL(*child_led, SetColor(green)).Times(1);
+  EXPECT_CALL(mock_strip_, Show()).Times(1);
+  EXPECT_EQ(controller_.Run(), prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(delay_calls, 3U);
+  EXPECT_EQ(g_last_scheduled_delay, 100U);
+  testing::Mock::VerifyAndClearExpectations(&mock_strip_);
+
+  g_fake_time = 700U;
+  g_last_scheduled_delay = 0U;
+  EXPECT_CALL(*root_led, SetColor(testing::_)).Times(0);
+  EXPECT_CALL(*child_led, SetColor(testing::_)).Times(0);
+  EXPECT_CALL(mock_strip_, Show()).Times(0);
+  EXPECT_EQ(controller_.Run(), prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(delay_calls, 4U);
+  EXPECT_EQ(g_last_scheduled_delay, 0U);
+}
+
+/// @brief Wrapped marks and timed deadlines remain ordered within half range.
+TEST_F(ControllerTest, TimestampWrapPreservesMarksAndDeadlines) {
+  std::uint32_t execution_count = 0U;
+  prism::test::TimedInstruction timed{10U, &execution_count};
+  prism::SetSingleColor marked;
+  marked.mark = 5U;
+  marked.index = 4U;
+
+  ASSERT_EQ(controller_.AddInstruction(&timed),
+            prism::ControllerStatus::kSuccess);
+  ASSERT_EQ(controller_.AddInstruction(&marked),
+            prism::ControllerStatus::kSuccess);
+  g_fake_time = 0xFFFFFFFAU;
+  ASSERT_EQ(controller_.Start(), prism::ControllerStatus::kSuccess);
+
+  EXPECT_CALL(*mock_strip_.MutableLed(4U), SetColor(testing::_)).Times(0);
+  EXPECT_CALL(mock_strip_, Show()).Times(0);
+  EXPECT_EQ(controller_.Run(), prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(execution_count, 1U);
+  EXPECT_EQ(g_last_scheduled_delay, 5U);
+  testing::Mock::VerifyAndClearExpectations(&mock_strip_);
+
+  g_fake_time = 0xFFFFFFFFU;
+  g_last_scheduled_delay = 0U;
+  EXPECT_CALL(*mock_strip_.MutableLed(4U), SetColor(testing::_)).Times(1);
+  EXPECT_CALL(mock_strip_, Show()).Times(1);
+  EXPECT_EQ(controller_.Run(), prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(execution_count, 1U);
+  EXPECT_EQ(g_last_scheduled_delay, 5U);
+  testing::Mock::VerifyAndClearExpectations(&mock_strip_);
+
+  g_fake_time = 4U;
+  g_last_scheduled_delay = 0U;
+  EXPECT_CALL(mock_strip_, Show()).Times(0);
+  EXPECT_EQ(controller_.Run(), prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(execution_count, 2U);
+  EXPECT_EQ(g_last_scheduled_delay, 0U);
+}
+
+/// @brief Reset aborts active children and makes stale timer ticks harmless.
+TEST_F(ControllerTest, ResetAbortsChildTimedWorkAndStaleTick) {
+  std::uint32_t child_calls = 0U;
+  prism::RunGroupPayload child_call_payload{};
+  child_call_payload.group_id = 0U;
+  child_call_payload.target_id = 0x81000002U;
+  prism::RunGroupInstruction child_call{child_call_payload};
+  prism::test::TimedInstruction child_timed{10U, &child_calls};
+  child_timed.group_id = child_call_payload.target_id;
+
+  ASSERT_EQ(controller_.AddInstruction(&child_call),
+            prism::ControllerStatus::kSuccess);
+  ASSERT_EQ(controller_.AddInstruction(&child_timed),
+            prism::ControllerStatus::kSuccess);
+  ASSERT_EQ(controller_.Start(), prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(controller_.Run(), prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(child_calls, 1U);
+  EXPECT_EQ(g_last_scheduled_delay, 10U);
+
+  controller_.ResetInstructions();
+  g_fake_time = 10U;
+  g_last_scheduled_delay = 0U;
+  EXPECT_CALL(mock_strip_, Show()).Times(0);
+  EXPECT_EQ(controller_.Run(), prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(child_calls, 1U);
+  EXPECT_EQ(g_last_scheduled_delay, 0U);
+  EXPECT_EQ(controller_.AddInstruction(&child_timed),
+            prism::ControllerStatus::kSuccess);
+}
+
+/// @brief A completed program replays from a fresh origin with reset state.
+TEST_F(ControllerTest, CompletedProgramReplayUsesFreshOrigin) {
+  std::uint32_t execution_count = 0U;
+  prism::test::TimedInstruction timed{10U, &execution_count};
+  ASSERT_EQ(controller_.AddInstruction(&timed),
+            prism::ControllerStatus::kSuccess);
+  g_fake_time = 100U;
+  ASSERT_EQ(controller_.Start(), prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(controller_.Run(), prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(execution_count, 1U);
+
+  g_fake_time = 110U;
+  EXPECT_EQ(controller_.Run(), prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(execution_count, 2U);
+
+  g_fake_time = 200U;
+  g_last_scheduled_delay = 0U;
+  ASSERT_EQ(controller_.Start(), prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(controller_.Run(), prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(execution_count, 3U);
+  EXPECT_EQ(g_last_scheduled_delay, 10U);
+
+  g_fake_time = 210U;
+  g_last_scheduled_delay = 0U;
+  EXPECT_EQ(controller_.Run(), prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(execution_count, 4U);
+}
+
+/// @brief Instructions sharing a mark retain their insertion order.
+TEST_F(ControllerTest, EqualMarksPreserveInsertionOrder) {
+  prism::SetSingleColor first;
+  first.mark = 10U;
+  first.color = prism::color::ToRgb(prism::color::Preset::kPureRed);
+  first.index = 0U;
+  prism::SetSingleColor second;
+  second.mark = 10U;
+  second.color = prism::color::ToRgb(prism::color::Preset::kPureBlue);
+  second.index = 1U;
+
+  ASSERT_EQ(controller_.AddInstruction(&first),
+            prism::ControllerStatus::kSuccess);
+  ASSERT_EQ(controller_.AddInstruction(&second),
+            prism::ControllerStatus::kSuccess);
+  ASSERT_EQ(controller_.Start(), prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(controller_.Run(), prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(g_last_scheduled_delay, 10U);
+
+  g_fake_time = 10U;
+  auto* first_led = mock_strip_.MutableLed(0U);
+  auto* second_led = mock_strip_.MutableLed(1U);
+  testing::InSequence sequence;
+  EXPECT_CALL(*first_led,
+              SetColor(prism::color::ToRgb(prism::color::Preset::kPureRed)))
+    .Times(1);
+  EXPECT_CALL(*second_led,
+              SetColor(prism::color::ToRgb(prism::color::Preset::kPureBlue)))
+    .Times(1);
+  EXPECT_CALL(mock_strip_, Show()).Times(1);
+  EXPECT_EQ(controller_.Run(), prism::ControllerStatus::kSuccess);
 }
 
 /// @brief Program mutation is rejected while active and after completion.

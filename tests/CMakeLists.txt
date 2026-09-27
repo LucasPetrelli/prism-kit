@@ -28,6 +28,7 @@ target_include_directories(controller_test PRIVATE
 )
 
 target_compile_features(controller_test PRIVATE cxx_std_17)
+target_compile_definitions(controller_test PRIVATE PRISM_CONTROLLER_TESTING=1)
 
 target_link_libraries(controller_test PRIVATE
   GTest::gmock_main
