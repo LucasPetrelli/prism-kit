@@ -5,6 +5,9 @@
 
 #include "prism/controller.hpp"
 
+#include <array>
+#include <limits>
+
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "mock_strip.hpp"
@@ -42,6 +45,275 @@ class ControllerTest : public ::testing::Test {
   prism::test::MockStrip mock_strip_;
   prism::Controller controller_;
 };
+
+void AddFade(prism::Controller& controller, std::uint8_t index,
+             std::uint16_t percent, std::uint16_t duration_ms,
+             prism::Mark mark = 0U) {
+  prism::FadePayload payload{};
+  payload.mark = mark;
+  payload.percent = percent;
+  payload.duration_ms = duration_ms;
+  payload.index = index;
+  prism::Fade fade{payload};
+  EXPECT_EQ(controller.AddInstruction(&fade),
+            prism::ControllerStatus::kSuccess);
+}
+
+// ====================================================================
+// Fade instruction tests
+// ====================================================================
+
+TEST_F(ControllerTest, FadeCapturesActivationColorInterpolatesAndFinishesLate) {
+  constexpr std::uint8_t index = 2U;
+  constexpr prism::color::RgbColor start{180U, 90U, 45U};
+  constexpr prism::color::RgbColor halfway{112U, 56U, 28U};
+  constexpr prism::color::RgbColor target{45U, 23U, 11U};
+  auto* led = mock_strip_.MutableLed(index);
+
+  AddFade(controller_, index, 25U, 100U);
+  ASSERT_EQ(controller_.Start(), prism::ControllerStatus::kSuccess);
+
+  // Capture the staged RGB only when the instruction becomes due.
+  EXPECT_CALL(*led, Color()).WillOnce(testing::Return(start));
+  EXPECT_CALL(mock_strip_, Show()).Times(0);
+  EXPECT_EQ(controller_.Run(), prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(g_last_scheduled_delay, 20U);
+
+  g_fake_time = 50U;
+  g_last_scheduled_delay = 0U;
+  EXPECT_CALL(*led, SetColor(halfway)).WillOnce(testing::Return(0));
+  EXPECT_CALL(*mock_strip_.MutableLed(0U), SetColor(testing::_)).Times(0);
+  EXPECT_CALL(*mock_strip_.MutableLed(1U), SetColor(testing::_)).Times(0);
+  EXPECT_CALL(*mock_strip_.MutableLed(3U), SetColor(testing::_)).Times(0);
+  EXPECT_CALL(*mock_strip_.MutableLed(4U), SetColor(testing::_)).Times(0);
+  EXPECT_CALL(*mock_strip_.MutableLed(5U), SetColor(testing::_)).Times(0);
+  EXPECT_CALL(*mock_strip_.MutableLed(6U), SetColor(testing::_)).Times(0);
+  EXPECT_CALL(*mock_strip_.MutableLed(7U), SetColor(testing::_)).Times(0);
+  EXPECT_CALL(mock_strip_, Show()).Times(1);
+  EXPECT_EQ(controller_.Run(), prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(g_last_scheduled_delay, 10U);
+
+  // A late callback still completes at the exact target from elapsed time.
+  g_fake_time = 150U;
+  g_last_scheduled_delay = 0U;
+  EXPECT_CALL(*led, SetColor(target)).WillOnce(testing::Return(0));
+  EXPECT_CALL(mock_strip_, Show()).Times(1);
+  EXPECT_EQ(controller_.Run(), prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(g_last_scheduled_delay, 0U);
+}
+
+TEST_F(ControllerTest, Fade400PercentSaturatesValueAt255) {
+  constexpr std::uint8_t index = 1U;
+  constexpr prism::color::RgbColor start{180U, 90U, 45U};
+  constexpr prism::color::RgbColor target{255U, 128U, 64U};
+  auto* led = mock_strip_.MutableLed(index);
+
+  AddFade(controller_, index, 400U, 0U);
+  ASSERT_EQ(controller_.Start(), prism::ControllerStatus::kSuccess);
+  EXPECT_CALL(*led, Color()).WillOnce(testing::Return(start));
+  EXPECT_CALL(*led, SetColor(target)).WillOnce(testing::Return(0));
+  EXPECT_CALL(mock_strip_, Show()).Times(1);
+
+  EXPECT_EQ(controller_.Run(), prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(g_last_scheduled_delay, 0U);
+}
+
+TEST_F(ControllerTest, FadeZeroDurationAppliesTargetImmediately) {
+  constexpr std::uint8_t index = 0U;
+  constexpr prism::color::RgbColor start{200U, 100U, 0U};
+  constexpr prism::color::RgbColor target{50U, 25U, 0U};
+  auto* led = mock_strip_.MutableLed(index);
+
+  AddFade(controller_, index, 25U, 0U);
+  ASSERT_EQ(controller_.Start(), prism::ControllerStatus::kSuccess);
+  EXPECT_CALL(*led, Color()).WillOnce(testing::Return(start));
+  EXPECT_CALL(*led, SetColor(target)).WillOnce(testing::Return(0));
+  EXPECT_CALL(mock_strip_, Show()).Times(1);
+
+  EXPECT_EQ(controller_.Run(), prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(g_last_scheduled_delay, 0U);
+}
+
+TEST_F(ControllerTest, FadeBlackInputRemainsBlackWhileFadingUp) {
+  constexpr std::uint8_t index = 4U;
+  constexpr prism::color::RgbColor black{0U, 0U, 0U};
+  auto* led = mock_strip_.MutableLed(index);
+
+  AddFade(controller_, index, 400U, 40U);
+  ASSERT_EQ(controller_.Start(), prism::ControllerStatus::kSuccess);
+  EXPECT_CALL(*led, Color()).WillOnce(testing::Return(black));
+  EXPECT_CALL(mock_strip_, Show()).Times(0);
+  EXPECT_EQ(controller_.Run(), prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(g_last_scheduled_delay, 20U);
+
+  g_fake_time = 20U;
+  g_last_scheduled_delay = 0U;
+  EXPECT_CALL(*led, SetColor(black)).WillOnce(testing::Return(0));
+  EXPECT_CALL(mock_strip_, Show()).Times(1);
+  EXPECT_EQ(controller_.Run(), prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(g_last_scheduled_delay, 20U);
+
+  g_fake_time = 40U;
+  g_last_scheduled_delay = 0U;
+  EXPECT_CALL(*led, SetColor(black)).WillOnce(testing::Return(0));
+  EXPECT_CALL(mock_strip_, Show()).Times(1);
+  EXPECT_EQ(controller_.Run(), prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(g_last_scheduled_delay, 0U);
+}
+
+TEST_F(ControllerTest, FadeZeroDurationDoesNotPermitRepeatedRootGroup) {
+  AddFade(controller_, 0U, 400U, 0U);
+
+  EXPECT_EQ(controller_.Start(1U), prism::ControllerStatus::kInvalidProgram);
+}
+
+TEST_F(ControllerTest, FadeReplayCapturesNewStagedColor) {
+  constexpr std::uint8_t index = 0U;
+  constexpr prism::color::RgbColor initial{100U, 50U, 25U};
+  constexpr prism::color::RgbColor first_target{25U, 13U, 6U};
+  constexpr prism::color::RgbColor replay_target{6U, 3U, 1U};
+  auto* led = mock_strip_.MutableLed(index);
+
+  AddFade(controller_, index, 25U, 100U);
+  ASSERT_EQ(controller_.Start(), prism::ControllerStatus::kSuccess);
+  EXPECT_CALL(*led, Color()).WillOnce(testing::Return(initial));
+  EXPECT_CALL(mock_strip_, Show()).Times(0);
+  EXPECT_EQ(controller_.Run(), prism::ControllerStatus::kSuccess);
+
+  g_fake_time = 100U;
+  g_last_scheduled_delay = 0U;
+  EXPECT_CALL(*led, SetColor(first_target)).WillOnce(testing::Return(0));
+  EXPECT_CALL(mock_strip_, Show()).Times(1);
+  EXPECT_EQ(controller_.Run(), prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(g_last_scheduled_delay, 0U);
+
+  ASSERT_EQ(controller_.Start(), prism::ControllerStatus::kSuccess);
+  EXPECT_CALL(*led, Color()).WillOnce(testing::Return(first_target));
+  EXPECT_CALL(mock_strip_, Show()).Times(0);
+  EXPECT_EQ(controller_.Run(), prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(g_last_scheduled_delay, 20U);
+
+  g_fake_time = 200U;
+  g_last_scheduled_delay = 0U;
+  EXPECT_CALL(*led, SetColor(replay_target)).WillOnce(testing::Return(0));
+  EXPECT_CALL(mock_strip_, Show()).Times(1);
+  EXPECT_EQ(controller_.Run(), prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(g_last_scheduled_delay, 0U);
+}
+
+TEST_F(ControllerTest, FadeUpdatesUseSharedTwentyMillisecondGrid) {
+  constexpr prism::color::RgbColor start{100U, 0U, 0U};
+  constexpr prism::color::RgbColor firstAtTwentyMs{80U, 0U, 0U};
+  constexpr prism::color::RgbColor secondAtTwentyMs{87U, 0U, 0U};
+  auto* first_led = mock_strip_.MutableLed(0U);
+  auto* second_led = mock_strip_.MutableLed(1U);
+
+  AddFade(controller_, 0U, 0U, 100U);
+  AddFade(controller_, 1U, 0U, 100U, 7U);
+  ASSERT_EQ(controller_.Start(), prism::ControllerStatus::kSuccess);
+  EXPECT_CALL(*first_led, Color()).WillOnce(testing::Return(start));
+  EXPECT_CALL(mock_strip_, Show()).Times(0);
+  EXPECT_EQ(controller_.Run(), prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(g_last_scheduled_delay, 7U);
+
+  g_fake_time = 7U;
+  g_last_scheduled_delay = 0U;
+  EXPECT_CALL(*second_led, Color()).WillOnce(testing::Return(start));
+  EXPECT_CALL(mock_strip_, Show()).Times(0);
+  EXPECT_EQ(controller_.Run(), prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(g_last_scheduled_delay, 13U);
+
+  g_fake_time = 20U;
+  g_last_scheduled_delay = 0U;
+  EXPECT_CALL(*first_led, SetColor(firstAtTwentyMs))
+    .WillOnce(testing::Return(0));
+  EXPECT_CALL(*second_led, SetColor(secondAtTwentyMs))
+    .WillOnce(testing::Return(0));
+  EXPECT_CALL(mock_strip_, Show()).Times(1);
+  EXPECT_EQ(controller_.Run(), prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(g_last_scheduled_delay, 20U);
+}
+
+TEST_F(ControllerTest, FadeElapsedTimeIsWrapSafe) {
+  constexpr std::uint8_t index = 0U;
+  constexpr std::uint32_t start_time =
+    std::numeric_limits<std::uint32_t>::max() - 15U;
+  constexpr prism::color::RgbColor start{100U, 0U, 0U};
+  constexpr prism::color::RgbColor halfway{50U, 0U, 0U};
+  constexpr prism::color::RgbColor target{0U, 0U, 0U};
+  auto* led = mock_strip_.MutableLed(index);
+
+  AddFade(controller_, index, 0U, 40U);
+  g_fake_time = start_time;
+  ASSERT_EQ(controller_.Start(), prism::ControllerStatus::kSuccess);
+  EXPECT_CALL(*led, Color()).WillOnce(testing::Return(start));
+  EXPECT_CALL(mock_strip_, Show()).Times(0);
+  EXPECT_EQ(controller_.Run(), prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(g_last_scheduled_delay, 20U);
+
+  g_fake_time = 4U;
+  g_last_scheduled_delay = 0U;
+  EXPECT_CALL(*led, SetColor(halfway)).WillOnce(testing::Return(0));
+  EXPECT_CALL(mock_strip_, Show()).Times(1);
+  EXPECT_EQ(controller_.Run(), prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(g_last_scheduled_delay, 16U);
+
+  g_fake_time = 24U;
+  g_last_scheduled_delay = 0U;
+  EXPECT_CALL(*led, SetColor(target)).WillOnce(testing::Return(0));
+  EXPECT_CALL(mock_strip_, Show()).Times(1);
+  EXPECT_EQ(controller_.Run(), prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(g_last_scheduled_delay, 0U);
+}
+
+TEST_F(ControllerTest,
+       FadeTwentyFiveThenFourHundredPercentCharacterizesPalette) {
+  constexpr std::array<prism::color::RgbColor, 7U> palette{{
+    {255U, 0U, 0U},
+    {255U, 40U, 0U},
+    {180U, 60U, 0U},
+    {0U, 80U, 0U},
+    {0U, 0U, 255U},
+    {40U, 0U, 160U},
+    {140U, 0U, 255U},
+  }};
+  constexpr std::array<prism::color::RgbColor, 7U> dimmed{{
+    {64U, 0U, 0U},
+    {64U, 10U, 0U},
+    {45U, 15U, 0U},
+    {0U, 20U, 0U},
+    {0U, 0U, 64U},
+    {10U, 0U, 40U},
+    {35U, 0U, 64U},
+  }};
+  constexpr std::array<prism::color::RgbColor, 7U> restored{{
+    {255U, 0U, 0U},
+    {255U, 40U, 0U},
+    {180U, 60U, 0U},
+    {0U, 80U, 0U},
+    {0U, 0U, 255U},
+    {40U, 0U, 160U},
+    {139U, 0U, 255U},
+  }};
+
+  for (std::uint8_t index = 0U; index < palette.size(); ++index) {
+    AddFade(controller_, index, 25U, 0U);
+    AddFade(controller_, index, 400U, 0U);
+
+    auto* led = mock_strip_.MutableLed(index);
+    EXPECT_CALL(*led, Color())
+      .WillOnce(testing::Return(palette[index]))
+      .WillOnce(testing::Return(dimmed[index]));
+    EXPECT_CALL(*led, SetColor(dimmed[index])).WillOnce(testing::Return(0));
+    EXPECT_CALL(*led, SetColor(restored[index])).WillOnce(testing::Return(0));
+  }
+
+  ASSERT_EQ(controller_.Start(), prism::ControllerStatus::kSuccess);
+  EXPECT_CALL(mock_strip_, Show()).Times(1);
+  EXPECT_EQ(controller_.Run(), prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(g_last_scheduled_delay, 0U);
+}
+
 // ====================================================================
 // HSV instruction tests
 // ====================================================================
