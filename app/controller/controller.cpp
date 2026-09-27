@@ -5,7 +5,20 @@
 #include <cstdio>
 
 #include "prism/debug.hpp"
+#include "prism/instruction.hpp"
 #include "prism/strip.hpp"
+
+static_assert(prism::kMaxGroups <= 32U,
+              "Group graph masks require at most 32 groups");
+
+struct prism::Controller::GroupBuildState {
+  GroupRecord groups[Controller::kMaxGroups]{};
+  std::uint32_t instruction_indices[prism::kMaxInstructions]{};
+  std::uint32_t index_write_positions[Controller::kMaxGroups]{};
+  std::uint32_t call_graph[Controller::kMaxGroups]{};
+  bool has_positive_boundary[Controller::kMaxGroups]{};
+  std::uint32_t group_count{1U};
+};
 
 // ====================================================================
 // Controller
@@ -19,6 +32,204 @@ prism::Controller::Controller()
       schedule_next_run_(nullptr),
       debug_(nullptr) {
   pending_.SetInstructions(instructions_);
+}
+
+std::uint32_t prism::Controller::FindGroup(const GroupRecord* groups,
+                                           std::uint32_t group_count,
+                                           GroupId id) {
+  for (std::uint32_t i = 0U; i < group_count; ++i) {
+    if (groups[i].id == id) {
+      return i;
+    }
+  }
+  return kMaxGroups;
+}
+
+prism::ControllerStatus prism::Controller::BuildAndValidateGroups(
+  LoopCount root_additional_repeats) {
+  GroupBuildState build{};
+  ControllerStatus status = BuildGroupTable(build);
+  if (status != ControllerStatus::kSuccess) {
+    return status;
+  }
+  status = BuildGroupIndexPool(build);
+  if (status != ControllerStatus::kSuccess) {
+    return status;
+  }
+  status = BuildGroupCallGraph(build);
+  if (status != ControllerStatus::kSuccess) {
+    return status;
+  }
+  status = ValidateGroupCallGraph(build);
+  if (status != ControllerStatus::kSuccess) {
+    return status;
+  }
+  status = ValidateRepeatBoundaries(build, root_additional_repeats);
+  if (status != ControllerStatus::kSuccess) {
+    return status;
+  }
+
+  CommitGroupBuild(build);
+  return ControllerStatus::kSuccess;
+}
+
+prism::ControllerStatus prism::Controller::BuildGroupTable(
+  GroupBuildState& build) const {
+  // Group zero is implicit even when the loaded program has no root
+  // instructions.
+  build.groups[0].id = 0U;
+  for (std::uint32_t i = 0U; i < instruction_count_; ++i) {
+    const GroupId group_id = instructions_[i].GetGroupId();
+    std::uint32_t group_index =
+      FindGroup(build.groups, build.group_count, group_id);
+    if (group_index == kMaxGroups) {
+      if (build.group_count >= kMaxGroups) {
+        return ControllerStatus::kCapacityExhausted;
+      }
+      group_index = build.group_count++;
+      build.groups[group_index].id = group_id;
+    }
+    ++build.groups[group_index].instruction_count;
+  }
+  return ControllerStatus::kSuccess;
+}
+
+prism::ControllerStatus prism::Controller::BuildGroupIndexPool(
+  GroupBuildState& build) const {
+  // Prefix the shared index pool with each group's compact range.
+  std::uint32_t index_cursor = 0U;
+  for (std::uint32_t i = 0U; i < build.group_count; ++i) {
+    build.groups[i].index_begin = index_cursor;
+    build.index_write_positions[i] = index_cursor;
+    index_cursor += build.groups[i].instruction_count;
+    if (index_cursor > kMaxInstructions) {
+      return ControllerStatus::kCapacityExhausted;
+    }
+  }
+
+  // Preserve insertion order inside each group's shared index range.
+  for (std::uint32_t i = 0U; i < instruction_count_; ++i) {
+    const std::uint32_t group_index =
+      FindGroup(build.groups, build.group_count, instructions_[i].GetGroupId());
+    build.instruction_indices[build.index_write_positions[group_index]++] = i;
+  }
+  return ControllerStatus::kSuccess;
+}
+
+prism::ControllerStatus prism::Controller::BuildGroupCallGraph(
+  GroupBuildState& build) const {
+  // Resolve every RunGroup target by label and build the bounded call graph.
+  for (std::uint32_t i = 0U; i < instruction_count_; ++i) {
+    const InstructionMemorySlot& slot = instructions_[i];
+    if (!slot.IsRunGroup()) {
+      continue;
+    }
+    const GroupId target_id = slot.GetTargetGroupId();
+    if (target_id == 0U || slot.GetAdditionalRepeats() == kForeverLoopCount) {
+      return ControllerStatus::kInvalidProgram;
+    }
+    const std::uint32_t source_index =
+      FindGroup(build.groups, build.group_count, slot.GetGroupId());
+    const std::uint32_t target_index =
+      FindGroup(build.groups, build.group_count, target_id);
+    if (source_index == kMaxGroups || target_index == kMaxGroups) {
+      return ControllerStatus::kInvalidProgram;
+    }
+    build.call_graph[source_index] |= (1U << target_index);
+  }
+  return ControllerStatus::kSuccess;
+}
+
+prism::ControllerStatus prism::Controller::ValidateGroupCallGraph(
+  GroupBuildState& build) const {
+  // Transitive closure is bounded by kMaxGroups and rejects every cycle,
+  // including a direct self-call, before any instruction is executed.  The
+  // current group limit fits in one 32-bit adjacency mask per group.
+  for (std::uint32_t through = 0U; through < build.group_count; ++through) {
+    for (std::uint32_t source = 0U; source < build.group_count; ++source) {
+      if ((build.call_graph[source] & (1U << through)) == 0U) {
+        continue;
+      }
+      build.call_graph[source] |= build.call_graph[through];
+    }
+  }
+  for (std::uint32_t i = 0U; i < build.group_count; ++i) {
+    if ((build.call_graph[i] & (1U << i)) != 0U) {
+      return ControllerStatus::kInvalidProgram;
+    }
+  }
+  return ControllerStatus::kSuccess;
+}
+
+prism::ControllerStatus prism::Controller::ValidateRepeatBoundaries(
+  GroupBuildState& build, LoopCount root_additional_repeats) const {
+  // Marks and statically-declared timed work are positive boundaries for the
+  // owning group.  Child boundaries propagate back over the acyclic graph.
+  for (std::uint32_t i = 0U; i < instruction_count_; ++i) {
+    const InstructionMemorySlot& slot = instructions_[i];
+    const std::uint32_t group_index =
+      FindGroup(build.groups, build.group_count, slot.GetGroupId());
+    if (slot.GetMark() > 0U || slot.HasPositiveSchedulingBoundary()) {
+      build.has_positive_boundary[group_index] = true;
+    }
+  }
+  for (std::uint32_t pass = 0U; pass < build.group_count; ++pass) {
+    bool changed = false;
+    for (std::uint32_t source = 0U; source < build.group_count; ++source) {
+      for (std::uint32_t target = 0U; target < build.group_count; ++target) {
+        if ((build.call_graph[source] & (1U << target)) != 0U &&
+            build.has_positive_boundary[target] &&
+            !build.has_positive_boundary[source]) {
+          build.has_positive_boundary[source] = true;
+          changed = true;
+        }
+      }
+    }
+    if (!changed) {
+      break;
+    }
+  }
+
+  // Every repeated child must have a positive completion boundary.  The same
+  // rule applies to a repeated root, including the forever sentinel.
+  for (std::uint32_t i = 0U; i < instruction_count_; ++i) {
+    const InstructionMemorySlot& slot = instructions_[i];
+    if (!slot.IsRunGroup() || slot.GetAdditionalRepeats() == 0U) {
+      continue;
+    }
+    const std::uint32_t target_index =
+      FindGroup(build.groups, build.group_count, slot.GetTargetGroupId());
+    if (target_index == kMaxGroups ||
+        !build.has_positive_boundary[target_index]) {
+      return ControllerStatus::kInvalidProgram;
+    }
+  }
+  if (root_additional_repeats != 0U && !build.has_positive_boundary[0U]) {
+    return ControllerStatus::kInvalidProgram;
+  }
+  return ControllerStatus::kSuccess;
+}
+
+void prism::Controller::CommitGroupBuild(const GroupBuildState& build) {
+  // Publish only a completely validated model so a failed start leaves the
+  // retained instruction program and its previous metadata untouched.
+  group_count_ = build.group_count;
+  for (std::uint32_t i = 0U; i < kMaxGroups; ++i) {
+    groups_[i] = (i < build.group_count) ? build.groups[i] : GroupRecord{};
+    runtimes_[i] = GroupRuntime{};
+  }
+  for (std::uint32_t i = 0U; i < kMaxInstructions; ++i) {
+    group_indices_[i] = build.instruction_indices[i];
+  }
+  for (std::uint32_t i = 0U; i < build.group_count; ++i) {
+    runtimes_[i].record = groups_[i];
+  }
+}
+
+void prism::Controller::ResetInstructionReplayState() {
+  for (std::uint32_t i = 0U; i < instruction_count_; ++i) {
+    instructions_[i].ResetForReplay();
+  }
 }
 
 void prism::Controller::SetStrip(Strip* strip) {
@@ -60,10 +271,19 @@ void prism::Controller::ScheduleTimeout(std::uint32_t ms) {
   }
 }
 
-void prism::Controller::AddInstruction(const ControllerInstruction* instr) {
+prism::ControllerStatus prism::Controller::AddInstruction(
+  const ControllerInstruction* instr) {
+  if (instr == nullptr) {
+    DebugLog("AddInstruction rejected null instruction");
+    return ControllerStatus::kInvalidArgument;
+  }
+  if (state_ != ProgramState::kEditable) {
+    DebugLog("AddInstruction rejected locked program");
+    return ControllerStatus::kBusy;
+  }
   if (instruction_count_ >= kMaxInstruction) {
     DebugLog("AddInstruction queue full (%u)", kMaxInstruction);
-    return;
+    return ControllerStatus::kCapacityExhausted;
   }
   DebugLog("AddInstruction tag=%hhu mark=%u",
            static_cast<std::uint8_t>(instr->Tag()),
@@ -72,33 +292,94 @@ void prism::Controller::AddInstruction(const ControllerInstruction* instr) {
   // Store the instruction at the next free slot.
   const std::uint32_t slot_idx = instruction_count_;
   auto& slot = instructions_[slot_idx];
-  slot.Set(instr);
+  if (!slot.Set(instr)) {
+    DebugLog("AddInstruction rejected unsupported tag");
+    return ControllerStatus::kInvalidArgument;
+  }
   slot.SetStrip(strip_);
   slot.SetController(this);
   ++instruction_count_;
 
-  // Insert into the mark-sorted pending queue.
-  pending_.Insert(slot_idx);
+  return ControllerStatus::kSuccess;
+}
+
+prism::ControllerStatus prism::Controller::Start(
+  LoopCount root_additional_repeats) {
+  if (state_ == ProgramState::kActive) {
+    DebugLog("Start rejected while active");
+    return ControllerStatus::kBusy;
+  }
+  const ControllerStatus status =
+    BuildAndValidateGroups(root_additional_repeats);
+  if (status != ControllerStatus::kSuccess) {
+    DebugLog("Start rejected status=%u", static_cast<unsigned>(status));
+    return status;
+  }
+
+  ResetInstructionReplayState();
+  executing_count_ = 0U;
+  pending_.Reset();
+  const std::uint32_t root_index =
+    FindGroup(groups_, group_count_, GroupId{0U});
+  if (root_index != kMaxGroups) {
+    const GroupRecord& root = groups_[root_index];
+    for (std::uint32_t i = 0U; i < root.instruction_count; ++i) {
+      pending_.Insert(group_indices_[root.index_begin + i]);
+    }
+  }
+
+  root_additional_repeats_ = root_additional_repeats;
+  start_time_ = GetTimestamp();
+  has_run_ = true;
+  show_requested_ = false;
+  min_scheduled_timeout_ = 0U;
+  state_ =
+    (root_index == kMaxGroups || groups_[root_index].instruction_count == 0U)
+      ? ProgramState::kCompleted
+      : ProgramState::kActive;
+  return ControllerStatus::kSuccess;
 }
 
 void prism::Controller::ResetInstructions() {
   DebugLog("ResetInstructions");
+  for (std::uint32_t i = 0U; i < kMaxInstruction; ++i) {
+    instructions_[i].Clear();
+  }
   instruction_count_ = 0U;
   executing_count_ = 0U;
   has_run_ = false;
+  state_ = ProgramState::kEditable;
+  root_additional_repeats_ = 0U;
+  group_count_ = 0U;
+  for (std::uint32_t i = 0U; i < kMaxGroups; ++i) {
+    groups_[i] = GroupRecord{};
+    runtimes_[i] = GroupRuntime{};
+  }
+  for (std::uint32_t i = 0U; i < kMaxInstructions; ++i) {
+    group_indices_[i] = 0U;
+  }
   pending_.Reset();
 }
 
-void prism::Controller::Run() {
+prism::ControllerStatus prism::Controller::Run() {
+  if (state_ == ProgramState::kEditable) {
+    if (instruction_count_ == 0U) {
+      return ControllerStatus::kSuccess;
+    }
+    // Keep the pre-Start call pattern working for existing local users while
+    // the APP start-command migration is completed in a later step.
+    const ControllerStatus status = Start(0U);
+    if (status != ControllerStatus::kSuccess) {
+      return status;
+    }
+  }
+  if (state_ != ProgramState::kActive) {
+    return ControllerStatus::kSuccess;
+  }
+
   DebugLog("Run");
   show_requested_ = false;
   min_scheduled_timeout_ = 0U;
-
-  // First Run() snapshots the start time; marks are relative offsets.
-  if (!has_run_) {
-    start_time_ = GetTimestamp();
-    has_run_ = true;
-  }
 
   DrainExecuting();
   PickNewInstructions();
@@ -122,6 +403,11 @@ void prism::Controller::Run() {
     DebugLog("strip->Show()");
     strip_->Show();
   }
+
+  if (!pending_.HasNext() && executing_count_ == 0U) {
+    state_ = ProgramState::kCompleted;
+  }
+  return ControllerStatus::kSuccess;
 }
 
 void prism::Controller::DrainExecuting() {

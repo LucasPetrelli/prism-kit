@@ -4,7 +4,7 @@
 #include <cstdint>
 
 #include "oshal/event_mailbox.hpp"
-#include "prism/controller.hpp"
+#include "prism/instruction.hpp"
 
 namespace app::hw {
 

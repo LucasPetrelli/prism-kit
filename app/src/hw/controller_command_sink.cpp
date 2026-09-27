@@ -4,7 +4,7 @@
 #include <cstring>
 
 #include "hw/controller_command.hpp"
-#include "prism/controller.hpp"
+#include "prism/instruction.hpp"
 #include "protocol.hpp"
 #include "tags.hpp"
 

@@ -9,6 +9,7 @@
 #include "gtest/gtest.h"
 #include "mock_strip.hpp"
 #include "prism/color.hpp"
+#include "prism/instruction.hpp"
 
 // ====================================================================
 // Test fixture
@@ -547,4 +548,281 @@ TEST_F(ControllerTest, ResetInstructionsClearsStateWithMarks) {
   g_fake_time = 100U;
   EXPECT_CALL(mock_strip_, Show()).Times(0);
   controller_.Run();
+}
+
+// ====================================================================
+// Fixed-capacity group-program validation tests
+// ====================================================================
+
+static_assert(prism::Controller::kMaxGroups ==
+                prism::Controller::kMaxInstruction + 1U,
+              "Group capacity includes the implicit root");
+
+/// @brief RunGroup configuration is copied through its fixed storage variant.
+TEST_F(ControllerTest, RunGroupSlotStoresItsMembershipAndTarget) {
+  prism::RunGroupPayload payload{};
+  payload.group_id = 0xF1234567U;
+  payload.mark = 17U;
+  payload.target_id = 0xFEDCBA98U;
+  payload.additional_repeats = prism::kMaxFiniteLoopCount;
+  prism::RunGroupInstruction instruction{payload};
+
+  prism::InstructionMemorySlot slot;
+  ASSERT_TRUE(slot.Set(&instruction));
+
+  EXPECT_EQ(slot.GetGroupId(), payload.group_id);
+  EXPECT_EQ(slot.GetMark(), payload.mark);
+  EXPECT_TRUE(slot.IsRunGroup());
+  EXPECT_EQ(slot.GetTargetGroupId(), payload.target_id);
+  EXPECT_EQ(slot.GetAdditionalRepeats(), payload.additional_repeats);
+  EXPECT_EQ(slot.Execute(), 0U);
+}
+
+/// @brief Runtime reset clears activation state but retains group metadata.
+TEST_F(ControllerTest, GroupRuntimeResetRetainsItsRecord) {
+  prism::GroupRuntime runtime{};
+  runtime.record = {0xF0000001U, 4U, 3U};
+  runtime.cursor = 2U;
+  runtime.start_time = 99U;
+  runtime.repeats_remaining = 7U;
+  runtime.active_count = 1U;
+  runtime.child_count = 2U;
+  runtime.active = true;
+
+  runtime.Reset();
+
+  EXPECT_EQ(runtime.record.id, 0xF0000001U);
+  EXPECT_EQ(runtime.record.index_begin, 4U);
+  EXPECT_EQ(runtime.record.instruction_count, 3U);
+  EXPECT_EQ(runtime.cursor, 0U);
+  EXPECT_EQ(runtime.start_time, 0U);
+  EXPECT_EQ(runtime.repeats_remaining, 0U);
+  EXPECT_EQ(runtime.active_count, 0U);
+  EXPECT_EQ(runtime.child_count, 0U);
+  EXPECT_FALSE(runtime.active);
+}
+
+/// @brief Instruction and group capacity failures leave the pool bounded.
+TEST_F(ControllerTest, AddInstructionReportsNullAndCapacityFailures) {
+  EXPECT_EQ(controller_.AddInstruction(nullptr),
+            prism::ControllerStatus::kInvalidArgument);
+
+  prism::SetSingleColor instruction;
+  for (std::uint32_t i = 0U; i < prism::Controller::kMaxInstruction; ++i) {
+    EXPECT_EQ(controller_.AddInstruction(&instruction),
+              prism::ControllerStatus::kSuccess);
+  }
+  EXPECT_EQ(controller_.AddInstruction(&instruction),
+            prism::ControllerStatus::kCapacityExhausted);
+  EXPECT_EQ(controller_.Start(), prism::ControllerStatus::kSuccess);
+}
+
+/// @brief Sixteen sparse non-root labels fit beside the implicit root record.
+TEST_F(ControllerTest, MaximumGroupCountIncludesImplicitRoot) {
+  for (std::uint32_t i = 0U; i < prism::Controller::kMaxInstruction; ++i) {
+    prism::SetSingleColor instruction;
+    instruction.group_id = 0x80000000U + i * 257U;
+    ASSERT_EQ(controller_.AddInstruction(&instruction),
+              prism::ControllerStatus::kSuccess);
+  }
+
+  EXPECT_EQ(prism::Controller::kMaxGroups, 17U);
+  EXPECT_EQ(controller_.Start(), prism::ControllerStatus::kSuccess);
+  prism::SetSingleColor replacement;
+  EXPECT_EQ(controller_.AddInstruction(&replacement),
+            prism::ControllerStatus::kBusy);
+}
+
+/// @brief Sparse GroupIds resolve by label without being used as array indexes.
+TEST_F(ControllerTest, SparseGroupIdsResolveRunGroupTargets) {
+  constexpr prism::GroupId sparse_id = 0xFFFFFFFFU;
+  prism::SetSingleColor child;
+  child.group_id = sparse_id;
+  child.mark = 23U;
+  ASSERT_EQ(controller_.AddInstruction(&child),
+            prism::ControllerStatus::kSuccess);
+
+  prism::RunGroupPayload payload{};
+  payload.group_id = 0U;
+  payload.mark = 0U;
+  payload.target_id = sparse_id;
+  prism::RunGroupInstruction start_child{payload};
+  ASSERT_EQ(controller_.AddInstruction(&start_child),
+            prism::ControllerStatus::kSuccess);
+
+  EXPECT_EQ(controller_.Start(), prism::ControllerStatus::kSuccess);
+}
+
+/// @brief Group zero exists implicitly and an empty root completes as a no-op.
+TEST_F(ControllerTest, EmptyRootIsValidWithNonRootInstructions) {
+  prism::SetSingleColor child;
+  child.group_id = 91U;
+  ASSERT_EQ(controller_.AddInstruction(&child),
+            prism::ControllerStatus::kSuccess);
+
+  EXPECT_EQ(controller_.Start(), prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(controller_.Run(), prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(controller_.AddInstruction(&child), prism::ControllerStatus::kBusy);
+}
+
+/// @brief Missing and root-group RunGroup targets fail before execution.
+TEST_F(ControllerTest, RunGroupRejectsMissingAndRootTargets) {
+  prism::RunGroupPayload payload{};
+  payload.group_id = 0U;
+  payload.target_id = 700U;
+  prism::RunGroupInstruction instruction{payload};
+  ASSERT_EQ(controller_.AddInstruction(&instruction),
+            prism::ControllerStatus::kSuccess);
+
+  EXPECT_EQ(controller_.Start(), prism::ControllerStatus::kInvalidProgram);
+
+  prism::SetSingleColor target;
+  target.group_id = payload.target_id;
+  ASSERT_EQ(controller_.AddInstruction(&target),
+            prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(controller_.Start(), prism::ControllerStatus::kSuccess);
+
+  controller_.ResetInstructions();
+  payload.target_id = 0U;
+  prism::RunGroupInstruction root_target{payload};
+  ASSERT_EQ(controller_.AddInstruction(&root_target),
+            prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(controller_.Start(), prism::ControllerStatus::kInvalidProgram);
+}
+
+/// @brief Self-calls and indirect group-call cycles fail program validation.
+TEST_F(ControllerTest, RunGroupRejectsCycles) {
+  prism::RunGroupPayload self_payload{};
+  self_payload.group_id = 0x10000U;
+  self_payload.target_id = self_payload.group_id;
+  prism::RunGroupInstruction self_call{self_payload};
+  ASSERT_EQ(controller_.AddInstruction(&self_call),
+            prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(controller_.Start(), prism::ControllerStatus::kInvalidProgram);
+
+  controller_.ResetInstructions();
+  prism::RunGroupPayload first_payload{};
+  first_payload.group_id = 0x10000U;
+  first_payload.target_id = 0x90000000U;
+  prism::RunGroupInstruction first_call{first_payload};
+  prism::RunGroupPayload second_payload{};
+  second_payload.group_id = first_payload.target_id;
+  second_payload.target_id = first_payload.group_id;
+  prism::RunGroupInstruction second_call{second_payload};
+
+  ASSERT_EQ(controller_.AddInstruction(&first_call),
+            prism::ControllerStatus::kSuccess);
+  ASSERT_EQ(controller_.AddInstruction(&second_call),
+            prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(controller_.Start(), prism::ControllerStatus::kInvalidProgram);
+}
+
+/// @brief Repeated zero-time root and child timelines are rejected.
+TEST_F(ControllerTest, RepeatedZeroTimeGroupsFailPreflight) {
+  prism::SetSingleColor root;
+  ASSERT_EQ(controller_.AddInstruction(&root),
+            prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(controller_.Start(1U), prism::ControllerStatus::kInvalidProgram);
+  EXPECT_EQ(controller_.Start(prism::kForeverLoopCount),
+            prism::ControllerStatus::kInvalidProgram);
+
+  controller_.ResetInstructions();
+  prism::RunGroupPayload payload{};
+  payload.group_id = 0U;
+  payload.target_id = 42U;
+  payload.additional_repeats = 1U;
+  prism::RunGroupInstruction child_call{payload};
+  prism::SetSingleColor child;
+  child.group_id = payload.target_id;
+  ASSERT_EQ(controller_.AddInstruction(&child_call),
+            prism::ControllerStatus::kSuccess);
+  ASSERT_EQ(controller_.AddInstruction(&child),
+            prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(controller_.Start(), prism::ControllerStatus::kInvalidProgram);
+}
+
+/// @brief A future mark provides the required repeat boundary.
+TEST_F(ControllerTest, RepeatedGroupsRequireAndAcceptPositiveBoundaries) {
+  prism::RunGroupPayload payload{};
+  payload.group_id = 0U;
+  payload.target_id = 0xA0000001U;
+  payload.additional_repeats = prism::kMaxFiniteLoopCount;
+  prism::RunGroupInstruction child_call{payload};
+  prism::SetSingleColor child;
+  child.group_id = payload.target_id;
+  child.mark = 1U;
+
+  ASSERT_EQ(controller_.AddInstruction(&child_call),
+            prism::ControllerStatus::kSuccess);
+  ASSERT_EQ(controller_.AddInstruction(&child),
+            prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(controller_.Start(1U), prism::ControllerStatus::kSuccess);
+}
+
+/// @brief Positive boundaries propagate from descendants to repeated parents.
+TEST_F(ControllerTest, NestedChildBoundaryPropagatesToRepeatedRoot) {
+  prism::RunGroupPayload root_call_payload{};
+  root_call_payload.group_id = 0U;
+  root_call_payload.target_id = 0x10000001U;
+  prism::RunGroupInstruction root_call{root_call_payload};
+
+  prism::RunGroupPayload nested_call_payload{};
+  nested_call_payload.group_id = root_call_payload.target_id;
+  nested_call_payload.target_id = 0xFFFFFFFFU;
+  prism::RunGroupInstruction nested_call{nested_call_payload};
+
+  prism::SetSingleColor leaf;
+  leaf.group_id = nested_call_payload.target_id;
+  leaf.mark = 5U;
+
+  ASSERT_EQ(controller_.AddInstruction(&root_call),
+            prism::ControllerStatus::kSuccess);
+  ASSERT_EQ(controller_.AddInstruction(&nested_call),
+            prism::ControllerStatus::kSuccess);
+  ASSERT_EQ(controller_.AddInstruction(&leaf),
+            prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(controller_.Start(1U), prism::ControllerStatus::kSuccess);
+}
+
+/// @brief Child groups cannot use the root-only forever repeat sentinel.
+TEST_F(ControllerTest, ChildRunGroupRejectsForeverRepeats) {
+  prism::RunGroupPayload payload{};
+  payload.group_id = 0U;
+  payload.target_id = 0xFFFF0001U;
+  payload.additional_repeats = prism::kForeverLoopCount;
+  prism::RunGroupInstruction child_call{payload};
+  prism::SetSingleColor child;
+  child.group_id = payload.target_id;
+  child.mark = 1U;
+
+  ASSERT_EQ(controller_.AddInstruction(&child_call),
+            prism::ControllerStatus::kSuccess);
+  ASSERT_EQ(controller_.AddInstruction(&child),
+            prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(controller_.Start(), prism::ControllerStatus::kInvalidProgram);
+}
+
+/// @brief Program mutation is rejected while active and after completion.
+TEST_F(ControllerTest, AddInstructionLocksAfterStartAndCompletion) {
+  prism::SetSingleColor instruction;
+  instruction.mark = 1U;
+  ASSERT_EQ(controller_.AddInstruction(&instruction),
+            prism::ControllerStatus::kSuccess);
+  ASSERT_EQ(controller_.Start(), prism::ControllerStatus::kSuccess);
+
+  prism::SetSingleColor replacement;
+  EXPECT_EQ(controller_.AddInstruction(&replacement),
+            prism::ControllerStatus::kBusy);
+
+  g_fake_time = 1U;
+  EXPECT_CALL(*mock_strip_.MutableLed(0U), SetColor(instruction.color))
+    .WillOnce(testing::Return(0));
+  EXPECT_CALL(mock_strip_, Show()).Times(1);
+  EXPECT_EQ(controller_.Run(), prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(controller_.AddInstruction(&replacement),
+            prism::ControllerStatus::kBusy);
+
+  controller_.ResetInstructions();
+  EXPECT_EQ(controller_.AddInstruction(&replacement),
+            prism::ControllerStatus::kSuccess);
 }

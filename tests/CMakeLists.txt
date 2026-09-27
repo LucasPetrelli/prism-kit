@@ -17,6 +17,7 @@ FetchContent_MakeAvailable(googletest)
 # --- Test executable ---
 add_executable(controller_test
   controller_test.cpp
+  instruction_header_compile_test.cpp
   ../app/controller/controller.cpp
   ../app/controller/instructions.cpp
 )

@@ -11,6 +11,7 @@
 #include "prism/color.hpp"
 #include "prism/controller.hpp"
 #include "prism/debug.hpp"
+#include "prism/instruction.hpp"
 #include "prism/strip.hpp"
 #include "prism/time.hpp"
 

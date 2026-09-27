@@ -3,6 +3,7 @@
 
 #include "prism/color.hpp"
 #include "prism/controller.hpp"
+#include "prism/instruction.hpp"
 #include "prism/strip.hpp"
 
 // ====================================================================
@@ -11,8 +12,12 @@
 
 prism::InstructionMemorySlot::~InstructionMemorySlot() { Destroy(); }
 
-void prism::InstructionMemorySlot::Set(const ControllerInstruction* instr) {
+bool prism::InstructionMemorySlot::Set(const ControllerInstruction* instr) {
   Destroy();
+  if (instr == nullptr) {
+    return false;
+  }
+
   switch (instr->Tag()) {
     case InstructionTag::kSetMultipleColor:
       ::new (&set_multiple_color)
@@ -30,9 +35,19 @@ void prism::InstructionMemorySlot::Set(const ControllerInstruction* instr) {
       ::new (&set_single_color_hsv)
         SetSingleColorHsv(*static_cast<const SetSingleColorHsv*>(instr));
       break;
+    case InstructionTag::kRunGroup:
+      ::new (&run_group)
+        RunGroupInstruction(*static_cast<const RunGroupInstruction*>(instr));
+      break;
+    default:
+      return false;
   }
   tag = instr->Tag();
+  active_ = true;
+  return true;
 }
+
+void prism::InstructionMemorySlot::Clear() { Destroy(); }
 
 prism::Mark prism::InstructionMemorySlot::GetMark() const {
   const ControllerInstruction* instr = Active();
@@ -51,7 +66,41 @@ void prism::InstructionMemorySlot::SetController(Controller* c) {
   }
 }
 
+prism::GroupId prism::InstructionMemorySlot::GetGroupId() const {
+  const ControllerInstruction* instr = Active();
+  return instr != nullptr ? instr->group_id : GroupId{0U};
+}
+
+bool prism::InstructionMemorySlot::IsRunGroup() const {
+  const ControllerInstruction* instr = Active();
+  return instr != nullptr && instr->IsRunGroup();
+}
+
+prism::GroupId prism::InstructionMemorySlot::GetTargetGroupId() const {
+  const ControllerInstruction* instr = Active();
+  return instr != nullptr ? instr->TargetGroupId() : GroupId{0U};
+}
+
+prism::LoopCount prism::InstructionMemorySlot::GetAdditionalRepeats() const {
+  const ControllerInstruction* instr = Active();
+  return instr != nullptr ? instr->AdditionalRepeats() : LoopCount{0U};
+}
+
+bool prism::InstructionMemorySlot::HasPositiveSchedulingBoundary() const {
+  const ControllerInstruction* instr = Active();
+  return instr != nullptr && instr->HasPositiveSchedulingBoundary();
+}
+
+void prism::InstructionMemorySlot::ResetForReplay() {
+  if (ControllerInstruction* instr = Active(); instr != nullptr) {
+    instr->ResetForReplay();
+  }
+}
+
 prism::ControllerInstruction* prism::InstructionMemorySlot::Active() {
+  if (!active_) {
+    return nullptr;
+  }
   switch (tag) {
     case InstructionTag::kSetMultipleColor:
       return &set_multiple_color;
@@ -61,12 +110,17 @@ prism::ControllerInstruction* prism::InstructionMemorySlot::Active() {
       return &set_multiple_color_hsv;
     case InstructionTag::kSetSingleColorHsv:
       return &set_single_color_hsv;
+    case InstructionTag::kRunGroup:
+      return &run_group;
   }
   return nullptr;
 }
 
 const prism::ControllerInstruction* prism::InstructionMemorySlot::Active()
   const {
+  if (!active_) {
+    return nullptr;
+  }
   switch (tag) {
     case InstructionTag::kSetMultipleColor:
       return &set_multiple_color;
@@ -76,23 +130,51 @@ const prism::ControllerInstruction* prism::InstructionMemorySlot::Active()
       return &set_multiple_color_hsv;
     case InstructionTag::kSetSingleColorHsv:
       return &set_single_color_hsv;
+    case InstructionTag::kRunGroup:
+      return &run_group;
   }
   return nullptr;
 }
 
 std::uint32_t prism::InstructionMemorySlot::Execute() {
-  return Active()->Execute();
+  ControllerInstruction* instr = Active();
+  return instr != nullptr ? instr->Execute() : 0U;
 }
 
 void prism::InstructionMemorySlot::ToString(char* buf, std::size_t size) const {
-  Active()->ToString(buf, size);
+  const ControllerInstruction* instr = Active();
+  if (instr != nullptr) {
+    instr->ToString(buf, size);
+    return;
+  }
+  std::snprintf(buf, size, "Empty");
 }
 
 void prism::InstructionMemorySlot::Destroy() {
-  if (tag != InstructionTag{}) {
-    Active()->~ControllerInstruction();
-    tag = {};
+  if (!active_) {
+    return;
   }
+  switch (tag) {
+    case InstructionTag::kSetMultipleColor:
+      set_multiple_color.~SetMultipleColor();
+      break;
+    case InstructionTag::kSetSingleColor:
+      set_single_color.~SetSingleColor();
+      break;
+    case InstructionTag::kSetMultipleColorHsv:
+      set_multiple_color_hsv.~SetMultipleColorHsv();
+      break;
+    case InstructionTag::kSetSingleColorHsv:
+      set_single_color_hsv.~SetSingleColorHsv();
+      break;
+    case InstructionTag::kRunGroup:
+      run_group.~RunGroupInstruction();
+      break;
+    default:
+      break;
+  }
+  active_ = false;
+  tag = {};
 }
 
 // ====================================================================
@@ -198,8 +280,65 @@ const char* prism::InstructionToString(InstructionTag tag) {
       return "SetMultipleColorHsv";
     case InstructionTag::kSetSingleColorHsv:
       return "SetSingleColorHsv";
+    case InstructionTag::kRunGroup:
+      return "RunGroup";
   }
   return "Unknown";
+}
+
+// ====================================================================
+// ControllerInstruction lifecycle and metadata
+// ====================================================================
+
+void prism::ControllerInstruction::ResetForReplay() {}
+
+bool prism::ControllerInstruction::HasPositiveSchedulingBoundary() const {
+  return false;
+}
+
+bool prism::ControllerInstruction::IsRunGroup() const { return false; }
+
+prism::GroupId prism::ControllerInstruction::TargetGroupId() const {
+  return GroupId{0U};
+}
+
+prism::LoopCount prism::ControllerInstruction::AdditionalRepeats() const {
+  return LoopCount{0U};
+}
+
+// ====================================================================
+// GroupRuntime
+// ====================================================================
+
+void prism::GroupRuntime::Reset() {
+  cursor = 0U;
+  start_time = 0U;
+  repeats_remaining = 0U;
+  active_count = 0U;
+  child_count = 0U;
+  active = false;
+}
+
+// ====================================================================
+// RunGroupInstruction
+// ====================================================================
+
+std::uint32_t prism::RunGroupInstruction::Execute() { return 0U; }
+
+void prism::RunGroupInstruction::ToString(char* buf, std::size_t size) const {
+  std::snprintf(buf, size, "RunGroup(target=%u repeats=%u)",
+                static_cast<unsigned>(target_id),
+                static_cast<unsigned>(additional_repeats));
+}
+
+bool prism::RunGroupInstruction::IsRunGroup() const { return true; }
+
+prism::GroupId prism::RunGroupInstruction::TargetGroupId() const {
+  return target_id;
+}
+
+prism::LoopCount prism::RunGroupInstruction::AdditionalRepeats() const {
+  return additional_repeats;
 }
 
 // ====================================================================
