@@ -34,6 +34,7 @@ smoke-test = "scripts.smoke_test:main"
 unit-tests = "scripts.unit_tests:main"
 rainbow = "scripts.rainbow:main"
 rainbow2 = "scripts.rainbow2:main"
+rainbow3 = "scripts.rainbow3:main"
 
 [build-system]
 requires = ["setuptools"]

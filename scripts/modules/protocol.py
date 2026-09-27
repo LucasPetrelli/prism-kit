@@ -11,6 +11,9 @@ Wire format (matches ``protocol::Frame`` in ``protocol/include/frame.hpp``):
 - Run tag: 0x0103 (``protocol::Tag::kRun``)
 - SetSingleColorHsv tag: 0x0105 (``protocol::Tag::kSetSingleColorHsv``)
 - SetMultipleColorHsv tag: 0x0106 (``protocol::Tag::kSetMultipleColorHsv``)
+- SetMultipleColorGrouped tag: 0x0107
+- SetSingleColorGrouped tag: 0x0108
+- Start tag: 0x010C
 - Delay was 0x0104 — removed; use mark gaps instead.
 - Checksum: XOR of tag + length + data bytes.
 """
@@ -29,6 +32,9 @@ TAG_RESET_INSTRUCTIONS = 0x0102
 TAG_RUN = 0x0103
 TAG_SET_SINGLE_COLOR_HSV = 0x0105
 TAG_SET_MULTIPLE_COLOR_HSV = 0x0106
+TAG_SET_MULTIPLE_COLOR_GROUPED = 0x0107
+TAG_SET_SINGLE_COLOR_GROUPED = 0x0108
+TAG_START = 0x010C
 
 
 def build_frame(tag: int, payload: bytes) -> bytes:
@@ -91,6 +97,47 @@ def build_set_multiple_color_frame(
     )
 
 
+def build_set_multiple_color_grouped_frame(
+    r: int,
+    g: int,
+    b: int,
+    start: int,
+    end: int,
+    group_id: int,
+    mark: int = 0,
+) -> bytes:
+    """Build a grouped ``kSetMultipleColor`` frame.
+
+    Payload: ``mark(2 LE) r(1) g(1) b(1) start(1) end(1) group_id(4 LE)``.
+    """
+    payload = (
+        mark.to_bytes(2, "little")
+        + bytes([r, g, b, start, end])
+        + group_id.to_bytes(4, "little")
+    )
+    return build_frame(TAG_SET_MULTIPLE_COLOR_GROUPED, payload)
+
+
+def build_set_single_color_grouped_frame(
+    r: int,
+    g: int,
+    b: int,
+    index: int,
+    group_id: int,
+    mark: int = 0,
+) -> bytes:
+    """Build a grouped ``kSetSingleColor`` frame.
+
+    Payload: ``mark(2 LE) r(1) g(1) b(1) index(1) group_id(4 LE)``.
+    """
+    payload = (
+        mark.to_bytes(2, "little")
+        + bytes([r, g, b, index])
+        + group_id.to_bytes(4, "little")
+    )
+    return build_frame(TAG_SET_SINGLE_COLOR_GROUPED, payload)
+
+
 def build_reset_instructions_frame() -> bytes:
     """Build a ``kResetInstructions`` frame (0-byte payload).
 
@@ -139,6 +186,15 @@ def build_run_frame() -> bytes:
     and flush the resulting pixel colours to the physical LED strip.
     """
     return build_frame(TAG_RUN, b"")
+
+
+def build_start_frame(root_additional_repeats: int) -> bytes:
+    """Build a ``kStart`` frame with a little-endian root repeat count.
+
+    The value ``0xFFFF`` requests an indefinitely repeating root group.
+    """
+    payload = root_additional_repeats.to_bytes(2, "little")
+    return build_frame(TAG_START, payload)
 
 
 def parse_wire_frame(data: bytes) -> dict | None:

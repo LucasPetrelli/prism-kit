@@ -41,12 +41,12 @@ from scripts.modules.serial_utils import (
     group_ports_by_device,
     print_captured_lines,
 )
-from scripts import rainbow2
+from scripts import rainbow3
 
 DEFAULT_BAUDRATE = 115200
 DEFAULT_WAIT_FOR_PORT_SECONDS = 10.0
 DEFAULT_CAPTURE_TIMEOUT_SECONDS = 12.0
-DEFAULT_RAINBOW_STEP_DELAY_MS = 1000
+DEFAULT_RAINBOW_STEP_DELAY_MS = rainbow3.DEFAULT_STEP_DELAY_MS
 DEFAULT_PORT_MATCH_TOKENS = ("Prism Kit",)
 DEFAULT_DEBUG_MARKER = "DebugPort online on"
 DEFAULT_OPTIONAL_MARKERS = ("Booting Zephyr OS build",)
@@ -144,15 +144,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--skip-rainbow",
         action="store_true",
-        help="Skip the visual LED rainbow2 sequence test.",
+        help="Skip the visual LED Rainbow3 sequence test.",
     )
     parser.add_argument(
         "--rainbow-step-delay",
-        type=int,
+        type=rainbow3.parse_step_delay_ms,
         default=DEFAULT_RAINBOW_STEP_DELAY_MS,
-        help=(
-            "Milliseconds between rainbow2 sequence steps. " "Default: %(default)s ms."
-        ),
+        help="Milliseconds between Rainbow3 sequence steps. Default: %(default)s ms.",
     )
     return parser.parse_args()
 
@@ -281,7 +279,7 @@ class SmokeTest:
 
         rainbow_ok = True
         if not self.args.skip_rainbow:
-            rainbow_ok = self._run_rainbow2_sequence()
+            rainbow_ok = self._run_rainbow3_sequence()
 
         if self.args.dump_logs:
             self._dump_debug_console()
@@ -575,13 +573,13 @@ class SmokeTest:
 
         return True
 
-    # ── Phase: run rainbow2 sequence ───────────────────────────────
+    # ── Phase: run Rainbow3 sequence ───────────────────────────────
 
-    def _run_rainbow2_sequence(self) -> bool:
-        """Run the device-timed rainbow2 sequence while capturing debug output.
+    def _run_rainbow3_sequence(self) -> bool:
+        """Run and clean up the infinite Rainbow3 sequence.
 
         Delegates the command-port frame sequence to
-        :func:`rainbow2.run_rainbow2_sequence` while a background thread
+        :func:`rainbow3.run_rainbow3_sequence` while a background thread
         drains the debug port so firmware log output is captured.
         """
         command_device = self._resolve_command_device()
@@ -633,8 +631,9 @@ class SmokeTest:
         reader.start()
 
         rainbow_ok = False
+        cleanup_ok = False
         try:
-            rainbow_ok = rainbow2.run_rainbow2_sequence(
+            rainbow_ok = rainbow3.run_rainbow3_sequence(
                 self.serial,
                 command_device,
                 self.args.baudrate,
@@ -643,19 +642,28 @@ class SmokeTest:
             if rainbow_ok:
                 observation_seconds = max(
                     1.0,
-                    (6 * self.args.rainbow_step_delay / 1000.0) + 0.5,
+                    (7 * self.args.rainbow_step_delay / 1000.0) + 0.5,
                 )
                 stop_reader.wait(observation_seconds)
             else:
                 print(
-                    "Smoke test failed — rainbow2 sequence did not succeed.",
+                    "Smoke test failed — Rainbow3 sequence did not succeed.",
                     file=sys.stderr,
                 )
         finally:
             stop_reader.set()
             reader.join(timeout=1.0)
+            cleanup_ok = rainbow3.reset_rainbow3_program(
+                self.serial, command_device, self.args.baudrate
+            )
 
-        if not rainbow_ok:
+        if not cleanup_ok:
+            print(
+                "Smoke test failed — Rainbow3 cleanup reset was not fully written.",
+                file=sys.stderr,
+            )
+
+        if not rainbow_ok or not cleanup_ok:
             return False
 
         if reader_error is not None:
