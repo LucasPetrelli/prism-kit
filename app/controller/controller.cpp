@@ -162,7 +162,7 @@ prism::ControllerStatus prism::Controller::BuildGroupCallGraph(
       continue;
     }
     const GroupId target_id = slot.GetTargetGroupId();
-    if (target_id == 0U || slot.GetAdditionalRepeats() == kForeverLoopCount) {
+    if (target_id == 0U) {
       return ControllerStatus::kInvalidProgram;
     }
     const std::uint32_t source_index =

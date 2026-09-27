@@ -23,18 +23,18 @@ using GroupId = std::uint32_t;
 
 /// @brief Additional passes requested for a group activation.
 ///
-/// A value of zero means one pass.  The all-ones value is reserved for the
-/// root start policy; child activations must use a finite value.
+/// A value of zero means one pass.  The all-ones value requests forever for a
+/// root start policy or a non-root RunGroup activation.
 using LoopCount = std::uint16_t;
 
-/// @brief Sentinel requesting an unbounded root repeat policy.
+/// @brief Sentinel requesting unbounded root or child-group repetition.
 constexpr LoopCount kForeverLoopCount = 0xFFFFU;
 
 /// @brief Largest finite additional-repeat count.
 constexpr LoopCount kMaxFiniteLoopCount = kForeverLoopCount - 1U;
 
 /// @brief Shared fixed capacity for stored instructions and pending indexes.
-constexpr std::uint32_t kMaxInstructions = 16U;
+constexpr std::uint32_t kMaxInstructions = 28U;
 
 /// @brief Tag identifying the concrete instruction type.
 enum class InstructionTag : std::uint8_t {
@@ -128,7 +128,7 @@ struct RunGroupPayload {
   Mark mark{0U};
   /// @brief Nonzero sparse label of the group to activate.
   GroupId target_id{0U};
-  /// @brief Finite number of additional child passes.
+  /// @brief Additional child passes, or kForeverLoopCount.
   LoopCount additional_repeats{0U};
 };
 
@@ -418,7 +418,7 @@ class RunGroupInstruction : public ControllerInstruction {
 
   /// @brief Nonzero group label to activate.
   GroupId target_id{0U};
-  /// @brief Finite additional child passes.
+  /// @brief Additional child passes, or kForeverLoopCount.
   LoopCount additional_repeats{0U};
 };
 

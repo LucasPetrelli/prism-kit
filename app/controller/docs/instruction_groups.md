@@ -30,7 +30,7 @@ hardware-flashing requirements to the controller core.
 
 ## Codebase Fit and Constraints
 
-- `Controller` currently stores at most 16 `InstructionMemorySlot` objects.
+- `Controller` currently stores at most 28 `InstructionMemorySlot` objects.
   `Mark` is `uint16_t`, while the timestamp callback returns `uint32_t`
   milliseconds [controller API][ctrl-hdr].
 - Current marks are offsets from the first `Controller::Run()` call. A run
@@ -76,8 +76,8 @@ hardware-flashing requirements to the controller core.
   value 0 is reserved for the implicit root group.
 - Define `LoopCount` as `uint16_t`. `0` means one pass, values through
   `0xFFFE` mean that many additional passes, and `0xFFFF` is the forever
-  sentinel. Only the root start policy may use the sentinel; a nonzero group
-  rejects it as an invalid program or command.
+  sentinel. The root start policy and non-root `RunGroup` calls may use the
+  sentinel; every repeated group still needs a positive scheduling boundary.
 - Keep the controller contract platform-neutral by defining a Prism-owned
   `ControllerStatus` rather than including an OSHAL status header. At minimum
   it reports success, invalid argument, busy/program-locked, capacity
@@ -135,7 +135,7 @@ hardware-flashing requirements to the controller core.
   completion-relative, not fixed-period scheduling.
 - A repeat count means additional passes: 0 is one pass, and N is one initial
   pass plus N repeats. The root repeat count is a controller start policy;
-  each `RunGroup` carries its own finite additional-repeat count.
+  each `RunGroup` carries its own finite or forever additional-repeat count.
 - Static preflight accepts a group with one or more repeats only when it has
   a statically identifiable positive scheduling boundary (a future mark, a
   timed-instruction deadline, or a child boundary). A one-pass zero-time group
@@ -241,8 +241,9 @@ contract is:
   There is no version negotiation: senders that need groups or root repeat
   policy use the new tags.
 - `RunGroup` carries its parent `GroupId`, activation `Mark`, target
-  `GroupId`, and finite additional-repeat `LoopCount`; the child forever
-  sentinel remains invalid. The new `Start` command carries the root
+  `GroupId`, and finite or forever additional-repeat `LoopCount`. A child
+  forever repeat is valid only when the child has a positive scheduling
+  boundary. The new `Start` command carries the root
   additional-repeat policy, including `0xFFFF` for forever. APP setup's
   default program starts with `Start(0)`. Both setup and external start
   commands call `Run()` once immediately only after a successful `Start`;
@@ -310,7 +311,7 @@ direct indexes.
 
 With N = `kMaxInstructions`, every non-root group must contain at least one
 stored instruction. Set `kMaxGroups = N + 1` to include the implicit root;
-with today's N = 16, that is at most 17 group records. The number of groups
+with today's N = 28, that is at most 29 group records. The number of groups
 cannot grow independently of the fixed instruction capacity.
 
 ```plantuml
@@ -411,9 +412,9 @@ group repeats can reuse its slot.
 - Reject instruction-capacity overflow and group-table overflow. `AddInstruction`
   must not silently drop an instruction; it returns the capacity status and
   leaves the existing program unchanged.
-- Reject null instruction pointers, group ID 0 as a `RunGroup` target, forever
-  child repeats, and mutation while active or after completion. A caller must
-  reset before loading a replacement program.
+- Reject null instruction pointers, group ID 0 as a `RunGroup` target,
+  repeated groups without positive boundaries, and mutation while active or
+  after completion. A caller must reset before loading a replacement program.
 - `ResetInstructions()` must stop all active iterators. Since the existing
   schedule callback only arms a timeout, either cancel the timer or ensure a
   stale timeout cannot restart/advance a cleared program.
@@ -437,23 +438,24 @@ group repeats can reuse its slot.
   currently 16-bit, so each local instruction horizon is bounded by that
   representation; timed-operation duration and timestamp-wrap assumptions
   still need tests.
-- A finite child repeat count is allowed; an infinite child count is invalid.
-  Only the controller's root repeat policy may select forever.
+- Finite and forever child repeat counts are allowed when the child has a
+  positive scheduling boundary. Only groups with a statically identifiable
+  boundary may repeat.
 - An empty non-root group is invalid because it cannot provide a completion
   boundary. An empty root is valid and completes immediately.
 
 ## Resource and Scaling Impact
 
 Capacity-specific items below are calculated bounds from the current
-16-instruction capacity. The Step 4 target-build storage measurements are
-recorded separately below:
+28-instruction capacity. The Step 4 target-build measurements below predate
+this capacity increase and are historical:
 
-- A 32-bit group ID stored with each of 16 instructions represents 64 bytes of
+- A 32-bit group ID stored with each of 28 instructions represents 112 bytes of
   group-ID scalar data before object/union alignment. The actual RAM delta must
   be measured with `sizeof` and the target link map.
-- A shared array of 16 32-bit instruction indexes is another calculated
-  64-byte pool. By comparison, 17 groups each reserving 16 32-bit indexes
-  would use 1,088 bytes; the shared pool avoids this O(groups x instructions)
+- A shared array of 28 32-bit instruction indexes is another calculated
+  112-byte pool. By comparison, 29 groups each reserving 28 32-bit indexes
+  would use 3,248 bytes; the shared pool avoids this O(groups x instructions)
   reservation. Group-record and group-runtime state, including one fixed
   observed-boundary flag per runtime, scales with the number of groups, at
   most N + 1 under the fixed capacity; the actual object sizes and padding
@@ -477,7 +479,7 @@ recorded separately below:
   registrations exactly fill the remaining entries, with no spare handler
   slot.
 - Group lookup and graph validation are bounded by the loaded instruction and
-  group counts. With N = 16, a linear compact-table lookup and an O(N^2)
+  group counts. With N = 28, a linear compact-table lookup and an O(N^2)
   build/sort are bounded and avoid dynamic allocation. Per-tick cost scales
   with active groups and due/in-flight instructions. Boundary propagation
   adds an active-ancestor walk per observed event, bounded by `kMaxGroups`;
@@ -496,8 +498,8 @@ recorded separately below:
 ## Design Decisions
 
 - **Repeat representation:** `LoopCount` is `uint16_t`; `0xFFFF` is forever
-  only for the root start policy, and `0xFFFE` is the largest finite
-  additional-repeat count.
+  for the root start policy and non-root `RunGroup` calls, and `0xFFFE` is
+  the largest finite additional-repeat count.
 - **Failure visibility:** controller mutations and progress ticks return a
   Prism-owned `ControllerStatus`. Runtime group conflicts and defensive
   repeated-boundary failures do not cancel unrelated timelines; they are
@@ -612,9 +614,9 @@ available; protocol and APP integration are not prerequisites.
   Release the stopped activation's successful parent relationship normally,
   without disturbing B's first activation or other successful work; root stays
   active until successfully launched children finish.
-- Preserve repeat-boundary validation: child repeats are finite, only the
-  root may use the forever sentinel, and every repeated group needs a static
-  positive boundary. Positive boundaries propagate from nested descendants.
+- Preserve repeat-boundary validation: root and child repeats require a static
+  positive boundary, including when a child uses the forever sentinel.
+  Positive boundaries propagate from nested descendants.
   A root whose only positive boundary is in a child or deeper descendant
   passes preflight, waits for that child chain to finish, and only then starts
   its next root pass at the completion time. Drain newly due work at that same
@@ -627,7 +629,8 @@ fake clock and a timed test instruction. Verify `Run()` on a loaded-but-editable
 program is a no-op; `Start()` executes no work before the caller's immediate
 `Run()`; and cover the empty, active-start, replay, reset, and stale-tick
 lifecycle. Test finite/forever root policies, finite child repeats (N means
-N+1 passes), rejection of the child forever sentinel, and per-pass instruction
+N+1 passes), concurrent forever child groups, rejection of zero-boundary
+forever children, and per-pass instruction
 state reset. Reproduce the worked timeline at 100, 200, 300, 400, 500, 600,
 and 700 ms; confirm parent progress during child execution, nested outstanding
 completion, and fresh repeat origins. Exercise local mark origins, child
@@ -651,7 +654,7 @@ boundary but completes without yielding; the guard must return existing
 `kInvalidProgram` and stop before another pass. Retain preflight coverage
 for zero-time repeats and status failures. Run the documented
 `uv run unit-tests` check; keep scheduling iterative and heap-free, and record
-bounded tick work and `sizeof` changes at the current 16-instruction limit.
+bounded tick work and `sizeof` changes at the current 28-instruction limit.
 Use the existing `cid-design-step` workflow for this bounded implementation
 and review checkpoint; no new skill is warranted.
 

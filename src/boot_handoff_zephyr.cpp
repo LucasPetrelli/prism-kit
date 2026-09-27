@@ -8,7 +8,7 @@
 
 namespace {
 
-constexpr std::size_t kAppTaskStackSizeBytes = 1024U;
+constexpr std::size_t kAppTaskStackSizeBytes = 1536U;
 K_THREAD_STACK_DEFINE(g_app_task_stack, kAppTaskStackSizeBytes);
 K_THREAD_STACK_DEFINE(g_hw_task_stack, app::hw::kTaskStackSizeBytes);
 app::AppTaskStartupContext g_app_task_startup_context{

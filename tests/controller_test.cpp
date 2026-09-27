@@ -949,7 +949,7 @@ TEST_F(ControllerTest, AddInstructionReportsNullAndCapacityFailures) {
   EXPECT_EQ(controller_.Start(), prism::ControllerStatus::kSuccess);
 }
 
-/// @brief Sixteen sparse non-root labels fit beside the implicit root record.
+/// @brief Twenty-eight sparse non-root labels fit beside the root record.
 TEST_F(ControllerTest, MaximumGroupCountIncludesImplicitRoot) {
   for (std::uint32_t i = 0U; i < prism::Controller::kMaxInstruction; ++i) {
     prism::SetSingleColor instruction;
@@ -958,11 +958,75 @@ TEST_F(ControllerTest, MaximumGroupCountIncludesImplicitRoot) {
               prism::ControllerStatus::kSuccess);
   }
 
-  EXPECT_EQ(prism::Controller::kMaxGroups, 17U);
+  EXPECT_EQ(prism::Controller::kMaxInstruction, 28U);
+  EXPECT_EQ(prism::Controller::kMaxGroups, 29U);
   EXPECT_EQ(controller_.Start(), prism::ControllerStatus::kSuccess);
   prism::SetSingleColor replacement;
   EXPECT_EQ(controller_.AddInstruction(&replacement),
             prism::ControllerStatus::kBusy);
+}
+
+/// @brief Seven staggered forever children occupy the 28-slot program safely.
+TEST_F(ControllerTest, SevenStaggeredForeverChildrenRepeatConcurrently) {
+  constexpr std::array<prism::Mark, 7U> kMarks{0U,    286U,  571U, 857U,
+                                               1143U, 1429U, 1714U};
+  std::array<std::array<std::uint32_t, 2U>, 7U> child_calls{};
+
+  for (std::size_t i = 0U; i < kMarks.size(); ++i) {
+    EXPECT_CALL(*mock_strip_.MutableLed(i), SetColor(testing::_)).Times(1);
+
+    prism::SetSingleColor color;
+    color.mark = kMarks[i];
+    color.index = static_cast<std::uint8_t>(i);
+    color.color = {static_cast<std::uint8_t>(20U + i),
+                   static_cast<std::uint8_t>(40U + i),
+                   static_cast<std::uint8_t>(60U + i)};
+    ASSERT_EQ(controller_.AddInstruction(&color),
+              prism::ControllerStatus::kSuccess);
+
+    prism::RunGroupPayload payload{};
+    payload.group_id = 0U;
+    payload.mark = kMarks[i];
+    payload.target_id = static_cast<prism::GroupId>(i + 1U);
+    payload.additional_repeats = prism::kForeverLoopCount;
+    prism::RunGroupInstruction start_child{payload};
+    ASSERT_EQ(controller_.AddInstruction(&start_child),
+              prism::ControllerStatus::kSuccess);
+  }
+  EXPECT_CALL(mock_strip_, Show()).Times(7);
+
+  for (std::size_t i = 0U; i < kMarks.size(); ++i) {
+    prism::test::TimedInstruction first{10U, &child_calls[i][0U]};
+    first.group_id = static_cast<prism::GroupId>(i + 1U);
+    prism::test::TimedInstruction second{10U, &child_calls[i][1U]};
+    second.group_id = first.group_id;
+    ASSERT_EQ(controller_.AddInstruction(&first),
+              prism::ControllerStatus::kSuccess);
+    ASSERT_EQ(controller_.AddInstruction(&second),
+              prism::ControllerStatus::kSuccess);
+  }
+
+  EXPECT_EQ(prism::Controller::kMaxInstruction, 28U);
+  prism::SetSingleColor overflow;
+  EXPECT_EQ(controller_.AddInstruction(&overflow),
+            prism::ControllerStatus::kCapacityExhausted);
+
+  ASSERT_EQ(controller_.Start(), prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(controller_.Run(), prism::ControllerStatus::kSuccess);
+  for (std::size_t i = 1U; i < kMarks.size(); ++i) {
+    g_fake_time = kMarks[i];
+    EXPECT_EQ(controller_.Run(), prism::ControllerStatus::kSuccess);
+  }
+
+  // Each child completes and starts another pass while all seven remain
+  // outstanding; the root therefore remains active after its final mark.
+  g_fake_time = static_cast<std::uint32_t>(kMarks.back()) + 10U;
+  EXPECT_EQ(controller_.Run(), prism::ControllerStatus::kSuccess);
+  for (const auto& calls : child_calls) {
+    EXPECT_GE(calls[0U], 3U);
+    EXPECT_GE(calls[1U], 3U);
+  }
+  EXPECT_EQ(controller_.Start(), prism::ControllerStatus::kBusy);
 }
 
 /// @brief Sparse GroupIds resolve by label without being used as array indexes.
@@ -1116,8 +1180,8 @@ TEST_F(ControllerTest, NestedChildBoundaryPropagatesToRepeatedRoot) {
   EXPECT_EQ(controller_.Start(1U), prism::ControllerStatus::kSuccess);
 }
 
-/// @brief Child groups cannot use the root-only forever repeat sentinel.
-TEST_F(ControllerTest, ChildRunGroupRejectsForeverRepeats) {
+/// @brief A child forever repeat still requires a positive time boundary.
+TEST_F(ControllerTest, ChildForeverRepeatWithoutBoundaryFailsPreflight) {
   prism::RunGroupPayload payload{};
   payload.group_id = 0U;
   payload.target_id = 0xFFFF0001U;
@@ -1125,7 +1189,6 @@ TEST_F(ControllerTest, ChildRunGroupRejectsForeverRepeats) {
   prism::RunGroupInstruction child_call{payload};
   prism::SetSingleColor child;
   child.group_id = payload.target_id;
-  child.mark = 1U;
 
   ASSERT_EQ(controller_.AddInstruction(&child_call),
             prism::ControllerStatus::kSuccess);
@@ -1771,6 +1834,7 @@ TEST_F(ControllerTest, ResetAbortsChildTimedWorkAndStaleTick) {
   prism::RunGroupPayload child_call_payload{};
   child_call_payload.group_id = 0U;
   child_call_payload.target_id = 0x81000002U;
+  child_call_payload.additional_repeats = prism::kForeverLoopCount;
   prism::RunGroupInstruction child_call{child_call_payload};
   prism::test::TimedInstruction child_timed{10U, &child_calls};
   child_timed.group_id = child_call_payload.target_id;
