@@ -82,9 +82,13 @@ class Strip {
 };
 
 /// @brief Initialize the selected Prism Kit strip backend.
+/// @param hw_task_stack_buffer Caller-owned stack object for the app_hw task.
+/// @param hw_task_stack_size_bytes Usable size of @p hw_task_stack_buffer in
+///     bytes.
 /// @return STATUS_OK on success, or a negative project-defined status code on
 ///     failure.
-int Initialize();
+int Initialize(void* hw_task_stack_buffer,
+               std::size_t hw_task_stack_size_bytes);
 
 /// @brief Return the selected Prism Kit strip object.
 /// @return Reference to the selected Prism Kit strip.

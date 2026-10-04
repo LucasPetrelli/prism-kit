@@ -1,4 +1,6 @@
 
+#include <cstddef>
+
 #include "hw/hw_constants.hpp"
 #include "hw/hw_coordinator.hpp"
 #include "hw/hw_task.hpp"
@@ -6,7 +8,7 @@
 
 namespace app::hw {
 
-int StartHwExecutor() {
+int StartHwExecutor(void* stack_buffer, std::size_t stack_size_bytes) {
   auto& hw = HwTask::Instance();
 
   /* Idempotent guard — return STATUS_OK if the task is already running.
@@ -15,7 +17,7 @@ int StartHwExecutor() {
     return STATUS_OK;
   }
 
-  return hw.Start("app_hw", kTaskStackSizeBytes, kTaskPriority);
+  return hw.Start("app_hw", stack_buffer, stack_size_bytes, kTaskPriority);
 }
 
 }  // namespace app::hw

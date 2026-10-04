@@ -66,8 +66,9 @@ AppTask& AppTask::Instance() {
 }
 
 bool AppTask::SetupTrampoline(void* context) {
-  static_cast<void>(context);
-  return Instance().Setup();
+  const auto* const startup_context =
+    static_cast<const AppTaskStartupContext*>(context);
+  return (startup_context != nullptr) && Instance().Setup(*startup_context);
 }
 
 bool AppTask::LoopTrampoline(void* context) {
@@ -75,8 +76,9 @@ bool AppTask::LoopTrampoline(void* context) {
   return Instance().Loop();
 }
 
-bool AppTask::Setup() {
-  if (prism::Initialize() < 0) {
+bool AppTask::Setup(const AppTaskStartupContext& context) {
+  if (prism::Initialize(context.hw_task_stack_buffer,
+                        context.hw_task_stack_size_bytes) < 0) {
     return false;
   }
 

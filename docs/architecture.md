@@ -35,6 +35,9 @@ the first timing-specific WS2812 engine while keeping the public transport
 contract independent from PWM versus future SPI signaling.
 The task interface is intentionally C++-only because no current C-shaped
 integration point needs to create or manage tasks directly.
+The Zephyr project integration defines task stack objects and passes them
+through BAL and OSHAL; OSHAL retains task-control metadata but does not allocate
+or reserve stack storage.
 
 ### BAL
 

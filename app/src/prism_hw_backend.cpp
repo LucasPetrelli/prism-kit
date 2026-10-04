@@ -16,7 +16,12 @@
 
 namespace prism {
 
-int Initialize() {
+int Initialize(void* hw_task_stack_buffer,
+               std::size_t hw_task_stack_size_bytes) {
+  if ((hw_task_stack_buffer == nullptr) || (hw_task_stack_size_bytes == 0U)) {
+    return STATUS_ERR_INVALID_ARGUMENT;
+  }
+
   static bool initialized = false;
   if (initialized) {
     return STATUS_OK;
@@ -51,7 +56,8 @@ int Initialize() {
 
   /* HwTask::Setup() configures the HW managers when the executor task
    * starts.  Start the HW executor to kick that off. */
-  const int start_ret = app::hw::StartHwExecutor();
+  const int start_ret =
+    app::hw::StartHwExecutor(hw_task_stack_buffer, hw_task_stack_size_bytes);
   if (start_ret < 0) {
     return start_ret;
   }

@@ -1,4 +1,6 @@
+#include <array>
 #include <cstdarg>
+#include <cstdint>
 #include <cstdio>
 #include <string>
 
@@ -72,6 +74,8 @@ class TestWs2812Strip final : public bal::Ws2812Strip {
 };
 
 TestDebugPort g_test_debug_port;
+oshal::TaskConfig g_last_task_config{};
+bool g_task_create_called = false;
 
 void IgnoreFrame(void* context, const std::uint8_t* data,
                  std::uint16_t length) {
@@ -92,7 +96,8 @@ TaskHandle::TaskHandle()
 
 int TaskHandle::Create(TaskHandle& handle, const TaskConfig& config) {
   static_cast<void>(handle);
-  static_cast<void>(config);
+  g_last_task_config = config;
+  g_task_create_called = true;
   return STATUS_ERR_BACKEND;
 }
 
@@ -149,6 +154,8 @@ class HwTaskSetupTest : public ::testing::Test {
  protected:
   void SetUp() override {
     g_test_debug_port.Clear();
+    g_last_task_config = oshal::TaskConfig{};
+    g_task_create_called = false;
     auto& protocol = app::hw::CommandManager::Instance().Protocol();
     ASSERT_TRUE(
       protocol.AddHandler(static_cast<protocol::Tag>(0x0200U), &IgnoreFrame));
@@ -156,6 +163,22 @@ class HwTaskSetupTest : public ::testing::Test {
       protocol.AddHandler(static_cast<protocol::Tag>(0x0201U), &IgnoreFrame));
   }
 };
+
+// Goal: Forward project-owned stack storage through the HW task wrapper.
+// Steps: Start HwTask with a stack object and verify OSHAL receives the same
+// pointer and usable byte count in TaskConfig.
+TEST(HwTaskStackTest, StartPassesCallerOwnedStackToOshal) {
+  g_last_task_config = oshal::TaskConfig{};
+  g_task_create_called = false;
+  app::hw::HwTask task;
+  alignas(16) std::array<std::uint8_t, 64U> stack{};
+
+  EXPECT_EQ(task.Start("test-hw", stack.data(), stack.size(), 1),
+            STATUS_ERR_BACKEND);
+  ASSERT_TRUE(g_task_create_called);
+  EXPECT_EQ(g_last_task_config.stack_buffer, static_cast<void*>(stack.data()));
+  EXPECT_EQ(g_last_task_config.stack_size_bytes, stack.size());
+}
 
 TEST_F(HwTaskSetupTest, RegistrationFailureLogsAndAbortsSetup) {
   app::hw::HwTask task;

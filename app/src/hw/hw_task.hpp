@@ -27,10 +27,12 @@ class HwTask {
 
   /// @brief Create and start the underlying Zephyr task.
   /// @param name             Diagnostic task name.
-  /// @param stack_size_bytes Stack size in bytes.
+  /// @param stack_buffer     Caller-owned stack object for the task.
+  /// @param stack_size_bytes Usable size of @p stack_buffer in bytes.
   /// @param priority         Task priority (lower = higher).
   /// @return STATUS_OK on success, or a negative status code.
-  int Start(const char* name, std::size_t stack_size_bytes, int priority);
+  int Start(const char* name, void* stack_buffer, std::size_t stack_size_bytes,
+            int priority);
 
   /// @brief Query whether the underlying task is still running.
   /// @return true while the task is active, otherwise false.

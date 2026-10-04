@@ -1,6 +1,7 @@
 #ifndef APP_APP_HPP_
 #define APP_APP_HPP_
 
+#include <cstddef>
 #include <cstdint>
 
 #include "hw/controller_command.hpp"
@@ -9,6 +10,16 @@
 #include "prism/controller.hpp"
 
 namespace app {
+
+/// @brief Project-provided stack storage required by the APP hardware task.
+/// @note The project owns this storage and keeps it valid while the app_hw task
+///     executes.
+struct AppTaskStartupContext {
+  /// @brief Stack object passed to the app_hw task's OSHAL configuration.
+  void* hw_task_stack_buffer = nullptr;
+  /// @brief Usable size of @p hw_task_stack_buffer in bytes.
+  std::size_t hw_task_stack_size_bytes = 0U;
+};
 
 /// @brief Owns the steady-state APP task loop and its mutable state.
 ///
@@ -37,7 +48,7 @@ class AppTask {
   prism::Controller& GetController();
 
   /// @brief C-callable setup trampoline for bal::RunBootstrap.
-  /// @param context Unused — all state is accessed via Instance().
+  /// @param context Pointer to the project-provided startup context.
   /// @return True when the steady-state loop may begin.
   static bool SetupTrampoline(void* context);
 
@@ -49,10 +60,11 @@ class AppTask {
  private:
   AppTask() = default;
 
-  /// @brief Bind the controller to the strip, apply the rainbow default,
-  ///     and wire the command mailbox to the protocol layer.
+  /// @brief Bind the controller to the strip, start the HW task, apply the
+  ///     rainbow default, and wire the command mailbox to the protocol layer.
+  /// @param context Project-provided stack storage for the HW task.
   /// @return True when the steady-state loop may begin.
-  bool Setup();
+  bool Setup(const AppTaskStartupContext& context);
 
   /// @brief Wait for controller commands and dispatch them.
   /// @return True to keep running.

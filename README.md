@@ -20,7 +20,8 @@ app -> bal -> oshal -> Zephyr and platform backends
 ```
 
 - **OSHAL** owns the hardware and OS boundary: startup, tasks, timing,
-  synchronization, communication, and hardware primitives.
+  synchronization, communication, and hardware primitives. The integrating
+  project owns task stack storage and supplies it through OSHAL's task API.
 - **BAL** owns board resources and board policy: LEDs, sensors, transports,
   board configuration, and the handoff into the application.
 - **APP** owns the RGB LED controller, protocols, user-facing behavior, and

@@ -111,7 +111,7 @@ package "app::hw" {
     - task_ : TaskHandle
     ..
     + {static} Instance() : HwTask&
-    + Start(name, stack_size_bytes, priority) : int
+    + Start(name, stack_buffer, stack_size_bytes, priority) : int
     + IsRunning() : bool
     + HasExited() : bool
     + ExitCode(out) : int

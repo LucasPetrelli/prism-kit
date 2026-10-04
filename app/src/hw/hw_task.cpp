@@ -23,8 +23,8 @@ namespace app::hw {
 
 HwTask& HwTask::Instance() { return g_hw_task_instance; }
 
-int HwTask::Start(const char* name, std::size_t stack_size_bytes,
-                  int priority) {
+int HwTask::Start(const char* name, void* stack_buffer,
+                  std::size_t stack_size_bytes, int priority) {
   if (task_.IsValid()) {
     return task_.IsRunning() ? STATUS_OK : STATUS_ERR_NOT_READY;
   }
@@ -34,6 +34,7 @@ int HwTask::Start(const char* name, std::size_t stack_size_bytes,
   config.setup = SetupTrampoline;
   config.loop = LoopTrampoline;
   config.context = this;
+  config.stack_buffer = stack_buffer;
   config.stack_size_bytes = stack_size_bytes;
   config.priority = priority;
   config.diagnostics.print_start = true;
