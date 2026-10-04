@@ -1,5 +1,4 @@
 #include <array>
-#include <cstdarg>
 #include <cstdint>
 
 #include "app/app.hpp"
@@ -11,10 +10,15 @@
 #include "oshal/timed_event.hpp"
 #include "prism/color.hpp"
 #include "prism/controller.hpp"
-#include "prism/debug.hpp"
 #include "prism/instruction.hpp"
 #include "prism/strip.hpp"
 #include "prism/time.hpp"
+
+#if defined(PRISM_KIT_LOG_CONTROLLER)
+#include <cstdarg>
+
+#include "prism/debug.hpp"
+#endif
 
 namespace {
 
@@ -30,6 +34,7 @@ constexpr std::array<prism::color::RgbColor, 7U> kRainbowColors = {{
   {140U, 0U, 255U},  // Violet
 }};
 
+#if defined(PRISM_KIT_LOG_CONTROLLER)
 /// @brief Adapter that bridges prism::Debug to an oshal::DebugPort.
 class PrismDebugPort final : public prism::Debug {
  public:
@@ -41,6 +46,7 @@ class PrismDebugPort final : public prism::Debug {
  private:
   oshal::DebugPort& port_;
 };
+#endif
 
 void LogControllerFailure(const char* operation,
                           prism::ControllerStatus status) {
@@ -80,15 +86,19 @@ bool AppTask::Setup() {
   controller_.SetTimestampCallback(prism::UptimeMs);
   controller_.SetScheduleCallback(&AppTask::OnScheduleNextRun);
 
+#if defined(PRISM_KIT_LOG_CONTROLLER)
   /* Wire the controller's debug output through the board's debug port. */
   {
     static PrismDebugPort s_debug{oshal::debug_port};
     controller_.SetDebug(&s_debug);
   }
+#endif
 
   /* Wire the command mailbox so protocol handlers can deliver commands. */
+#if defined(PRISM_KIT_LOG_EVB)
   command_mailbox_.SetDebugPort(&oshal::debug_port);
   command_mailbox_.SetDebugName("CMDB");
+#endif
   app::hw::ControllerCommandSink::Instance().SetMailbox(&command_mailbox_);
 
   /* Rainbow default — one SetSingleColor instruction per LED.

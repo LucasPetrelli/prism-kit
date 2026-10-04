@@ -54,6 +54,16 @@ Use `uv run flash` and `uv run smoke-test` for hardware validation when the
 required target and probe are available. Project-owned wrappers define the
 supported options for each command.
 
+### Debug Traces
+
+The `[EVB]` mailbox traces and the `[Controller]` trace output on the debug
+port are off by default. Set the matching variable to `ON` in
+`app/CMakeLists.txt` (or pass `-D<NAME>=ON` when invoking CMake or `west`
+directly) and rebuild to enable them:
+
+- `PRISM_KIT_LOG_EVB` - `[EVB]` event-mailbox send/receive traces.
+- `PRISM_KIT_LOG_CONTROLLER` - `[Controller]` controller trace output.
+
 ## Agent Guidance
 
 Before changing code:

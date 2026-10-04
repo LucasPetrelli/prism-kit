@@ -666,6 +666,10 @@ void prism::Controller::ScheduleNextRun(std::uint32_t timestamp) {
 
 void prism::Controller::DebugLogDrain(std::uint32_t i,
                                       std::uint32_t idx) const {
+  // Skip building the instruction description when no sink is attached.
+  if (debug_ == nullptr) {
+    return;
+  }
   char desc[64];
   instructions_[idx].ToString(desc, sizeof(desc));
   DebugLog("DrainExecuting[%u] idx=%u (%s)", i, idx, desc);
@@ -673,6 +677,9 @@ void prism::Controller::DebugLogDrain(std::uint32_t i,
 
 void prism::Controller::DebugLogPick(std::uint32_t idx,
                                      std::uint32_t elapsed) const {
+  if (debug_ == nullptr) {
+    return;
+  }
   char desc[64];
   instructions_[idx].ToString(desc, sizeof(desc));
   DebugLog("PickDueInstructions idx=%u mark=%u elapsed=%u (%s)", idx,
