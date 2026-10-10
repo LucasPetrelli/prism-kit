@@ -8,6 +8,9 @@ __cmake_systeminformation/
 __pycache__/
 *.egg-info/
 
+# Temporary log file dump
+logs/*
+
 # Editor and user-local build cache files.
 .vscode/*
 !.vscode/extensions.json
