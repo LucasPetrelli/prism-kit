@@ -20,6 +20,7 @@ add_executable(controller_test
   controller_command_test.cpp
   hw_task_setup_test.cpp
   instruction_header_compile_test.cpp
+  samd21_ws2812_test.cpp
   ../app/controller/controller.cpp
   ../app/controller/instructions.cpp
   ../app/src/controller_command_dispatch.cpp
@@ -28,6 +29,7 @@ add_executable(controller_test
   ../app/src/hw/hw_task.cpp
   ../app/src/hw/status_led.cpp
   ../app/src/hw/strip_manager.cpp
+  ../oshal/src/samd21_ws2812.cpp
   ../protocol/src/protocol.cpp
 )
 
