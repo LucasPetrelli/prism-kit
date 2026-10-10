@@ -9,7 +9,7 @@
 #include "prism/color.hpp"
 #include "prism/strip.hpp"
 
-#if defined(PRISM_KIT_LOG_EVB)
+#if defined(PRISM_KIT_LOG_EVB) || defined(PRISM_KIT_LOG_LED)
 #include "oshal/debug_port.hpp"
 #endif
 
@@ -155,6 +155,14 @@ int StripManager::ApplyFrame(const SharedFrame& frame) {
     const prism::color::RgbColor& color = frame.colors[index];
     const int set_ret =
       pixel->SetColor(bal::RgbColor{color.red, color.green, color.blue});
+#if defined(PRISM_KIT_LOG_LED)
+    oshal::debug_port.Printf(
+      "[LED] apply strip=%s index=%lu rgb=#%02X%02X%02X set_color_ret=%d\n",
+      name_, static_cast<unsigned long>(index),
+      static_cast<unsigned int>(color.red),
+      static_cast<unsigned int>(color.green),
+      static_cast<unsigned int>(color.blue), set_ret);
+#endif
     if (set_ret < 0) {
       return set_ret;
     }

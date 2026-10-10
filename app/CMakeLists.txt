@@ -3,9 +3,11 @@
 set(PRISM_KIT_APP_BACKEND "HW" CACHE STRING "Prism Kit APP backend")
 set_property(CACHE PRISM_KIT_APP_BACKEND PROPERTY STRINGS HW SIM)
 
-# Optional debug-port traces, OFF by default:
+# Optional debug-port traces:
 #   PRISM_KIT_LOG_EVB        "[EVB]" EventMailbox send/receive traces.
 #   PRISM_KIT_LOG_CONTROLLER "[Controller]" Controller trace output.
+#   PRISM_KIT_LOG_LED        "[LED] apply" per-pixel logical color/status
+#                            trace (OFF by default).
 # Set one to ON below, or pass -D<NAME>=ON to CMake/west. These are plain
 # defaults rather than cache entries so that editing them takes effect on the
 # next incremental build; a -D value is cached and sticks until it is
@@ -15,6 +17,9 @@ if(NOT DEFINED PRISM_KIT_LOG_EVB)
 endif()
 if(NOT DEFINED PRISM_KIT_LOG_CONTROLLER)
   set(PRISM_KIT_LOG_CONTROLLER OFF)
+endif()
+if(NOT DEFINED PRISM_KIT_LOG_LED)
+  set(PRISM_KIT_LOG_LED OFF)
 endif()
 
 target_include_directories(app PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include
@@ -36,6 +41,9 @@ if(PRISM_KIT_LOG_EVB)
 endif()
 if(PRISM_KIT_LOG_CONTROLLER)
   target_compile_definitions(app PRIVATE PRISM_KIT_LOG_CONTROLLER)
+endif()
+if(PRISM_KIT_LOG_LED)
+  target_compile_definitions(app PRIVATE PRISM_KIT_LOG_LED)
 endif()
 
 if(PRISM_KIT_APP_BACKEND STREQUAL "HW")
