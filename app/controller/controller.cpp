@@ -486,7 +486,7 @@ bool prism::Controller::DrainExecuting(std::uint32_t timestamp,
     ObservePositiveBoundary(instruction.runtime_index);
     DebugLogDrain(i, instruction.instruction_index);
     const std::uint32_t delay =
-      instructions_[instruction.instruction_index].Execute();
+      instructions_[instruction.instruction_index].Execute(timestamp);
     progressed = true;
     if (delay != 0U) {
       executing_[i].deadline = timestamp + delay;
@@ -585,7 +585,7 @@ bool prism::Controller::DispatchDueInstruction(std::uint32_t runtime_index,
     return true;
   }
 
-  const std::uint32_t delay = instructions_[slot_index].Execute();
+  const std::uint32_t delay = instructions_[slot_index].Execute(timestamp);
   if (delay == 0U) {
     return false;
   }

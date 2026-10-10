@@ -8,7 +8,7 @@
 
 namespace {
 
-constexpr std::uint32_t kFadeUpdateIntervalMs = 20U;
+constexpr std::uint32_t kFadeUpdateIntervalMs = 100U;
 
 std::uint8_t InterpolateValue(std::uint8_t start, std::uint8_t target,
                               std::uint32_t elapsed, std::uint32_t duration) {
@@ -199,9 +199,9 @@ const prism::ControllerInstruction* prism::InstructionMemorySlot::Active()
   return nullptr;
 }
 
-std::uint32_t prism::InstructionMemorySlot::Execute() {
+std::uint32_t prism::InstructionMemorySlot::Execute(std::uint32_t timestamp) {
   ControllerInstruction* instr = Active();
-  return instr != nullptr ? instr->Execute() : 0U;
+  return instr != nullptr ? instr->Execute(timestamp) : 0U;
 }
 
 void prism::InstructionMemorySlot::ToString(char* buf, std::size_t size) const {
@@ -271,7 +271,7 @@ void prism::PendingInstructionQueueView::Insert(std::uint32_t slot_idx) {
 // SetMultipleColor::Execute
 // ====================================================================
 
-std::uint32_t prism::SetMultipleColor::Execute() {
+std::uint32_t prism::SetMultipleColor::Execute(std::uint32_t) {
   if (controller == nullptr || strip == nullptr) {
     return 0U;
   }
@@ -289,7 +289,7 @@ std::uint32_t prism::SetMultipleColor::Execute() {
 // SetSingleColor::Execute
 // ====================================================================
 
-std::uint32_t prism::SetSingleColor::Execute() {
+std::uint32_t prism::SetSingleColor::Execute(std::uint32_t) {
   if (controller == nullptr || strip == nullptr) {
     return 0U;
   }
@@ -305,7 +305,7 @@ std::uint32_t prism::SetSingleColor::Execute() {
 // SetMultipleColorHsv::Execute
 // ====================================================================
 
-std::uint32_t prism::SetMultipleColorHsv::Execute() {
+std::uint32_t prism::SetMultipleColorHsv::Execute(std::uint32_t) {
   if (controller == nullptr || strip == nullptr) {
     return 0U;
   }
@@ -324,7 +324,7 @@ std::uint32_t prism::SetMultipleColorHsv::Execute() {
 // SetSingleColorHsv::Execute
 // ====================================================================
 
-std::uint32_t prism::SetSingleColorHsv::Execute() {
+std::uint32_t prism::SetSingleColorHsv::Execute(std::uint32_t) {
   if (controller == nullptr || strip == nullptr) {
     return 0U;
   }
@@ -341,7 +341,7 @@ std::uint32_t prism::SetSingleColorHsv::Execute() {
 // Fade::Execute
 // ====================================================================
 
-std::uint32_t prism::Fade::Execute() {
+std::uint32_t prism::Fade::Execute(std::uint32_t timestamp) {
   if (controller == nullptr || strip == nullptr) {
     return 0U;
   }
@@ -350,7 +350,6 @@ std::uint32_t prism::Fade::Execute() {
     return 0U;
   }
 
-  const std::uint32_t timestamp = controller->GetTimestamp();
   if (!started_) {
     start_color_ = led->Color();
     start_value_ = start_color_.red;
@@ -474,7 +473,7 @@ void prism::GroupRuntime::Reset() {
 // RunGroupInstruction
 // ====================================================================
 
-std::uint32_t prism::RunGroupInstruction::Execute() { return 0U; }
+std::uint32_t prism::RunGroupInstruction::Execute(std::uint32_t) { return 0U; }
 
 void prism::RunGroupInstruction::ToString(char* buf, std::size_t size) const {
   std::snprintf(buf, size, "RunGroup(target=%u repeats=%u)",
@@ -502,7 +501,7 @@ prism::test::TimedInstruction::TimedInstruction(std::uint32_t delay_ms,
   tag_ = InstructionTag::kTestTimed;
 }
 
-std::uint32_t prism::test::TimedInstruction::Execute() {
+std::uint32_t prism::test::TimedInstruction::Execute(std::uint32_t) {
   if (execution_count_ != nullptr) {
     ++*execution_count_;
   }

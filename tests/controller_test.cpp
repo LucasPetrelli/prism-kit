@@ -29,13 +29,22 @@ void OnScheduleNextRun(std::uint32_t delay_ms) {
 }
 /// @brief Mutable timestamp for the FakeTimestamp callback.
 std::uint32_t g_fake_time = 0U;
+/// @brief Number of reads made through the incrementing timestamp callback.
+std::uint32_t g_timestamp_read_count = 0U;
 
 /// @brief Returns g_fake_time so tests can control the clock.
 std::uint32_t FakeTimestamp() { return g_fake_time; }
+/// @brief Returns and increments g_fake_time while counting clock reads.
+std::uint32_t IncrementingTimestamp() {
+  ++g_timestamp_read_count;
+  return g_fake_time++;
+}
+
 class ControllerTest : public ::testing::Test {
  protected:
   void SetUp() override {
     g_fake_time = 0U;
+    g_timestamp_read_count = 0U;
     controller_.SetStrip(&mock_strip_);
     controller_.SetTimestampCallback(FakeTimestamp);
     controller_.SetScheduleCallback(OnScheduleNextRun);
@@ -266,6 +275,29 @@ TEST_F(ControllerTest, FadeElapsedTimeIsWrapSafe) {
   EXPECT_EQ(g_last_scheduled_delay, 0U);
 }
 
+/// @brief Goal: keep Fade grid alignment and deadlines on one time snapshot.
+/// @details Steps: advance the clock on each read, activate two Fades, then
+/// verify Run uses one read and schedules from that shared snapshot.
+TEST_F(ControllerTest, FadesUseSingleRunTimestampForActivationAndScheduling) {
+  constexpr prism::color::RgbColor start{100U, 0U, 0U};
+  AddFade(controller_, 0U, 0U, 100U);
+  AddFade(controller_, 1U, 0U, 100U);
+  g_fake_time = 100U;
+  controller_.SetTimestampCallback(IncrementingTimestamp);
+  ASSERT_EQ(controller_.Start(), prism::ControllerStatus::kSuccess);
+  const std::uint32_t reads_after_start = g_timestamp_read_count;
+
+  EXPECT_CALL(*mock_strip_.MutableLed(0U), Color())
+    .WillOnce(testing::Return(start));
+  EXPECT_CALL(*mock_strip_.MutableLed(1U), Color())
+    .WillOnce(testing::Return(start));
+  EXPECT_CALL(mock_strip_, Show()).Times(0);
+  EXPECT_EQ(controller_.Run(), prism::ControllerStatus::kSuccess);
+
+  EXPECT_EQ(g_timestamp_read_count, reads_after_start + 1U);
+  EXPECT_EQ(g_last_scheduled_delay, 19U);
+}
+
 TEST_F(ControllerTest,
        FadeTwentyFiveThenFourHundredPercentCharacterizesPalette) {
   constexpr std::array<prism::color::RgbColor, 7U> palette{{
@@ -338,7 +370,7 @@ TEST_F(ControllerTest, SetSingleColorHsvConvertsAndDispatches) {
     .WillOnce(testing::Return(0));
   EXPECT_CALL(mock_strip_, Show()).Times(0);
 
-  slot.Execute();
+  slot.Execute(0U);
 }
 
 /// @brief SetMultipleColorHsv converts HSV to RGB and fills the range.
@@ -365,7 +397,7 @@ TEST_F(ControllerTest, SetMultipleColorHsvFillsRange) {
     .WillOnce(testing::Return(0));
   EXPECT_CALL(mock_strip_, Show()).Times(0);
 
-  slot.Execute();
+  slot.Execute(0U);
 }
 
 /// @brief SetSingleColorHsv is a no-op when strip is null.
@@ -380,7 +412,7 @@ TEST_F(ControllerTest, SetSingleColorHsvWithNullStripIsNoop) {
   prism::InstructionMemorySlot slot;
   slot.Set(&instr);
 
-  slot.Execute();
+  slot.Execute(0U);
 }
 
 /// @brief Slot reused from SetSingleColor to SetSingleColorHsv.
@@ -400,7 +432,7 @@ TEST_F(ControllerTest, SlotReusesRgbThenHsv) {
   EXPECT_CALL(*mock_strip_.MutableLed(0U), SetColor(testing::_))
     .WillOnce(testing::Return(0));
   EXPECT_CALL(mock_strip_, Show()).Times(0);
-  slot.Execute();
+  slot.Execute(0U);
 
   testing::Mock::VerifyAndClearExpectations(&mock_strip_);
 
@@ -418,7 +450,7 @@ TEST_F(ControllerTest, SlotReusesRgbThenHsv) {
   EXPECT_CALL(*mock_strip_.MutableLed(1U), SetColor(expected_rgb))
     .WillOnce(testing::Return(0));
   EXPECT_CALL(mock_strip_, Show()).Times(0);
-  slot.Execute();
+  slot.Execute(0U);
 }
 
 }  // namespace
@@ -449,7 +481,7 @@ TEST_F(ControllerTest, SetSingleColorDispatchesToCorrectLed) {
     .WillOnce(testing::Return(0));
   EXPECT_CALL(mock_strip_, Show()).Times(0);
 
-  slot.Execute();
+  slot.Execute(0U);
 }
 
 /// @brief SetSingleColor does nothing when strip is null.
@@ -465,7 +497,7 @@ TEST_F(ControllerTest, SetSingleColorWithNullStripIsNoop) {
   slot.Set(&instr);
 
   // No interaction with any mock — strip is null.
-  slot.Execute();
+  slot.Execute(0U);
 }
 
 // ====================================================================
@@ -495,7 +527,7 @@ TEST_F(ControllerTest, SetMultipleColorFillsRange) {
     .WillOnce(testing::Return(0));
   EXPECT_CALL(mock_strip_, Show()).Times(0);
 
-  slot.Execute();
+  slot.Execute(0U);
 }
 
 // ====================================================================
@@ -609,7 +641,7 @@ TEST_F(ControllerTest, SlotExecuteDispatchesCorrectly) {
     .WillOnce(testing::Return(0));
   EXPECT_CALL(mock_strip_, Show()).Times(0);
 
-  slot.Execute();
+  slot.Execute(0U);
 }
 
 /// @brief A slot can be reused by calling set() again with a different type.
@@ -629,7 +661,7 @@ TEST_F(ControllerTest, SlotCanBeReused) {
   EXPECT_CALL(*mock_strip_.MutableLed(2U), SetColor(testing::_))
     .WillOnce(testing::Return(0));
   EXPECT_CALL(mock_strip_, Show()).Times(0);
-  slot.Execute();
+  slot.Execute(0U);
 
   // Reset the mock expectations for the second execution.
   testing::Mock::VerifyAndClearExpectations(&mock_strip_);
@@ -649,7 +681,7 @@ TEST_F(ControllerTest, SlotCanBeReused) {
   EXPECT_CALL(*mock_strip_.MutableLed(1U), SetColor(testing::_))
     .WillOnce(testing::Return(0));
   EXPECT_CALL(mock_strip_, Show()).Times(0);
-  slot.Execute();
+  slot.Execute(0U);
 }
 
 // ====================================================================
@@ -884,7 +916,7 @@ TEST_F(ControllerTest, RunGroupSlotStoresItsMembershipAndTarget) {
   EXPECT_TRUE(slot.IsRunGroup());
   EXPECT_EQ(slot.GetTargetGroupId(), payload.target_id);
   EXPECT_EQ(slot.GetAdditionalRepeats(), payload.additional_repeats);
-  EXPECT_EQ(slot.Execute(), 0U);
+  EXPECT_EQ(slot.Execute(0U), 0U);
 }
 
 /// @brief The host-only timed variant yields and resets through fixed storage.
@@ -895,12 +927,12 @@ TEST_F(ControllerTest, TimedTestInstructionSlotYieldsAndResets) {
 
   ASSERT_TRUE(slot.Set(&instruction));
   EXPECT_TRUE(slot.HasPositiveSchedulingBoundary());
-  EXPECT_EQ(slot.Execute(), 25U);
+  EXPECT_EQ(slot.Execute(0U), 25U);
   EXPECT_EQ(execution_count, 1U);
 
   slot.ResetForReplay();
-  EXPECT_EQ(slot.Execute(), 25U);
-  EXPECT_EQ(slot.Execute(), 0U);
+  EXPECT_EQ(slot.Execute(0U), 25U);
+  EXPECT_EQ(slot.Execute(0U), 0U);
   EXPECT_EQ(execution_count, 3U);
 }
 

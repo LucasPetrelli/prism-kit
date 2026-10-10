@@ -89,6 +89,14 @@ still reaches the target at the requested duration. At the end, write the
 exact target V and complete. A zero duration applies the scaled target
 immediately.
 
+`Controller::Run()` takes one timestamp for the progress tick and passes that
+same value to every instruction executed during the tick. Fade uses it for its
+activation time, elapsed interpolation, and update-grid alignment; the
+controller uses it as the base for the returned relative delay. Fade does not
+read the clock again. This keeps Fade calculations and controller deadlines
+anchored to one snapshot even if the clock advances while `Run()` processes
+multiple instructions.
+
 Keep H and S constant. To avoid repeated lossy 8-bit HSV round-trips, the
 proposed implementation captures the starting RGB and scales its channels
 proportionally to each interpolated V. This is mathematically equivalent to
@@ -107,9 +115,10 @@ Use a proposed 20 ms shared update grid. Seven independently phased Fades
 otherwise create up to seven distinct 50 Hz deadline streams (about 350
 controller wakeups per second in the fully overlapped case). Aligning regular
 updates to one monotonic grid lets all active Fades update in one `Run()` and
-one strip commit. Keep exact duration endpoints even when they fall between
-grid ticks. These rates are calculated from the proposed cadence, not measured
-on hardware.
+one strip commit. Grid alignment and controller deadline bookkeeping use the
+same per-Run timestamp snapshot. Keep exact duration endpoints even when they
+fall between grid ticks. These rates are calculated from the proposed cadence,
+not measured on hardware.
 
 ### Rainbow4 Program
 
@@ -143,6 +152,13 @@ colors unchanged.
 
 ## Alternatives and Trade-offs
 
+- **Explicit `Execute(timestamp)` (selected for timing consistency):** every
+  instruction on a progress tick receives the controller's one timestamp, so
+  Fade interpolation and relative rescheduling share a time base. This changes
+  the public virtual method and all overrides/call sites. Keeping the current
+  signature and exposing an active timestamp through `Controller` would avoid
+  that signature change but introduce implicit context and validity rules; it
+  is not selected.
 - **Independent child loops (selected):** preserves a nominal 4-second cycle
   per LED and the requested phase offsets. It needs child forever-repeat
   support and the 28-instruction capacity.
@@ -164,6 +180,11 @@ colors unchanged.
   they contain no positive mark or timed boundary.
 - Missed timer ticks use actual elapsed time; they do not stretch the fade.
   Timestamp subtraction must retain the controller's wrap-safe contract.
+- A single `Run()` timestamp makes one progress tick internally consistent; it
+  does not guarantee that the next timer callback runs on time. The supplied
+  log shows a requested 4 ms wake followed by the next `Run()` about 67 ms
+  later. That late-wake/processing-latency investigation is separate and must
+  not be treated as fixed by the timestamp handoff.
 - Multiple Fades targeting one LED are last-writer-wins according to
   controller execution order. `rainbow4` avoids overlap within each child.
 - Reset aborts all loops without restoring their initial colors. The
@@ -191,6 +212,12 @@ program is thirty protocol frames (490 protocol bytes with the proposed
 11-byte Fade payload), excluding serial framing. No target timing or ROM delta
 has been measured.
 
+**Calculated from the call path, not measured:** Passing the timestamp adds no
+per-instruction storage and removes up to seven extra clock reads per `Run()`
+for the seven active Rainbow4 Fades. Interpolation remains O(active Fades); no
+cycle or binary-size delta has been measured. This does not remove OS timer or
+`Run()` processing latency.
+
 ## Steps
 
 ### Step 1 — Adding and implementing test-driven Fade behavior
@@ -206,13 +233,21 @@ the Prism controller layer.
 - Tests cover current staged-color capture at activation, 25% and 400%
   scaling, V saturation, halfway interpolation, exact completion after a late
   tick, zero-duration behavior, black input, replay reset, and one-pixel scope.
+- Tests prove every instruction executed in one `Run()` receives the same
+  timestamp, even when the timestamp source would advance on another read, and
+  that timed deadlines are based on that same snapshot.
 - The implementation uses elapsed timestamps, updates the staged strip color,
   requests a show through the controller, and does not sleep or allocate.
+- `Controller::Run()` passes its timestamp through `InstructionMemorySlot` to
+  `ControllerInstruction::Execute(timestamp)`; Fade does not read the clock
+  independently.
 - The full palette's RGB channel rounding is characterized by tests.
 
 **Focused validation:** Use the existing fake-time and mock-strip patterns in
 [controller_test.cpp][controller-tests]. Run `uv run unit-tests` and
-`uv run format --check` on changed C++ files.
+`uv run format --check` on changed C++ files. The supplied runtime log is not
+evidence that the separate 4 ms-versus-67 ms wake gap is resolved; remeasure
+that cadence independently before claiming smooth hardware output.
 
 **Resource risk:** The Fade member may enlarge the instruction-slot union;
 measure this in the target build.
@@ -313,3 +348,6 @@ separate, explicitly requested validation.
 
 No firmware, host tests, target build, or hardware timing has been run for this
 design. The current worktree was clean before this document was added.
+The timing-consistency follow-up is design-only; the supplied
+`debug-log-rainbow4.txt` is runtime evidence of the timestamp mismatch and late
+wake gap, not a post-fix validation result.

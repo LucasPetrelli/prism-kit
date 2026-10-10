@@ -156,10 +156,12 @@ class ControllerInstruction {
   virtual ~ControllerInstruction() = default;
 
   /// @brief Execute this instruction against its bound strip.
-  /// @return 0 if the instruction completed, or a positive duration in
-  ///     milliseconds after which Execute() should be called again. Positive
-  ///     durations must be less than half the uint32 timestamp range.
-  virtual std::uint32_t Execute() = 0;
+  /// @param timestamp Timestamp shared by instructions in this controller
+  ///     progress tick, in milliseconds.
+  /// @return 0 if completed, or a positive duration in milliseconds until the
+  ///     next call to Execute(timestamp). Positive durations must be less than
+  ///     half the uint32 timestamp range.
+  virtual std::uint32_t Execute(std::uint32_t timestamp) = 0;
 
   /// @brief Return the tag identifying this instruction's concrete type.
   /// @return InstructionTag value set by the derived-class constructor.
@@ -229,8 +231,10 @@ class SetMultipleColor : public ControllerInstruction {
   }
 
   /// @brief Execute the fill-and-show operation on the bound strip.
+  /// @param timestamp Timestamp shared by this controller progress tick; this
+  ///     instant instruction does not use it.
   /// @return 0 (instant instruction — always completes immediately).
-  std::uint32_t Execute() override;
+  std::uint32_t Execute(std::uint32_t timestamp) override;
 
   /// @brief Write a description including color and range into a buffer.
   void ToString(char* buf, std::size_t size) const override;
@@ -256,8 +260,10 @@ class SetSingleColor : public ControllerInstruction {
   }
 
   /// @brief Execute the set-and-show operation on the bound strip.
+  /// @param timestamp Timestamp shared by this controller progress tick; this
+  ///     instant instruction does not use it.
   /// @return 0 (instant instruction — always completes immediately).
-  std::uint32_t Execute() override;
+  std::uint32_t Execute(std::uint32_t timestamp) override;
 
   /// @brief Write a description including color and index into a buffer.
   void ToString(char* buf, std::size_t size) const override;
@@ -286,8 +292,10 @@ class SetSingleColorHsv : public ControllerInstruction {
   }
 
   /// @brief Execute the HSV-to-RGB conversion and set the pixel.
+  /// @param timestamp Timestamp shared by this controller progress tick; this
+  ///     instant instruction does not use it.
   /// @return 0 (instant instruction — always completes immediately).
-  std::uint32_t Execute() override;
+  std::uint32_t Execute(std::uint32_t timestamp) override;
 
   /// @brief Write a description including HSV and index into a buffer.
   void ToString(char* buf, std::size_t size) const override;
@@ -317,8 +325,10 @@ class Fade : public ControllerInstruction {
   }
 
   /// @brief Capture the staged color or advance the elapsed-time interpolation.
+  /// @param timestamp Shared progress-tick timestamp used for activation,
+  ///     interpolation, and update-grid alignment.
   /// @return Milliseconds until the next shared update or exact endpoint.
-  std::uint32_t Execute() override;
+  std::uint32_t Execute(std::uint32_t timestamp) override;
 
   /// @brief Describe this Fade for controller diagnostics.
   void ToString(char* buf, std::size_t size) const override;
@@ -367,8 +377,10 @@ class SetMultipleColorHsv : public ControllerInstruction {
   }
 
   /// @brief Execute the HSV-to-RGB conversion and fill the range.
+  /// @param timestamp Timestamp shared by this controller progress tick; this
+  ///     instant instruction does not use it.
   /// @return 0 (instant instruction — always completes immediately).
-  std::uint32_t Execute() override;
+  std::uint32_t Execute(std::uint32_t timestamp) override;
 
   /// @brief Write a description including HSV and range into a buffer.
   void ToString(char* buf, std::size_t size) const override;
@@ -396,8 +408,10 @@ class RunGroupInstruction : public ControllerInstruction {
   }
 
   /// @brief Direct execution is a no-op; Controller::Run handles activation.
+  /// @param timestamp Timestamp shared by this controller progress tick; this
+  ///     instruction is dispatched by the group scheduler instead.
   /// @return 0 when called outside the controller's group scheduler.
-  std::uint32_t Execute() override;
+  std::uint32_t Execute(std::uint32_t timestamp) override;
 
   /// @brief Write a description including target and repeat policy.
   /// @param buf Destination buffer.
@@ -438,8 +452,10 @@ class TimedInstruction : public ControllerInstruction {
                    bool yield_on_first_execution = true);
 
   /// @brief Yield once, then complete on the next execution.
+  /// @param timestamp Timestamp shared by this controller progress tick; this
+  ///     test instruction uses its configured delay instead.
   /// @return The configured delay on the first call, then zero.
-  std::uint32_t Execute() override;
+  std::uint32_t Execute(std::uint32_t timestamp) override;
 
   /// @brief Write a description for controller debug logs.
   /// @param buf Destination buffer.
@@ -513,8 +529,10 @@ struct InstructionMemorySlot {
   void SetStrip(Strip* s);
 
   /// @brief Execute the active instruction.
+  /// @param timestamp Progress-tick timestamp forwarded to the active
+  ///     instruction.
   /// @return 0 if completed, or a positive duration in ms until the next call.
-  std::uint32_t Execute();
+  std::uint32_t Execute(std::uint32_t timestamp);
 
   /// @brief Write a description of the active instruction into a buffer.
   /// @param buf  Destination buffer.
