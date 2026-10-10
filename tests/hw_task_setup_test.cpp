@@ -6,6 +6,7 @@
 
 #include "bal/led.hpp"
 #include "bal/ws2812_strip.hpp"
+#include "debug_port_test_access.hpp"
 #include "gtest/gtest.h"
 #include "hw/command_manager.hpp"
 #include "hw/hw_task.hpp"
@@ -85,6 +86,14 @@ void IgnoreFrame(void* context, const std::uint8_t* data,
 }
 
 }  // namespace
+
+namespace prism::test {
+
+void ClearDebugPortOutput() { g_test_debug_port.Clear(); }
+
+std::string DebugPortOutput() { return g_test_debug_port.Output(); }
+
+}  // namespace prism::test
 
 namespace oshal {
 

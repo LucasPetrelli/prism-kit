@@ -2,15 +2,18 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <string>
 
 #include "../oshal/src/samd21_ws2812_internal.hpp"
+#include "debug_port_test_access.hpp"
 #include "gtest/gtest.h"
 #include "oshal/status.h"
 #include "oshal/time.h"
 
 namespace {
 
-constexpr std::size_t kMaxPulseSequenceEntries = 257U;
+constexpr std::size_t kMaxPulseSequenceEntries = 281U;
+constexpr std::size_t kWs2812PreamblePulseCount = 24U;
 constexpr std::size_t kWs2812DataPulseCount = 21U * 8U;
 constexpr std::uint32_t kWs2812ZeroPulseNs = 350U;
 constexpr std::uint32_t kWs2812OnePulseNs = 700U;
@@ -65,6 +68,7 @@ class FakePulseSequenceOutput final : public oshal::PwmSequenceOutput {
                         std::size_t pulse_count,
                         std::uint32_t repeat_count) override {
     if ((pulse_ns_sequence == nullptr) ||
+        (pulse_count > max_pulse_sequence_length_) ||
         (pulse_count > pulse_ns_sequence_.size())) {
       return STATUS_ERR_INVALID_ARGUMENT;
     }
@@ -79,7 +83,11 @@ class FakePulseSequenceOutput final : public oshal::PwmSequenceOutput {
   int StopPulseSequence() override { return STATUS_OK; }
   bool IsPulseSequenceActive() const override { return false; }
   std::size_t MaxPulseSequenceLength() const override {
-    return kMaxPulseSequenceEntries;
+    return max_pulse_sequence_length_;
+  }
+
+  void SetMaxPulseSequenceLength(std::size_t max_pulse_sequence_length) {
+    max_pulse_sequence_length_ = max_pulse_sequence_length;
   }
 
   std::size_t PlayCallCount() const { return play_call_count_; }
@@ -92,6 +100,7 @@ class FakePulseSequenceOutput final : public oshal::PwmSequenceOutput {
 
  private:
   std::array<std::uint32_t, kMaxPulseSequenceEntries> pulse_ns_sequence_{};
+  std::size_t max_pulse_sequence_length_ = kMaxPulseSequenceEntries;
   std::size_t play_call_count_ = 0U;
   std::size_t pulse_count_ = 0U;
   std::uint32_t repeat_count_ = 0U;
@@ -112,10 +121,11 @@ class Samd21Ws2812TransportTest : public ::testing::Test {
   oshal::internal::Samd21PwmWs2812Transport transport_;
 };
 
-// Goal: preserve every payload pulse and append exactly one idle-low entry.
-// Steps: Submit a mixed 21-byte frame, compare all 168 encoded data widths,
-// then verify the single zero tail, finite repeat, foreground low write, and
-// existing 1 ms latch sleep.
+// Goal: prepend 24 zero-duty entries without changing the 168 payload pulses,
+// then schedule exactly one idle-low tail.
+// Steps: Submit a mixed 21-byte frame, verify all 24 preamble values and all
+// encoded data widths, then check the zero tail, finite repeat, foreground
+// low write, and existing 1 ms latch sleep.
 TEST_F(Samd21Ws2812TransportTest,
        TwentyOneByteFrameKeepsDataAndAddsOneZeroTail) {
   constexpr std::array<std::uint8_t, 21U> frame{
@@ -127,10 +137,17 @@ TEST_F(Samd21Ws2812TransportTest,
   ASSERT_EQ(transport_.WriteFrame(frame.data(), frame.size()), STATUS_OK);
 
   ASSERT_EQ(sequence_output_.PlayCallCount(), 1U);
-  ASSERT_EQ(sequence_output_.PulseCount(), kWs2812DataPulseCount + 1U);
+  ASSERT_EQ(sequence_output_.PulseCount(),
+            kWs2812PreamblePulseCount + kWs2812DataPulseCount + 1U);
   EXPECT_EQ(sequence_output_.RepeatCount(), 1U);
 
-  std::size_t pulse_index = 0U;
+  for (std::size_t pulse_index = 0U; pulse_index < kWs2812PreamblePulseCount;
+       ++pulse_index) {
+    EXPECT_EQ(sequence_output_.PulseSequenceNs()[pulse_index], 0U)
+      << "preamble entry " << pulse_index;
+  }
+
+  std::size_t pulse_index = kWs2812PreamblePulseCount;
   for (const std::uint8_t current_byte : frame) {
     for (std::uint8_t bit_index = 0U; bit_index < 8U; ++bit_index) {
       const std::uint8_t bit_mask =
@@ -145,7 +162,7 @@ TEST_F(Samd21Ws2812TransportTest,
     }
   }
 
-  ASSERT_EQ(pulse_index, kWs2812DataPulseCount);
+  ASSERT_EQ(pulse_index, kWs2812PreamblePulseCount + kWs2812DataPulseCount);
   EXPECT_EQ(sequence_output_.PulseSequenceNs()[pulse_index], 0U);
   EXPECT_EQ(pwm_output_.ConfigureCallCount(), 1U);
   EXPECT_EQ(pwm_output_.ConfiguredPeriodNs(), 1250U);
@@ -157,10 +174,12 @@ TEST_F(Samd21Ws2812TransportTest,
   EXPECT_EQ(g_sleep_durations[0U], 1U);
 }
 
-// Goal: keep the advertised 32-byte limit when a tail entry consumes a slot.
-// Steps: Submit 32 bytes of one-bits and verify 256 unchanged data widths plus
-// one zero tail fit in the 257-entry sequence with one finite repeat.
-TEST_F(Samd21Ws2812TransportTest, ThirtyTwoByteFrameFitsThe257EntrySequence) {
+// Goal: keep the advertised 32-byte limit when preamble and tail entries use
+// sequence slots.
+// Steps: Submit 32 bytes of one-bits and verify 24 zero preamble entries,
+// 256 unchanged data widths, one zero tail, and one finite repeat fit in 281
+// entries.
+TEST_F(Samd21Ws2812TransportTest, ThirtyTwoByteFrameFitsThe281EntrySequence) {
   std::array<std::uint8_t, 32U> frame{};
   frame.fill(0xFFU);
 
@@ -168,12 +187,62 @@ TEST_F(Samd21Ws2812TransportTest, ThirtyTwoByteFrameFitsThe257EntrySequence) {
   ASSERT_EQ(transport_.WriteFrame(frame.data(), frame.size()), STATUS_OK);
   ASSERT_EQ(sequence_output_.PulseCount(), kMaxPulseSequenceEntries);
   EXPECT_EQ(sequence_output_.RepeatCount(), 1U);
-  for (std::size_t pulse_index = 0U; pulse_index < 256U; ++pulse_index) {
+  for (std::size_t pulse_index = 0U; pulse_index < kWs2812PreamblePulseCount;
+       ++pulse_index) {
+    EXPECT_EQ(sequence_output_.PulseSequenceNs()[pulse_index], 0U)
+      << "preamble entry " << pulse_index;
+  }
+  for (std::size_t pulse_index = kWs2812PreamblePulseCount;
+       pulse_index < kWs2812PreamblePulseCount + 256U; ++pulse_index) {
     EXPECT_EQ(sequence_output_.PulseSequenceNs()[pulse_index],
               kWs2812OnePulseNs)
       << "data pulse index " << pulse_index;
   }
-  EXPECT_EQ(sequence_output_.PulseSequenceNs()[256U], 0U);
+  EXPECT_EQ(sequence_output_.PulseSequenceNs()[280U], 0U);
+}
+
+// Goal: reserve preamble and tail entries when the backend capacity is below
+// the transport's local maximum.
+// Steps: Limit the fake backend to 280 entries, verify the 31-byte maximum and
+// a complete 31-byte sequence, then confirm a 32-byte frame is rejected.
+TEST_F(Samd21Ws2812TransportTest,
+       SmallerBackendCapacityReservesPreambleAndTail) {
+  sequence_output_.SetMaxPulseSequenceLength(280U);
+  std::array<std::uint8_t, 31U> frame{};
+  frame.fill(0xFFU);
+  constexpr std::array<std::uint8_t, 32U> oversized_frame{};
+
+  EXPECT_EQ(transport_.MaxFrameSizeBytes(), 31U);
+  ASSERT_EQ(transport_.WriteFrame(frame.data(), frame.size()), STATUS_OK);
+  ASSERT_EQ(sequence_output_.PulseCount(),
+            kWs2812PreamblePulseCount + (31U * 8U) + 1U);
+  for (std::size_t pulse_index = 0U; pulse_index < kWs2812PreamblePulseCount;
+       ++pulse_index) {
+    EXPECT_EQ(sequence_output_.PulseSequenceNs()[pulse_index], 0U)
+      << "preamble entry " << pulse_index;
+  }
+  EXPECT_EQ(sequence_output_.PulseSequenceNs()[272U], 0U);
+  EXPECT_EQ(
+    transport_.WriteFrame(oversized_frame.data(), oversized_frame.size()),
+    STATUS_ERR_INVALID_ARGUMENT);
+  EXPECT_EQ(sequence_output_.PlayCallCount(), 1U);
+}
+
+// Goal: report no payload capacity when preamble and tail consume every
+// sequence entry.
+// Steps: Set the backend capacity to exactly 25 entries and verify a one-byte
+// frame is rejected without starting DMA playback.
+TEST_F(Samd21Ws2812TransportTest,
+       BackendCapacityUsedOnlyByPreambleAndTailHasNoPayloadRoom) {
+  sequence_output_.SetMaxPulseSequenceLength(25U);
+  constexpr std::array<std::uint8_t, 1U> frame{};
+
+  EXPECT_EQ(transport_.MaxFrameSizeBytes(), 0U);
+  EXPECT_EQ(transport_.WriteFrame(frame.data(), frame.size()),
+            STATUS_ERR_INVALID_ARGUMENT);
+  EXPECT_EQ(sequence_output_.PlayCallCount(), 0U);
+  EXPECT_EQ(pwm_output_.SetPulseCallCount(), 0U);
+  EXPECT_EQ(g_sleep_call_count, 0U);
 }
 
 // Goal: reject a payload larger than the advertised transport maximum.
@@ -189,6 +258,38 @@ TEST_F(Samd21Ws2812TransportTest, ThirtyThreeByteFrameIsRejected) {
   EXPECT_EQ(sequence_output_.PlayCallCount(), 0U);
   EXPECT_EQ(pwm_output_.SetPulseCallCount(), 0U);
   EXPECT_EQ(g_sleep_call_count, 0U);
+}
+
+// Goal: log the accepted frame bytes and the resulting DMA pulse sequence.
+// Steps: submit a mixed three-byte frame and verify the original bytes precede
+// the complete decimal sequence, comma-delimited on one line.
+TEST_F(Samd21Ws2812TransportTest, LogsFrameBytesAndPulseSequence) {
+  constexpr std::array<std::uint8_t, 3U> frame{0x00U, 0xA5U, 0xFFU};
+  constexpr std::array<std::uint32_t, 24U> expected_payload_pulses{
+    350U, 350U, 350U, 350U, 350U, 350U, 350U, 350U, 700U, 350U, 700U, 350U,
+    350U, 700U, 350U, 700U, 700U, 700U, 700U, 700U, 700U, 700U, 700U, 700U,
+  };
+
+  prism::test::ClearDebugPortOutput();
+  ASSERT_EQ(transport_.WriteFrame(frame.data(), frame.size()), STATUS_OK);
+
+  std::string expected_output =
+    "[OSHAL][WS2812] DMA frame (3 bytes): 00 A5 FF\n"
+    "[OSHAL][WS2812] DMA pulse sequence ns: ";
+  for (std::size_t pulse_index = 0U; pulse_index < kWs2812PreamblePulseCount;
+       ++pulse_index) {
+    if (pulse_index > 0U) {
+      expected_output += ',';
+    }
+    expected_output += '0';
+  }
+  for (const std::uint32_t pulse_ns : expected_payload_pulses) {
+    expected_output += ',';
+    expected_output += std::to_string(pulse_ns);
+  }
+  expected_output += ",0\n";
+
+  EXPECT_EQ(prism::test::DebugPortOutput(), expected_output);
 }
 
 }  // namespace

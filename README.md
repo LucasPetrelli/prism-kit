@@ -57,9 +57,11 @@ supported options for each command.
 
 ### Debug Traces
 
-Trace output is sent through the debug port. Set the matching variable to
-`ON` in `app/CMakeLists.txt` (or pass `-D<NAME>=ON` when invoking CMake or
-`west` directly) and rebuild to enable it. The separate per-pixel LED trace
+Trace output is sent through the debug port. APP trace variables are set in
+`app/CMakeLists.txt` (or passed as `-D<NAME>=ON` when invoking CMake or `west`
+directly). The OSHAL WS2812 frame trace is controlled separately through
+`OSHAL_LOG_WS2812_FRAME` in `oshal/CMakeLists.txt`; it defaults to `ON` and can
+be disabled with `-DOSHAL_LOG_WS2812_FRAME=OFF`. The per-pixel LED trace
 defaults to `OFF` so it can be enabled without changing controller logging:
 
 - `PRISM_KIT_LOG_EVB` - `[EVB]` event-mailbox send/receive traces.
@@ -67,6 +69,9 @@ defaults to `OFF` so it can be enabled without changing controller logging:
 - `PRISM_KIT_LOG_LED` - `[LED] apply` per-pixel records with strip name,
   zero-based index, logical `#RRGGBB`, and the `SetColor` status at the
   APP-to-BAL boundary.
+- `OSHAL_LOG_WS2812_FRAME` - `[OSHAL][WS2812]` frame bytes before pulse
+  encoding and the comma-separated decimal DMA pulse sequence (ns) before
+  playback (ON by default; set to `OFF` to suppress both traces).
 
 ## Agent Guidance
 
