@@ -57,13 +57,16 @@ supported options for each command.
 
 ### Debug Traces
 
-The `[EVB]` mailbox traces and the `[Controller]` trace output on the debug
-port are off by default. Set the matching variable to `ON` in
-`app/CMakeLists.txt` (or pass `-D<NAME>=ON` when invoking CMake or `west`
-directly) and rebuild to enable them:
+Trace output is sent through the debug port. Set the matching variable to
+`ON` in `app/CMakeLists.txt` (or pass `-D<NAME>=ON` when invoking CMake or
+`west` directly) and rebuild to enable it. The separate per-pixel LED trace
+defaults to `OFF` so it can be enabled without changing controller logging:
 
 - `PRISM_KIT_LOG_EVB` - `[EVB]` event-mailbox send/receive traces.
 - `PRISM_KIT_LOG_CONTROLLER` - `[Controller]` controller trace output.
+- `PRISM_KIT_LOG_LED` - `[LED] apply` per-pixel records with strip name,
+  zero-based index, logical `#RRGGBB`, and the `SetColor` status at the
+  APP-to-BAL boundary.
 
 ## Agent Guidance
 
