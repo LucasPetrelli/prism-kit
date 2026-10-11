@@ -27,6 +27,7 @@ dependencies = [
 [project.scripts]
 build = "scripts.build:main"
 flash = "scripts.flash:main"
+flush-worktrees = "scripts.flush_worktrees:main"
 format = "scripts.format:main"
 lint = "scripts.lint:main"
 lint-python = "scripts.lint_python:main"
