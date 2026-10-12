@@ -24,9 +24,13 @@ foreach(required_submodule IN ITEMS oshal bal)
 	endif()
 endforeach()
 
-target_sources(app PRIVATE src/boot_handoff_zephyr.cpp)
-
 add_subdirectory(oshal)
-add_subdirectory(bal)
-add_subdirectory(protocol)
-add_subdirectory(app)
+
+if(OSHAL_DEMO STREQUAL "NONE")
+	target_sources(app PRIVATE src/boot_handoff_zephyr.cpp)
+	add_subdirectory(bal)
+	add_subdirectory(protocol)
+	add_subdirectory(app)
+else()
+	target_link_libraries(app PRIVATE oshal_implementation)
+endif()

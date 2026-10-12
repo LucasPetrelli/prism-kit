@@ -34,12 +34,12 @@ from scripts.modules.protocol import (  # noqa: E402
 from scripts.rainbow2 import RAINBOW_COLORS  # noqa: E402
 
 ROOT_GROUP_ID = 0
-ROOT_ADDITIONAL_REPEATS = 0
+ROOT_ADDITIONAL_REPEATS = 0xFFFF
 LED_COUNT = len(RAINBOW_COLORS)
-RED_COLOR = (255, 0, 0)
-FADE_DURATION_MS = 5000
-DIM_PERCENT = 25
-RESTORE_PERCENT = 400
+RED_COLOR = (0, 0, 128)
+FADE_DURATION_MS = 1000
+DIM_PERCENT = 5
+RESTORE_PERCENT = 2000
 
 
 def _write_frame(port: Any, frame: bytes) -> None:

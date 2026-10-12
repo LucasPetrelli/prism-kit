@@ -47,6 +47,7 @@ Run commands from `prism-kit/`.
 git submodule update --init --recursive
 uv sync
 uv run build
+uv run build --oshal-demo SAMD21_DMA_PWM
 uv run unit-tests
 uv run lint
 ```
@@ -54,6 +55,13 @@ uv run lint
 Use `uv run flash` and `uv run smoke-test` for hardware validation when the
 required target and probe are available. Project-owned wrappers define the
 supported options for each command.
+
+The standalone SAMD21 DMA PWM demo submits a finite 26-period pulse train (a
+25-value pulse-width ramp plus a zero-duty terminal period) about every 2 ms,
+and omits the normal APP/BAL runtime composition. Build it with
+`uv run build --oshal-demo SAMD21_DMA_PWM`; a regular `uv run build` explicitly
+selects `NONE` and restores the normal product image. The existing
+`uv run flash` wrapper can program whichever image was most recently built.
 
 ### Debug Traces
 

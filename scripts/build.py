@@ -16,6 +16,7 @@ Usage::
     uv run build --debug-opt
     uv run build --clean
     uv run build --skip-lint
+    uv run build --oshal-demo SAMD21_DMA_PWM
 """
 
 from __future__ import annotations
@@ -46,8 +47,8 @@ def parse_args() -> argparse.Namespace:
     """Parse command-line arguments for the build script.
 
     Returns:
-        Parsed arguments with ``--no-opt``, ``--debug-opt``, ``--clean``,
-        and ``--skip-lint`` flags.
+        Parsed arguments with optimization, cleanup, lint, and OSHAL demo
+        selections.
     """
     parser = argparse.ArgumentParser(
         description="Build the firmware with the repo-local Zephyr toolchain setup."
@@ -67,6 +68,15 @@ def parse_args() -> argparse.Namespace:
         "--clean",
         action="store_true",
         help="Force a full clean rebuild (--pristine always).",
+    )
+    parser.add_argument(
+        "--oshal-demo",
+        default="NONE",
+        metavar="NAME",
+        help=(
+            "Select an OSHAL demo profile (NONE or SAMD21_DMA_PWM). "
+            "OSHAL CMake validates this value."
+        ),
     )
     parser.add_argument(
         "--skip-lint",
@@ -241,6 +251,7 @@ def run_west_build(
     toolchain_root: Path,
     extra_conf_files: list[Path],
     pristine: str = "auto",
+    oshal_demo: str = "NONE",
 ) -> None:
     """Invoke ``west build`` with the project's standard configuration.
 
@@ -251,11 +262,15 @@ def run_west_build(
         extra_conf_files: Additional Kconfig fragment files to apply.
         pristine: West pristine level — ``"auto"`` (default) for incremental
             builds or ``"always"`` for a full clean rebuild.
+        oshal_demo: OSHAL demo profile forwarded to CMake on every build.
     """
     env = os.environ.copy()
     env["ZEPHYR_TOOLCHAIN_VARIANT"] = "gnuarmemb"
     env["GNUARMEMB_TOOLCHAIN_PATH"] = str(toolchain_root)
-    cmake_args = ["-DCMAKE_EXPORT_COMPILE_COMMANDS=ON"]
+    cmake_args = [
+        "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON",
+        f"-DOSHAL_DEMO={oshal_demo}",
+    ]
     if extra_conf_files:
         extra_conf_value = ";".join(str(path) for path in extra_conf_files)
         cmake_args.append(f"-DEXTRA_CONF_FILE={extra_conf_value}")
@@ -423,7 +438,14 @@ def main() -> int:
     if args.clean:
         remove_build_directory(root)
 
-    run_west_build(root, python_exe, toolchain_root, extra_conf_files, pristine)
+    run_west_build(
+        root,
+        python_exe,
+        toolchain_root,
+        extra_conf_files,
+        pristine,
+        oshal_demo=args.oshal_demo,
+    )
     sanitize_compile_database(root)
 
     if not args.skip_lint:
