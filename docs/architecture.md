@@ -65,7 +65,7 @@ Zephyr startup
         +--> OSHAL SYS_INIT at APPLICATION level
             +--> publish platform startup status
     |
-        +--> main() in oshal/src/zephyr_system.c
+        +--> main() in oshal/src/zephyr/zephyr_system.c
             |
             +--> OSHAL-declared handoff hook
                 |

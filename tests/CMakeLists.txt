@@ -29,7 +29,7 @@ add_executable(controller_test
   ../app/src/hw/hw_task.cpp
   ../app/src/hw/status_led.cpp
   ../app/src/hw/strip_manager.cpp
-  ../oshal/src/samd21_ws2812.cpp
+  ../oshal/src/samd21/samd21_ws2812.cpp
   ../protocol/src/protocol.cpp
 )
 

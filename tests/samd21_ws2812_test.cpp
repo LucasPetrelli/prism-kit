@@ -4,7 +4,7 @@
 #include <cstdint>
 #include <string>
 
-#include "../oshal/src/samd21_ws2812_internal.hpp"
+#include "../oshal/src/samd21/samd21_ws2812_internal.hpp"
 #include "debug_port_test_access.hpp"
 #include "gtest/gtest.h"
 #include "oshal/status.h"

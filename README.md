@@ -43,12 +43,23 @@ OSHAL hands off to BAL, and BAL launches the application.
 
 Run commands from `prism-kit/`.
 
+On the first build, choose a project board explicitly. The wrapper saves the
+validated alias in the ignored, root-level `.prism-kit.local.json`; later builds
+reuse that choice, while another explicit `--board` selection replaces it.
+Choose `seeeduino_xiao` for the SAMD21 or `xiao_nrf52_sense` for the staged
+XIAO nRF52840 Sense target. The remembered file is outside `build/` and survives
+`--clean`. Direct West/CMake callers must still select the Zephyr board target
+explicitly.
+
 ```bash
 git submodule update --init --recursive
 uv sync
-uv run build
-uv run build --oshal-demo SAMD21_DMA_PWM
+uv run build --board seeeduino_xiao  # first use; saves the selected board
+uv run build                         # later uses the saved choice
+uv run build --board seeeduino_xiao --oshal-demo samd21-dma-pwm
 uv run unit-tests
+uv run format --check
+uv run lint-python
 uv run lint
 ```
 
@@ -56,12 +67,16 @@ Use `uv run flash` and `uv run smoke-test` for hardware validation when the
 required target and probe are available. Project-owned wrappers define the
 supported options for each command.
 
-The standalone SAMD21 DMA PWM demo submits a finite 26-period pulse train (a
+The standalone SAMD21 DMA/PWM demo submits a finite 26-period pulse train (a
 25-value pulse-width ramp plus a zero-duty terminal period) about every 2 ms,
 and omits the normal APP/BAL runtime composition. Build it with
-`uv run build --oshal-demo SAMD21_DMA_PWM`; a regular `uv run build` explicitly
-selects `NONE` and restores the normal product image. The existing
-`uv run flash` wrapper can program whichever image was most recently built.
+`uv run build --oshal-demo samd21-dma-pwm`; a regular `uv run build` selects
+`none` and restores the normal product image. Use `--clean` when switching
+board targets in the shared build directory. The `uv run flash` wrapper selects
+the artifact and J-Link device from a content-validated provenance record
+written after a successful build. A missing or stale record fails closed; an
+external artifact requires an explicit `--device`, and an external `.bin` also
+requires `--load-address`.
 
 ### Debug Traces
 

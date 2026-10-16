@@ -15,6 +15,8 @@ logs/*
 .vscode/*
 !.vscode/extensions.json
 !.vscode/settings.json
+!.vscode/tasks.json
+.prism-kit.local.json
 CMakeUserPresets.json
 *.swp
 *.swo

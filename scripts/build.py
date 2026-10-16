@@ -11,18 +11,19 @@ edit-compile cycles.  Pass ``--clean`` to force a full rebuild.
 
 Usage::
 
-    uv run build
+    uv run build --board seeeduino_xiao  # first use; saves the local choice
+    uv run build                        # later uses the saved choice
     uv run build --no-opt
     uv run build --debug-opt
     uv run build --clean
     uv run build --skip-lint
-    uv run build --oshal-demo SAMD21_DMA_PWM
+    uv run build --board seeeduino_xiao --oshal-demo samd21-dma-pwm
 """
 
 from __future__ import annotations
 
-import ctypes
 import argparse
+import ctypes
 import json
 import os
 from pathlib import Path, PureWindowsPath
@@ -30,6 +31,11 @@ import re
 import shutil
 import subprocess
 import sys
+
+if __package__:
+    from .build_provenance import write_build_provenance
+else:
+    from build_provenance import write_build_provenance
 
 DEFAULT_TOOLCHAIN_ROOT = Path(
     r"C:\Program Files (x86)\Arm GNU Toolchain arm-none-eabi\14.2 rel1"
@@ -41,17 +47,35 @@ GCC_ONLY_PATTERNS = (
     r"\s+-fno-defer-pop",
 )
 REQUIRED_SUBMODULES = ("bal", "oshal")
+LOCAL_SETTINGS_FILENAME = ".prism-kit.local.json"
+BOARD_TARGETS = {
+    "seeeduino_xiao": "seeeduino_xiao",
+    "xiao_nrf52_sense": "xiao_ble/nrf52840/sense",
+}
+CONFIG_BOARD_TARGETS = {
+    "seeeduino_xiao": "seeeduino_xiao/samd21g18a",
+    "xiao_nrf52_sense": "xiao_ble/nrf52840/sense",
+}
+OSHAL_DEMOS = ("none", "blinky", "samd21-dma-pwm", "ws2812-spi")
 
 
 def parse_args() -> argparse.Namespace:
     """Parse command-line arguments for the build script.
 
     Returns:
-        Parsed arguments with optimization, cleanup, lint, and OSHAL demo
-        selections.
+        Parsed arguments with board, optimization, cleanup, lint, and OSHAL
+        demo selections.
     """
     parser = argparse.ArgumentParser(
         description="Build the firmware with the repo-local Zephyr toolchain setup."
+    )
+    parser.add_argument(
+        "--board",
+        choices=tuple(BOARD_TARGETS),
+        help=(
+            "Select a project board alias (required on first use; the validated "
+            "choice is saved locally)."
+        ),
     )
     optimization_group = parser.add_mutually_exclusive_group()
     optimization_group.add_argument(
@@ -71,11 +95,12 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--oshal-demo",
-        default="NONE",
+        choices=OSHAL_DEMOS,
+        default="none",
         metavar="NAME",
         help=(
-            "Select an OSHAL demo profile (NONE or SAMD21_DMA_PWM). "
-            "OSHAL CMake validates this value."
+            "Select a lower-case OSHAL demo (none, blinky, samd21-dma-pwm, or "
+            "ws2812-spi)."
         ),
     )
     parser.add_argument(
@@ -92,6 +117,92 @@ def repo_root() -> Path:
     Resolves relative to this script's location (``scripts/`` sibling).
     """
     return Path(__file__).resolve().parent.parent
+
+
+def config_board_target_for_alias(board_alias: str) -> str:
+    """Return the expected fully qualified Zephyr target for *board_alias*.
+
+    Args:
+        board_alias: Validated project board alias.
+
+    Returns:
+        The expected value of ``CONFIG_BOARD_TARGET`` after configuration.
+
+    Raises:
+        ValueError: If the project alias has no configured Zephyr target.
+    """
+    try:
+        return CONFIG_BOARD_TARGETS[board_alias]
+    except KeyError as exc:
+        supported = ", ".join(CONFIG_BOARD_TARGETS)
+        raise ValueError(
+            f"Unsupported board alias '{board_alias}'. Choose one of: {supported}."
+        ) from exc
+
+
+def resolve_board(
+    requested_board: str | None,
+    settings_path: Path | None = None,
+) -> tuple[str, str]:
+    """Resolve and, when explicitly selected, persist the project board.
+
+    Args:
+        requested_board: Project alias passed through ``--board``, or ``None``
+            to reuse the local preference.
+        settings_path: Optional preference path for tests; defaults to the
+            root-level ``.prism-kit.local.json`` file.
+
+    Returns:
+        The selected project alias and its corresponding Zephyr board target.
+
+    Raises:
+        ValueError: If the preference is missing or invalid, or an explicit
+            alias is unsupported.
+        OSError: If the local preference cannot be read or written.
+    """
+    if settings_path is None:
+        settings_path = repo_root() / LOCAL_SETTINGS_FILENAME
+
+    if requested_board is not None:
+        if requested_board not in BOARD_TARGETS:
+            supported = ", ".join(BOARD_TARGETS)
+            raise ValueError(
+                f"Unsupported board alias '{requested_board}'. Choose one of: "
+                f"{supported}."
+            )
+        board_alias = requested_board
+    else:
+        try:
+            settings = json.loads(settings_path.read_text(encoding="utf-8"))
+        except FileNotFoundError as exc:
+            examples = " or ".join(
+                f"`uv run build --board {alias}`" for alias in BOARD_TARGETS
+            )
+            raise ValueError(
+                f"No saved board choice was found. On first use, run {examples}."
+            ) from exc
+        except json.JSONDecodeError as exc:
+            raise ValueError(
+                f"Local board settings '{settings_path}' is not valid JSON. "
+                "Choose a board explicitly with --board to replace it."
+            ) from exc
+
+        board_alias = settings.get("board") if isinstance(settings, dict) else None
+        if not isinstance(board_alias, str) or board_alias not in BOARD_TARGETS:
+            supported = ", ".join(BOARD_TARGETS)
+            raise ValueError(
+                f"Invalid saved board choice in '{settings_path}'. Expected one "
+                f"of: {supported}. Select a board with --board to update it."
+            )
+
+    if requested_board is not None:
+        settings_path.parent.mkdir(parents=True, exist_ok=True)
+        settings_path.write_text(
+            json.dumps({"board": board_alias}, indent=2) + "\n",
+            encoding="utf-8",
+        )
+
+    return board_alias, BOARD_TARGETS[board_alias]
 
 
 def _python_has_west(python_exe: Path) -> bool:
@@ -249,9 +360,10 @@ def run_west_build(
     root: Path,
     python_exe: Path,
     toolchain_root: Path,
+    board_target: str,
     extra_conf_files: list[Path],
     pristine: str = "auto",
-    oshal_demo: str = "NONE",
+    oshal_demo: str = "none",
 ) -> None:
     """Invoke ``west build`` with the project's standard configuration.
 
@@ -259,6 +371,7 @@ def run_west_build(
         root: The repository root directory.
         python_exe: Path to a Python interpreter that has ``west``.
         toolchain_root: GNU Arm Embedded toolchain installation root.
+        board_target: Validated Zephyr target corresponding to the project alias.
         extra_conf_files: Additional Kconfig fragment files to apply.
         pristine: West pristine level — ``"auto"`` (default) for incremental
             builds or ``"always"`` for a full clean rebuild.
@@ -282,7 +395,7 @@ def run_west_build(
             "west",
             "build",
             "-b",
-            "seeeduino_xiao",
+            board_target,
             "--pristine",
             pristine,
             ".",
@@ -423,6 +536,16 @@ def main() -> int:
     """
     args = parse_args()
     root = repo_root()
+
+    try:
+        board_alias, board_target = resolve_board(
+            args.board, root / LOCAL_SETTINGS_FILENAME
+        )
+    except (OSError, ValueError) as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+
+    print(f"[build] Board: {board_alias} -> {board_target}")
     python_exe = resolve_python_with_west(root)
     ensure_required_submodules(root)
     toolchain_root = resolve_toolchain_root()
@@ -442,6 +565,7 @@ def main() -> int:
         root,
         python_exe,
         toolchain_root,
+        board_target,
         extra_conf_files,
         pristine,
         oshal_demo=args.oshal_demo,
@@ -452,6 +576,17 @@ def main() -> int:
         lint_rc = run_lint(root)
         if lint_rc != 0:
             return lint_rc
+
+    try:
+        provenance = write_build_provenance(
+            root, config_board_target_for_alias(board_alias)
+        )
+    except (OSError, ValueError) as exc:
+        print(f"[build] Unable to publish flash provenance: {exc}", file=sys.stderr)
+        return 1
+
+    print(f"[build] Verified Zephyr target: {provenance.board_target}")
+    print(f"[build] Flash provenance: {provenance.artifact_path}")
 
     return 0
 

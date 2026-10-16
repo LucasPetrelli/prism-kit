@@ -26,7 +26,7 @@ endforeach()
 
 add_subdirectory(oshal)
 
-if(OSHAL_DEMO STREQUAL "NONE")
+if(OSHAL_DEMO STREQUAL "none")
 	target_sources(app PRIVATE src/boot_handoff_zephyr.cpp)
 	add_subdirectory(bal)
 	add_subdirectory(protocol)

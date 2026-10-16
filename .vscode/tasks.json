@@ -1,0 +1,27 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Build prism-kit (choose board)",
+			"type": "shell",
+			"command": "cd c:/dev/west-zephyr/prism-kit && uv run scripts/build.py --board ${input:prismKitBoard} 2>&1",
+			"group": "build",
+			"detail": "Prompts for a board alias and saves it to the ignored .prism-kit.local.json preference. Use this task on first build or to switch boards."
+		},
+		{
+			"label": "Build prism-kit",
+			"type": "shell",
+			"command": "cd c:/dev/west-zephyr/prism-kit && uv run scripts/build.py 2>&1",
+			"group": "build",
+			"detail": "Builds for the board saved in .prism-kit.local.json. On first use, run Build prism-kit (choose board) or `uv run build --board seeeduino_xiao`."
+		}
+	],
+	"inputs": [
+		{
+			"id": "prismKitBoard",
+			"type": "pickString",
+			"description": "Select the project board alias to save",
+			"options": ["seeeduino_xiao", "xiao_nrf52_sense"]
+		}
+	]
+}
