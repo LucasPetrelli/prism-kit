@@ -100,7 +100,9 @@ class FlashBoardMetadataTest(TestCase):
         with self.assertRaisesRegex(ValueError, "Unsupported CONFIG_BOARD_TARGET"):
             flash.resolve_jlink_device("custom-device", "unsupported/board")
 
-    def test_default_flash_uses_recorded_artifact_without_local_preference(self) -> None:
+    def test_default_flash_uses_recorded_artifact_without_local_preference(
+        self,
+    ) -> None:
         """Goal: use the exact recorded image, not rediscovered output or preference.
 
         Steps: publish valid provenance, add an unrelated candidate artifact,
@@ -148,7 +150,10 @@ class FlashBoardMetadataTest(TestCase):
             "stale-config",
         )
         for invalid_case in invalid_cases:
-            with self.subTest(invalid_case=invalid_case), TemporaryDirectory() as directory:
+            with (
+                self.subTest(invalid_case=invalid_case),
+                TemporaryDirectory() as directory,
+            ):
                 root = Path(directory)
                 if invalid_case == "malformed":
                     manifest_path = build_provenance.provenance_path(root)
@@ -163,9 +168,7 @@ class FlashBoardMetadataTest(TestCase):
                     provenance = self.create_successful_build(root, target)
                     manifest_path = build_provenance.provenance_path(root)
                     if invalid_case == "unsupported-schema":
-                        manifest = json.loads(
-                            manifest_path.read_text(encoding="utf-8")
-                        )
+                        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
                         manifest["schema_version"] = 2
                         manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
                     elif invalid_case == "target-mismatch":

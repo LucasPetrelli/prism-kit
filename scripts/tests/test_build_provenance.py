@@ -45,9 +45,7 @@ class BuildProvenanceTest(TestCase):
             )
 
             self.assertEqual(manifest["schema_version"], 1)
-            self.assertEqual(
-                manifest["board_target"], "seeeduino_xiao/samd21g18a"
-            )
+            self.assertEqual(manifest["board_target"], "seeeduino_xiao/samd21g18a")
             self.assertEqual(manifest["artifact_path"], "build/zephyr/zephyr.elf")
             self.assertEqual(
                 manifest["artifact_sha256"],
@@ -55,9 +53,7 @@ class BuildProvenanceTest(TestCase):
             )
             self.assertEqual(
                 manifest["config_sha256"],
-                build_provenance.sha256_file(
-                    build_provenance.build_config_path(root)
-                ),
+                build_provenance.sha256_file(build_provenance.build_config_path(root)),
             )
 
     def test_load_accepts_matching_manifest_and_files(self) -> None:

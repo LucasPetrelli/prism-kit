@@ -37,9 +37,13 @@ class BuildBoardSelectionTest(TestCase):
         with (
             patch.object(build, "repo_root", return_value=root),
             patch.object(build, "parse_args", return_value=args),
-            patch.object(build, "resolve_python_with_west", return_value=Path("python")),
+            patch.object(
+                build, "resolve_python_with_west", return_value=Path("python")
+            ),
             patch.object(build, "ensure_required_submodules"),
-            patch.object(build, "resolve_toolchain_root", return_value=Path("toolchain")),
+            patch.object(
+                build, "resolve_toolchain_root", return_value=Path("toolchain")
+            ),
             patch.object(build, "run_west_build"),
             patch.object(build, "sanitize_compile_database"),
             patch.object(build, "run_lint", return_value=lint_result) as run_lint,
@@ -170,7 +174,9 @@ class BuildBoardSelectionTest(TestCase):
                 (alias, target),
                 ("xiao_nrf52_sense", "xiao_ble/nrf52840/sense"),
             )
-            self.assertEqual(settings_path.read_text(encoding="utf-8"), original_contents)
+            self.assertEqual(
+                settings_path.read_text(encoding="utf-8"), original_contents
+            )
 
     def test_explicit_board_overrides_and_updates_a_saved_choice(self) -> None:
         """Goal: let an explicit alias replace the current local preference.

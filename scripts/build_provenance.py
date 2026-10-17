@@ -121,9 +121,7 @@ def resolve_default_artifact(build_dir: Path) -> Path:
         if canonical_candidate.is_file():
             return canonical_candidate.resolve()
 
-        candidates = [
-            path for path in build_dir.glob(f"*{suffix}") if path.is_file()
-        ]
+        candidates = [path for path in build_dir.glob(f"*{suffix}") if path.is_file()]
         if candidates:
             return max(candidates, key=lambda path: path.stat().st_mtime).resolve()
 
@@ -188,9 +186,7 @@ def write_build_provenance(
     if not selected_artifact.is_file():
         raise FileNotFoundError(f"Build artifact '{selected_artifact}' is missing.")
     if selected_artifact.suffix.lower() not in ARTIFACT_SUFFIXES:
-        raise BuildProvenanceError(
-            f"Unsupported build artifact '{selected_artifact}'."
-        )
+        raise BuildProvenanceError(f"Unsupported build artifact '{selected_artifact}'.")
     try:
         relative_artifact = selected_artifact.relative_to(build_dir.resolve())
         artifact_path = selected_artifact.relative_to(project_root).as_posix()

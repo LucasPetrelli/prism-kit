@@ -21,7 +21,10 @@
 			"id": "prismKitBoard",
 			"type": "pickString",
 			"description": "Select the project board alias to save",
-			"options": ["seeeduino_xiao", "xiao_nrf52_sense"]
+			"options": [
+				"seeeduino_xiao",
+				"xiao_nrf52_sense"
+			]
 		}
 	]
 }

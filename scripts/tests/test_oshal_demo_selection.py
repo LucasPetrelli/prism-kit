@@ -38,16 +38,14 @@ class OshalDemoSelectionTest(TestCase):
             source_dir = root / "fixture"
             source_dir.mkdir()
             (source_dir / "CMakeLists.txt").write_text(
-                textwrap.dedent(
-                    """
+                textwrap.dedent("""
                     cmake_minimum_required(VERSION 3.20)
                     project(oshal_demo_selection_test LANGUAGES C CXX)
                     add_library(zephyr_interface INTERFACE)
                     set(CONFIG_SOC_FAMILY_ATMEL_SAM0 ON)
                     set(CONFIG_SOC_SERIES_SAMD21 ON)
                     add_subdirectory("${OSHAL_SOURCE_DIR}" oshal)
-                    """
-                ),
+                    """),
                 encoding="utf-8",
             )
             return subprocess.run(
@@ -93,7 +91,8 @@ class OshalDemoSelectionTest(TestCase):
         CMake fails with the explicit Step 1 reservation diagnostic.
         """
         self.assert_reserved_demo_rejected(
-            "blinky", "OSHAL_DEMO='blinky' is reserved but not implemented until Step 1."
+            "blinky",
+            "OSHAL_DEMO='blinky' is reserved but not implemented until Step 1.",
         )
 
     def test_ws2812_spi_is_reserved_until_step_two(self) -> None:
