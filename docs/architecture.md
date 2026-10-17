@@ -30,9 +30,10 @@ The Zephyr-only binding schemas and vendor prefix live under
 `DTS_ROOT` before configuration. BAL owns the board overlay that instantiates
 those schemas; the project root does not own a separate binding directory.
 
-The backend is currently Zephyr-based and uses the SAMD21 PWM-plus-DMA path as
-the first timing-specific WS2812 engine while keeping the public transport
-contract independent from PWM versus future SPI signaling.
+The backend is currently Zephyr-based. It includes an nRF52 GPIO resource path
+for the standalone XIAO Sense blinky demo, while the SAMD21 PWM-plus-DMA path is
+the first timing-specific WS2812 engine. The public transport contract remains
+independent from PWM versus future SPI signaling.
 The task interface is intentionally C++-only because no current C-shaped
 integration point needs to create or manage tasks directly.
 The Zephyr project integration defines task stack objects and passes them

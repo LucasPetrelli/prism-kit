@@ -1,4 +1,4 @@
-"""Configure-level tests for Step 0 OSHAL demo selection behavior."""
+"""Configure-level tests for OSHAL demo and backend selection behavior."""
 
 from __future__ import annotations
 
@@ -15,13 +15,16 @@ OSHAL_ROOT = Path(__file__).resolve().parents[2] / "oshal"
 
 
 class OshalDemoSelectionTest(TestCase):
-    """Verify reserved demos fail in the real OSHAL CMake dispatcher."""
+    """Verify the real OSHAL CMake dispatcher selects compatible demos."""
 
-    def configure_demo(self, demo_name: str) -> subprocess.CompletedProcess[str]:
+    def configure_demo(
+        self, demo_name: str, soc: str = "samd21"
+    ) -> subprocess.CompletedProcess[str]:
         """Configure OSHAL through a minimal Zephyr-target fixture.
 
         Args:
             demo_name: Demo selector to pass through the CMake cache.
+            soc: SoC fixture name, either ``samd21`` or ``nrf52``.
 
         Returns:
             CMake's captured configure result.
@@ -42,9 +45,16 @@ class OshalDemoSelectionTest(TestCase):
                     cmake_minimum_required(VERSION 3.20)
                     project(oshal_demo_selection_test LANGUAGES C CXX)
                     add_library(zephyr_interface INTERFACE)
-                    set(CONFIG_SOC_FAMILY_ATMEL_SAM0 ON)
-                    set(CONFIG_SOC_SERIES_SAMD21 ON)
+                    if(OSHAL_TEST_SOC STREQUAL "nrf52")
+                        set(CONFIG_SOC_FAMILY_NORDIC_NRF ON)
+                        set(CONFIG_SOC_SERIES_NRF52X ON)
+                    else()
+                        set(CONFIG_SOC_FAMILY_ATMEL_SAM0 ON)
+                        set(CONFIG_SOC_SERIES_SAMD21 ON)
+                    endif()
                     add_subdirectory("${OSHAL_SOURCE_DIR}" oshal)
+                    message(STATUS
+                        "OSHAL_ENABLE_COMMAND_USB_CDC=${OSHAL_ENABLE_COMMAND_USB_CDC}")
                     """),
                 encoding="utf-8",
             )
@@ -59,6 +69,7 @@ class OshalDemoSelectionTest(TestCase):
                     generator,
                     f"-DOSHAL_SOURCE_DIR={OSHAL_ROOT}",
                     f"-DOSHAL_DEMO={demo_name}",
+                    f"-DOSHAL_TEST_SOC={soc}",
                 ],
                 cwd=source_dir,
                 env=default_cmake_env(),
@@ -84,15 +95,39 @@ class OshalDemoSelectionTest(TestCase):
         self.assertNotEqual(result.returncode, 0, output)
         self.assertIn(expected_message, output)
 
-    def test_blinky_is_reserved_until_step_one(self) -> None:
-        """Goal: keep Step 1's GPIO demo out of the Step 0 implementation.
+    def test_blinky_is_supported_for_samd21_gpio0_profile(self) -> None:
+        """Goal: allow the generic GPIO demo on the SAMD21 profile.
 
         Steps: configure the real OSHAL dispatcher with ``blinky`` and verify
-        CMake fails with the explicit Step 1 reservation diagnostic.
+        the existing GPIO-capable backend accepts the generic demo.
         """
-        self.assert_reserved_demo_rejected(
-            "blinky",
-            "OSHAL_DEMO='blinky' is reserved but not implemented until Step 1.",
+        result = self.configure_demo("blinky", "samd21")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_blinky_is_supported_for_nrf52(self) -> None:
+        """Goal: route the generic GPIO demo to the new nRF52 backend.
+
+        Steps: configure the real OSHAL dispatcher with ``blinky`` and verify
+        the nRF52 backend is selected while the command-port option stays on.
+        """
+        result = self.configure_demo("blinky", "nrf52")
+        output = result.stdout + result.stderr
+
+        self.assertEqual(result.returncode, 0, output)
+        self.assertIn("OSHAL_ENABLE_COMMAND_USB_CDC=ON", output)
+
+    def test_samd21_dma_demo_rejects_nrf52_with_actionable_error(self) -> None:
+        """Goal: explain the backend requirement for the SAMD21-only demo.
+
+        Steps: configure ``samd21-dma-pwm`` with the nRF52 fixture and verify
+        CMake fails with the selected demo's backend requirement.
+        """
+        result = self.configure_demo("samd21-dma-pwm", "nrf52")
+        output = result.stdout + result.stderr
+
+        self.assertNotEqual(result.returncode, 0, output)
+        self.assertIn(
+            "OSHAL_DEMO='samd21-dma-pwm' requires the SAMD21 backend.", output
         )
 
     def test_ws2812_spi_is_reserved_until_step_two(self) -> None:

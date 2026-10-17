@@ -57,6 +57,7 @@ uv sync
 uv run python scripts/install_git_hooks.py
 uv run build --board seeeduino_xiao  # first use; saves the selected board
 uv run build                         # later uses the saved choice
+uv run build --board xiao_nrf52_sense --oshal-demo blinky
 uv run build --board seeeduino_xiao --oshal-demo samd21-dma-pwm
 uv run unit-tests
 uv run format --check
@@ -83,6 +84,13 @@ the artifact and J-Link device from a content-validated provenance record
 written after a successful build. A missing or stale record fails closed; an
 external artifact requires an explicit `--device`, and an external `.bin` also
 requires `--load-address`.
+
+The generic OSHAL `blinky` demo uses only OSHAL APIs and the selected board's
+`gpio0` resource, and omits the BAL and APP runtime. Its selected-board
+Devicetree requirements are checked by a Zephyr-side configuration source.
+It is available on the XIAO nRF52840 Sense and the existing SAMD21 profile. On
+a first build, pass the board explicitly, for example
+`uv run build --board xiao_nrf52_sense --oshal-demo blinky`.
 
 ### Debug Traces
 
