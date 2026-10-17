@@ -147,8 +147,26 @@ class Rainbow3WireTest(TestCase):
         final_clear = unpack_frame(serial.ports[0].writes[-2])[1]
         self.assertEqual(int.from_bytes(final_clear[:2], "little"), 119)
 
-    def test_delay_bounds_and_invalid_values_before_open(self) -> None:
-        """Accept mark-safe endpoints and reject invalid values before I/O."""
+    def test_finite_pass_clears_without_restarting(self) -> None:
+        """Allow smoke to finish at its final black frame, without another lap."""
+        serial = FakeSerialModule()
+
+        self.assertTrue(
+            rainbow3.run_rainbow3_sequence(
+                serial,
+                "COM8",
+                115200,
+                root_additional_repeats=0,
+            )
+        )
+
+        self.assertEqual(
+            unpack_frame(serial.ports[0].writes[-1]),
+            (protocol.TAG_START, b"\x00\x00"),
+        )
+
+    def test_delay_and_repeat_bounds_before_open(self) -> None:
+        """Accept mark-safe values and reject invalid inputs before I/O."""
         for delay, final_mark in ((1, 7), (9362, 65534)):
             serial = FakeSerialModule()
             self.assertTrue(
@@ -165,6 +183,19 @@ class Rainbow3WireTest(TestCase):
                 self.assertFalse(
                     rainbow3.run_rainbow3_sequence(
                         serial, "COM8", 115200, step_delay_ms=delay
+                    )
+                )
+            self.assertEqual(serial.ports, [])
+
+        for repeats in (-1, 65536, 1.5, True):
+            serial = FakeSerialModule()
+            with redirect_stderr(StringIO()):
+                self.assertFalse(
+                    rainbow3.run_rainbow3_sequence(
+                        serial,
+                        "COM8",
+                        115200,
+                        root_additional_repeats=repeats,
                     )
                 )
             self.assertEqual(serial.ports, [])
@@ -241,7 +272,11 @@ class SmokeRainbow3Test(TestCase):
         self.assertTrue(smoke._run_rainbow3_sequence())
 
         run_sequence.assert_called_once_with(
-            smoke.serial, "COM8", 115200, step_delay_ms=250
+            smoke.serial,
+            "COM8",
+            115200,
+            step_delay_ms=250,
+            root_additional_repeats=0,
         )
         event.wait.assert_called_once_with(2.25)
         reset_program.assert_called_once_with(smoke.serial, "COM8", 115200)
@@ -361,8 +396,8 @@ class SmokeRainbow3Test(TestCase):
     def test_debug_only_cli_rejects_command_port_and_disabled_markers(self) -> None:
         """Accept the debug-only flag but reject contradictory smoke settings.
 
-        Goal: Keep the one-port debug profile strict about its built-in boot
-        and task markers and prevent callers from supplying a command port.
+        Goal: Keep the debug-only profile strict about its built-in boot and
+        task markers and prevent callers from supplying a command port.
         Steps: Parse the standalone flag, then parse it with each contradictory
         option and verify argparse rejects those combinations.
         """
@@ -454,12 +489,13 @@ class SmokeRainbow3Test(TestCase):
             capture_console.call_args.kwargs["reconnect_disconnected_ports"]
         )
 
-    def test_debug_only_requires_exactly_one_matching_port(self) -> None:
-        """Reject extra matching serial ports even when debug was identified.
+    def test_debug_only_accepts_single_or_composite_port_sets(self) -> None:
+        """Allow debug-only validation on either CDC profile.
 
-        Goal: Bind debug-only smoke acceptance to one enumerated CDC ACM port.
-        Steps: Provide a resolved debug port with two discovered matches and
-        verify failure, then retain only the debug port and verify success.
+        Goal: Keep boot/task diagnostics usable with the original one-port
+        image and the integrated two-port Sense image.
+        Steps: Resolve the debug port, then verify role validation succeeds
+        when discovery returns one or both CDC ACM interfaces.
         """
         smoke = SmokeTest(
             argparse.Namespace(
@@ -469,12 +505,9 @@ class SmokeRainbow3Test(TestCase):
             )
         )
         smoke.role_ports["debug"] = "COM7"
-        smoke.ports = [object(), object()]
-
-        with redirect_stderr(StringIO()):
-            self.assertFalse(smoke._validate_roles())
-
         smoke.ports = [object()]
+        self.assertTrue(smoke._validate_roles())
+        smoke.ports = [object(), object()]
         self.assertTrue(smoke._validate_roles())
 
     def test_debug_only_skips_command_and_rainbow_phases(self) -> None:
@@ -507,3 +540,33 @@ class SmokeRainbow3Test(TestCase):
         self.assertEqual(smoke.run(), 0)
         smoke._run_loopback.assert_not_called()
         smoke._run_rainbow3_sequence.assert_not_called()
+
+    @patch("scripts.smoke_test.capture_console")
+    def test_full_smoke_retries_cdc_ports_after_reset(
+        self, capture_console: Mock
+    ) -> None:
+        """Reconnect both USB CDC streams after reset during full capture.
+
+        Goal: Preserve startup evidence when the Sense USB composite device
+        disconnects while the user resets the board for a full smoke run.
+        Steps: Capture with both roles already assigned and verify the shared
+        console helper is asked to reopen disconnected CDC paths.
+        """
+        capture_console.return_value = ({}, set(), set(), {})
+        smoke = SmokeTest(
+            argparse.Namespace(
+                debug_only=False,
+                no_default_requirements=False,
+                require=[],
+                baudrate=115200,
+                capture_timeout=30.0,
+                quiet=True,
+            )
+        )
+        smoke.role_ports.update({"debug": "COM7", "command": "COM8"})
+
+        smoke._capture_console()
+
+        self.assertTrue(
+            capture_console.call_args.kwargs["reconnect_disconnected_ports"]
+        )

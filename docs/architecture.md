@@ -58,9 +58,12 @@ Steady-state APP logic talks to the Prism Kit strip contract rather than to BAL
 strip objects directly. APP also owns backend selection in `app/CMakeLists.txt`
 and starts backend-specific runtime helpers such as the current `app_hw` task.
 For the normal XIAO Sense image, the Zephyr composition selects the Sense BAL
-policy and OSHAL's `worldsemi,ws2812-spi` adapter. The board publishes one CDC
-ACM debug console and no command CDC resource, so OSHAL exposes a null command
-port while APP runs its default animation.
+policy and OSHAL's `worldsemi,ws2812-spi` adapter. BAL selects the existing
+board CDC ACM console as the debug role and publishes a second CDC ACM node as
+the command role. OSHAL owns composite USB registration and wraps the command
+node in its serial-port interface; APP consumes that interface through its
+existing command manager and protocol. APP does not include Zephyr USB or UART
+headers.
 
 ## Boot Flow
 

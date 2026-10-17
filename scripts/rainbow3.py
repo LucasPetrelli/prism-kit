@@ -83,8 +83,9 @@ def run_rainbow3_sequence(
     command_device: str,
     baudrate: int,
     step_delay_ms: int = DEFAULT_STEP_DELAY_MS,
+    root_additional_repeats: int = ROOT_REPEAT_FOREVER,
 ) -> bool:
-    """Program the Rainbow2 palette and start Group 0 with forever repeats.
+    """Program the Rainbow2 palette and start Group 0 with the requested repeats.
 
     The controller executes an initial black range, the seven palette colors,
     and a final black range on its own timeline. A successful host write does
@@ -96,10 +97,24 @@ def run_rainbow3_sequence(
         command_device: Command-port device name.
         baudrate: Serial baud rate.
         step_delay_ms: Spacing between LED marks, in ``1..9362`` ms.
+        root_additional_repeats: Extra Group 0 runs after the first pass,
+            from zero through ``0xFFFF``. The default repeats forever.
 
     Returns:
         True when every frame was fully written, otherwise False.
     """
+    if (
+        isinstance(root_additional_repeats, bool)
+        or not isinstance(root_additional_repeats, int)
+        or not 0 <= root_additional_repeats <= ROOT_REPEAT_FOREVER
+    ):
+        print(
+            "Rainbow3 sequence FAIL — root additional repeats must be an "
+            f"integer between 0 and {ROOT_REPEAT_FOREVER}.",
+            file=sys.stderr,
+        )
+        return False
+
     if (
         isinstance(step_delay_ms, bool)
         or not isinstance(step_delay_ms, int)
@@ -154,14 +169,22 @@ def run_rainbow3_sequence(
                     mark=7 * step_delay_ms,
                 ),
             )
-            _write_frame(port, build_start_frame(ROOT_REPEAT_FOREVER))
+            _write_frame(port, build_start_frame(root_additional_repeats))
     except Exception as exc:
         print(f"Rainbow3 sequence FAIL — {exc}.", file=sys.stderr)
         return False
 
+    if root_additional_repeats == ROOT_REPEAT_FOREVER:
+        repeat_description = "Group 0 repeats forever"
+    elif root_additional_repeats == 0:
+        repeat_description = "Group 0 completes after one pass"
+    else:
+        repeat_description = (
+            f"Group 0 repeats {root_additional_repeats} additional times"
+        )
     print(
         f"Rainbow3 sequence programmed ({len(RAINBOW_COLORS)} LEDs, "
-        f"{step_delay_ms} ms per step, Group 0 repeats forever)."
+        f"{step_delay_ms} ms per step, {repeat_description})."
     )
     return True
 

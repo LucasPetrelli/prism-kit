@@ -66,13 +66,18 @@ uv run lint
 ```
 
 Use `uv run flash` and `uv run smoke-test` for hardware validation when the
-required target and probe are available. The normal XIAO Sense image has one
-CDC ACM debug port, so use `uv run smoke-test --debug-only` to check its boot
-and APP task markers without command-port, loopback, or Rainbow3 phases. The
-existing SAMD21 smoke path retains its two-port checks. Because the boot and
-debug markers are emitted during startup, run the check with the board
-connected, then press its RESET button when the console capture prompt appears.
-The debug-only capture retries the CDC port after the board reconnects.
+required target and probe are available. The normal XIAO Sense image is
+configured with two CDC ACM interfaces: the debug console and the command
+port. Run `uv run smoke-test` for boot/task marker checks, protocol loopback,
+and a one-pass Rainbow3 command sequence that clears the strip when complete.
+Use `uv run smoke-test --debug-only` to check only the debug console markers; this
+mode works with either the original one-port image or the two-port composite
+image. The SAMD21 profile keeps its existing
+two-port smoke path. Because the boot and debug markers are emitted during
+startup, connect the board, start the smoke test, then press RESET when the
+console capture prompt appears. The smoke capture retries CDC streams after
+the board reconnects. If port discovery cannot assign the roles, pass both
+explicitly, for example `uv run smoke-test --port COM7 --command-port COM8`.
 Project-owned wrappers define the supported options for each command.
 
 The hook installer configures the parent repository and the `bal/` and
@@ -108,9 +113,10 @@ it with `uv run build --board xiao_nrf52_sense --oshal-demo ws2812-spi`; this
 explicit selector builds the OSHAL demo image and keeps the normal Prism APP and
 BAL runtime out of it. The normal Sense profile also enables this validated
 Zephyr SPI transport and composes the standard APP/BAL/OSHAL image. BAL maps the
-seven-pixel GRB strip to D10/MOSI and the onboard active-low red status LED.
-Its command CDC port remains null while the debug console uses the board's
-single CDC ACM interface.
+seven-pixel GRB strip to D10/MOSI and the onboard active-low red status LED. BAL
+selects the board's CDC console for debug and adds a second CDC ACM interface
+for commands. OSHAL exposes the debug and serial-port roles to APP, where the
+existing command manager handles protocol input.
 
 The diagnostic `ws2812-spi-probe` demo reuses those OSHAL patterns but sends
 each frame through its direct-SPI timing probe, with a low prefix and a

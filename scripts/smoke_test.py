@@ -157,8 +157,8 @@ def parse_args() -> argparse.Namespace:
         "--debug-only",
         action="store_true",
         help=(
-            "Require one debug CDC port and boot/task markers; skip command "
-            "loopback and Rainbow3 phases."
+            "Require the debug port and boot/task markers; skip command "
+            "loopback and Rainbow3 phases. Works with single- or dual-port images."
         ),
     )
     parser.add_argument(
@@ -271,7 +271,7 @@ class SmokeTest:
         self.role_ports: dict[str, str] = {}
 
     def _debug_only(self) -> bool:
-        """Return whether this run uses the single-port debug-only profile."""
+        """Return whether this run skips command-port smoke phases."""
         return bool(getattr(self.args, "debug_only", False))
 
     def _uses_default_requirements(self) -> bool:
@@ -446,7 +446,7 @@ class SmokeTest:
             command_marker="",
             quiet=self.args.quiet,
             stop_early=False,
-            reconnect_disconnected_ports=self._debug_only(),
+            reconnect_disconnected_ports=True,
         )
         self.seen_required = seen_required
         all_captured_lines = [
@@ -532,16 +532,9 @@ class SmokeTest:
         """Validate that the debug port was identified.
 
         The command port is resolved later by exclusion (the non-debug port)
-        rather than by a dedicated banner.
+        rather than by a dedicated banner. Debug-only mode may discover both
+        CDC ACM interfaces and simply leaves the command interface unused.
         """
-        if self._debug_only() and len(self.ports) != 1:
-            print(
-                "Smoke test failed. Debug-only mode requires exactly one "
-                "matching CDC ACM port.",
-                file=sys.stderr,
-            )
-            return False
-
         if not self._uses_default_requirements():
             return True
 
@@ -648,7 +641,7 @@ class SmokeTest:
     # ── Phase: run Rainbow3 sequence ───────────────────────────────
 
     def _run_rainbow3_sequence(self) -> bool:
-        """Run and clean up the infinite Rainbow3 sequence.
+        """Run one finite Rainbow3 pass and clean up its controller program.
 
         Delegates the command-port frame sequence to
         :func:`rainbow3.run_rainbow3_sequence` while a background thread
@@ -710,6 +703,7 @@ class SmokeTest:
                 command_device,
                 self.args.baudrate,
                 step_delay_ms=self.args.rainbow_step_delay,
+                root_additional_repeats=0,
             )
             if rainbow_ok:
                 observation_seconds = max(
