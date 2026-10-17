@@ -24,7 +24,17 @@ add_executable(controller_test
   nrf52_ws2812_spi_probe_test.cpp
   samd21_ws2812_test.cpp
   ../app/controller/controller.cpp
-  ../app/controller/instructions.cpp
+  ../app/controller/group_runtime.cpp
+  ../app/controller/instructions/pending_instruction_queue_view.cpp
+  ../app/controller/instructions/controller_instruction.cpp
+  ../app/controller/instructions/instruction_memory_slot.cpp
+  ../app/controller/instructions/set_multiple_color.cpp
+  ../app/controller/instructions/set_single_color.cpp
+  ../app/controller/instructions/set_multiple_color_hsv.cpp
+  ../app/controller/instructions/set_single_color_hsv.cpp
+  ../app/controller/instructions/fade.cpp
+  ../app/controller/instructions/run_group.cpp
+  ../app/controller/instructions/test_timed_instruction.cpp
   ../app/src/controller_command_dispatch.cpp
   ../app/src/hw/command_manager.cpp
   ../app/src/hw/controller_command_sink.cpp

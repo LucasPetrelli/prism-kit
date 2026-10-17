@@ -3,8 +3,13 @@
 
 #include <cstdint>
 
+#include "prism/controller_instruction.hpp"
 #include "prism/debug.hpp"
-#include "prism/instruction.hpp"
+#include "prism/group_record.hpp"
+#include "prism/group_runtime.hpp"
+#include "prism/instruction_memory_slot.hpp"
+#include "prism/instruction_types.hpp"
+#include "prism/pending_instruction_queue_view.hpp"
 #include "prism/strip.hpp"
 
 namespace prism {
@@ -42,50 +47,6 @@ enum class ControllerStatus : std::uint8_t {
   kAlreadyActiveGroup,
   /// @brief Alias for the active-group failure.
   kGroupAlreadyActive = kAlreadyActiveGroup,
-};
-
-/// @brief Maximum number of group records, including the implicit root.
-constexpr std::uint32_t kMaxGroups = kMaxInstructions + 1U;
-
-/// @brief Immutable metadata describing one compact group view.
-struct GroupRecord {
-  /// @brief Sparse label identifying the group.
-  GroupId id{0U};
-  /// @brief Offset into the controller's shared instruction-index pool.
-  std::uint32_t index_begin{0U};
-  /// @brief Number of instruction indexes belonging to this group.
-  std::uint32_t instruction_count{0U};
-};
-
-/// @brief Fixed runtime storage reserved for one group activation.
-///
-/// The controller resets this record for each pass while retaining its
-/// immutable group metadata.
-struct GroupRuntime {
-  /// @brief Immutable group metadata copied at validation time.
-  GroupRecord record{};
-  /// @brief Next instruction position within record.
-  std::uint32_t cursor{0U};
-  /// @brief Local timestamp origin for the current pass.
-  std::uint32_t start_time{0U};
-  /// @brief Additional passes remaining after the current pass.
-  LoopCount repeats_remaining{0U};
-  /// @brief Number of timed instructions still outstanding.
-  std::uint32_t active_count{0U};
-  /// @brief Number of child activations still outstanding.
-  std::uint32_t child_count{0U};
-  /// @brief Whether this pass observed a positive scheduling boundary.
-  bool positive_boundary_observed{false};
-  /// @brief Parent runtime index, or kMaxGroups for the root.
-  std::uint32_t parent_group_index{kMaxGroups};
-  /// @brief Nesting depth used to advance children before their parents.
-  std::uint8_t depth{0U};
-  /// @brief Whether this runtime currently represents an active invocation.
-  bool active{false};
-
-  /// @brief Clear transient activation state while retaining group metadata.
-  /// @return None.
-  void Reset();
 };
 
 /// @brief High-level animation controller for a Prism Kit strip.

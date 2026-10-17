@@ -34,7 +34,16 @@ target_sources(app PRIVATE src/blink_app.cpp
                          src/hw/command_manager.cpp
                          src/hw/controller_command_sink.cpp
                          controller/controller.cpp
-                         controller/instructions.cpp)
+                         controller/group_runtime.cpp
+                         controller/instructions/pending_instruction_queue_view.cpp
+                         controller/instructions/controller_instruction.cpp
+                         controller/instructions/instruction_memory_slot.cpp
+                         controller/instructions/set_multiple_color.cpp
+                         controller/instructions/set_single_color.cpp
+                         controller/instructions/set_multiple_color_hsv.cpp
+                         controller/instructions/set_single_color_hsv.cpp
+                         controller/instructions/fade.cpp
+                         controller/instructions/run_group.cpp)
 
 if(PRISM_KIT_LOG_EVB)
   target_compile_definitions(app PRIVATE PRISM_KIT_LOG_EVB)

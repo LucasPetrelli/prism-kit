@@ -2,7 +2,13 @@
 
 #include "hw/controller_command.hpp"
 #include "prism/controller.hpp"
-#include "prism/instruction.hpp"
+#include "prism/fade.hpp"
+#include "prism/instruction_types.hpp"
+#include "prism/run_group_instruction.hpp"
+#include "prism/set_multiple_color.hpp"
+#include "prism/set_multiple_color_hsv.hpp"
+#include "prism/set_single_color.hpp"
+#include "prism/set_single_color_hsv.hpp"
 
 namespace app {
 namespace {

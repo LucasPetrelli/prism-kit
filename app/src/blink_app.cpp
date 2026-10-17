@@ -10,7 +10,8 @@
 #include "oshal/timed_event.hpp"
 #include "prism/color.hpp"
 #include "prism/controller.hpp"
-#include "prism/instruction.hpp"
+#include "prism/instruction_types.hpp"
+#include "prism/set_single_color.hpp"
 #include "prism/strip.hpp"
 #include "prism/time.hpp"
 

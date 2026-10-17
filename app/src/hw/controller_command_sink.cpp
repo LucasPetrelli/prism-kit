@@ -5,7 +5,7 @@
 
 #include "hw/controller_command.hpp"
 #include "oshal/status.h"
-#include "prism/instruction.hpp"
+#include "prism/instruction_types.hpp"
 #include "protocol.hpp"
 #include "tags.hpp"
 

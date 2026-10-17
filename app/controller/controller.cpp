@@ -4,8 +4,10 @@
 #include <cstdint>
 #include <cstdio>
 
+#include "prism/controller_instruction.hpp"
 #include "prism/debug.hpp"
-#include "prism/instruction.hpp"
+#include "prism/group_record.hpp"
+#include "prism/instruction_types.hpp"
 #include "prism/strip.hpp"
 
 static_assert(prism::kMaxGroups <= 32U,
