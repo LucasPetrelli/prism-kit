@@ -5,6 +5,8 @@
 #include <cstdint>
 #include <limits>
 
+#include "prism/color.hpp"
+
 namespace {
 
 constexpr std::int32_t kQ13One = 8192;
@@ -290,7 +292,7 @@ prism::controller_detail::OklabColor prism::controller_detail::ToOklab(
   const std::uint16_t g = kSrgbToLinearQ16[rgb.green];
   const std::uint16_t b = kSrgbToLinearQ16[rgb.blue];
 
-  const std::uint16_t l = SumQ16Products(&kLinearRgbToLmsQ16[0U], r, g, b);
+  const std::uint16_t l = SumQ16Products(kLinearRgbToLmsQ16.data(), r, g, b);
   const std::uint16_t m = SumQ16Products(&kLinearRgbToLmsQ16[3U], r, g, b);
   const std::uint16_t s = SumQ16Products(&kLinearRgbToLmsQ16[6U], r, g, b);
 
@@ -302,7 +304,7 @@ prism::controller_detail::OklabColor prism::controller_detail::ToOklab(
     (static_cast<std::uint32_t>(CubeRootQ16(s)) + 4U) / 8U;
   return OklabColor{
     static_cast<std::int16_t>(
-      Dot3Q13(&kLmsRootToOklabQ13[0U], l_root, m_root, s_root)),
+      Dot3Q13(kLmsRootToOklabQ13.data(), l_root, m_root, s_root)),
     static_cast<std::int16_t>(
       Dot3Q13(&kLmsRootToOklabQ13[3U], l_root, m_root, s_root)),
     static_cast<std::int16_t>(
@@ -316,7 +318,7 @@ prism::color::RgbColor prism::controller_detail::FromOklab(
   // a convex interpolation of their [0,1] LMS roots. Clamp only matrix
   // quantization excursions at those bounds before cubing.
   const std::int32_t l_root =
-    ClampQ13Root(Dot3Q13(&kOklabToLmsRootQ13[0U], lab.l, lab.a, lab.b));
+    ClampQ13Root(Dot3Q13(kOklabToLmsRootQ13.data(), lab.l, lab.a, lab.b));
   const std::int32_t m_root =
     ClampQ13Root(Dot3Q13(&kOklabToLmsRootQ13[3U], lab.l, lab.a, lab.b));
   const std::int32_t s_root =
@@ -326,7 +328,7 @@ prism::color::RgbColor prism::controller_detail::FromOklab(
   const std::int32_t m = CubeQ13(m_root);
   const std::int32_t s = CubeQ13(s_root);
   const std::int32_t red = ClampQ13Root(
-    Dot3Q12CoefficientsToQ13(&kLmsCubeToLinearRgbQ12[0U], l, m, s));
+    Dot3Q12CoefficientsToQ13(kLmsCubeToLinearRgbQ12.data(), l, m, s));
   const std::int32_t green = ClampQ13Root(
     Dot3Q12CoefficientsToQ13(&kLmsCubeToLinearRgbQ12[3U], l, m, s));
   const std::int32_t blue = ClampQ13Root(
