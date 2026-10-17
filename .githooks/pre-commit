@@ -14,8 +14,14 @@ fi
 repo_root=$(git rev-parse --show-toplevel)
 cd "$repo_root"
 
-# ── Stage 1: format staged sources ──────────────────────────────────
-"$PYTHON" scripts/format.py --staged --git-add
+# ── Stage 1: verify and format staged sources ───────────────────────
+if ! "$PYTHON" scripts/format.py --staged --check; then
+  "$PYTHON" scripts/format.py --staged
+  echo "[pre-commit] Formatting changes were applied to the working tree." >&2
+  echo "             Review and stage them before retrying the commit." >&2
+  exit 1
+fi
+"$PYTHON" scripts/format.py --staged --check-index
 
 # ── Stage 2: lint staged sources (blocking) ─────────────────────────
 # clang-tidy runs on staged .cpp/.hpp files.  Violations (including all

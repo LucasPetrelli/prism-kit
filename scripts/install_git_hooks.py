@@ -14,7 +14,10 @@ from __future__ import annotations
 import os
 import stat
 import subprocess
+import sys
 from pathlib import Path
+
+SUBMODULES = ("bal", "oshal")
 
 
 def repo_root() -> Path:
@@ -57,6 +60,33 @@ def ensure_hook_is_executable(root: Path) -> None:
     hook_path.chmod(current_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
 
 
+def install_submodule_hooks(root: Path) -> None:
+    """Install repo-local hooks for each initialized source submodule.
+
+    Args:
+        root: The integrating prism-kit repository root.
+
+    Raises:
+        SystemExit: If a submodule is unavailable or its installer fails.
+    """
+    for name in SUBMODULES:
+        submodule_root = root / name
+        installer = submodule_root / "scripts" / "install_git_hooks.py"
+        if not (submodule_root / ".git").exists() or not installer.is_file():
+            raise SystemExit(
+                f"The '{name}' submodule is missing or not initialized. "
+                "Run 'git submodule update --init --recursive' and retry."
+            )
+
+        completed = subprocess.run(
+            [sys.executable, str(installer)],
+            cwd=submodule_root,
+            check=False,
+        )
+        if completed.returncode != 0:
+            raise SystemExit(f"Failed to install git hooks for '{name}'.")
+
+
 def main() -> int:
     """Run the git hooks installer.
 
@@ -70,6 +100,7 @@ def main() -> int:
     set_hooks_path(root)
     if os.name != "nt":
         ensure_hook_is_executable(root)
+    install_submodule_hooks(root)
     print("Installed repo-local git hooks from .githooks/.")
     return 0
 

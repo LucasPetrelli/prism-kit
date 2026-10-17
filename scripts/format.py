@@ -38,7 +38,7 @@ def parse_args() -> argparse.Namespace:
 
     Returns:
         Parsed arguments with paths, ``--check``, ``--staged``,
-        ``--git-add``, and ``--clang-format`` flags.
+        ``--check-index``, ``--git-add``, and ``--clang-format`` flags.
     """
     parser = argparse.ArgumentParser(
         description="Format repo C and C++ sources with the repo clang-format policy."
@@ -57,6 +57,11 @@ def parse_args() -> argparse.Namespace:
         "--staged",
         action="store_true",
         help="Format only staged C and C++ files from the current git index.",
+    )
+    parser.add_argument(
+        "--check-index",
+        action="store_true",
+        help="Fail if staged C/C++ files have unstaged working-tree changes.",
     )
     parser.add_argument(
         "--git-add",
@@ -276,6 +281,47 @@ def collect_staged_targets(root: Path) -> list[Path]:
     return sorted(files)
 
 
+def check_staged_worktree_matches_index(root: Path, files: list[Path]) -> int:
+    """Fail when staged source files also have unstaged edits.
+
+    Args:
+        root: The repository root directory.
+        files: The staged C/C++ source files to compare.
+
+    Returns:
+        0 when every staged source matches the working tree, otherwise 1.
+    """
+    if not files:
+        print("No matching C or C++ source files found.")
+        return 0
+
+    completed = subprocess.run(
+        [
+            "git",
+            "diff",
+            "--quiet",
+            "--",
+            *[file_path.relative_to(root).as_posix() for file_path in files],
+        ],
+        cwd=root,
+        check=False,
+    )
+    if completed.returncode == 0:
+        print(f"Staged source files match the working tree ({len(files)} file(s)).")
+        return 0
+
+    if completed.returncode == 1:
+        print(
+            "Staged C/C++ files have unstaged working-tree changes. "
+            "Review and stage or discard them before retrying the commit.",
+            file=sys.stderr,
+        )
+        return 1
+
+    print("Unable to compare staged sources with the working tree.", file=sys.stderr)
+    return 1
+
+
 def build_command(clang_format: Path, check: bool, file_path: Path) -> list[str]:
     """Build the clang-format invocation for a single file.
 
@@ -379,6 +425,12 @@ def main() -> int:
     if args.git_add and not args.staged:
         raise SystemExit("--git-add requires --staged.")
 
+    if args.check_index and not args.staged:
+        raise SystemExit("--check-index requires --staged.")
+
+    if args.check_index and (args.check or args.git_add):
+        raise SystemExit("--check-index cannot be combined with --check or --git-add.")
+
     if args.git_add and args.check:
         raise SystemExit("--git-add cannot be combined with --check.")
 
@@ -392,6 +444,9 @@ def main() -> int:
         if args.staged
         else collect_targets(root, args.paths)
     )
+    if args.check_index:
+        return check_staged_worktree_matches_index(root, files)
+
     formatter_status = run_formatter(clang_format, files, args.check)
     if formatter_status != 0 or args.check or not args.git_add:
         return formatter_status

@@ -54,6 +54,7 @@ explicitly.
 ```bash
 git submodule update --init --recursive
 uv sync
+uv run python scripts/install_git_hooks.py
 uv run build --board seeeduino_xiao  # first use; saves the selected board
 uv run build                         # later uses the saved choice
 uv run build --board seeeduino_xiao --oshal-demo samd21-dma-pwm
@@ -66,6 +67,11 @@ uv run lint
 Use `uv run flash` and `uv run smoke-test` for hardware validation when the
 required target and probe are available. Project-owned wrappers define the
 supported options for each command.
+
+The hook installer configures the parent repository and the `bal/` and
+`oshal/` submodules. Their pre-commit hooks check staged C/C++ files and, when
+formatting is needed, apply it in the working tree and block the commit so the
+changes can be reviewed and staged explicitly.
 
 The standalone SAMD21 DMA/PWM demo submits a finite 26-period pulse train (a
 25-value pulse-width ramp plus a zero-duty terminal period) about every 2 ms,
