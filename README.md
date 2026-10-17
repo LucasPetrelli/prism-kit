@@ -66,8 +66,14 @@ uv run lint
 ```
 
 Use `uv run flash` and `uv run smoke-test` for hardware validation when the
-required target and probe are available. Project-owned wrappers define the
-supported options for each command.
+required target and probe are available. The normal XIAO Sense image has one
+CDC ACM debug port, so use `uv run smoke-test --debug-only` to check its boot
+and APP task markers without command-port, loopback, or Rainbow3 phases. The
+existing SAMD21 smoke path retains its two-port checks. Because the boot and
+debug markers are emitted during startup, run the check with the board
+connected, then press its RESET button when the console capture prompt appears.
+The debug-only capture retries the CDC port after the board reconnects.
+Project-owned wrappers define the supported options for each command.
 
 The hook installer configures the parent repository and the `bal/` and
 `oshal/` submodules. Their pre-commit hooks check staged C/C++ files and, when
@@ -100,8 +106,11 @@ The standalone `ws2812-spi` OSHAL demo exercises the XIAO nRF52840 Sense
 `transport0` with off, white, and alternating red/blue seven-pixel frames. Build
 it with `uv run build --board xiao_nrf52_sense --oshal-demo ws2812-spi`; this
 explicit selector builds the OSHAL demo image and keeps the normal Prism APP and
-BAL runtime out of it. Step 2 demo and diagnostic code is not part of the normal
-product image; that integration is reserved for Step 3.
+BAL runtime out of it. The normal Sense profile also enables this validated
+Zephyr SPI transport and composes the standard APP/BAL/OSHAL image. BAL maps the
+seven-pixel GRB strip to D10/MOSI and the onboard active-low red status LED.
+Its command CDC port remains null while the debug console uses the board's
+single CDC ACM interface.
 
 The diagnostic `ws2812-spi-probe` demo reuses those OSHAL patterns but sends
 each frame through its direct-SPI timing probe, with a low prefix and a

@@ -58,6 +58,13 @@ DEFAULT_TASK_MARKERS = {
 DEFAULT_LOOPBACK_PAYLOAD = bytes.fromhex("01020304")
 
 
+def _is_padded_task_runtime_marker(line: str, task_name: str) -> bool:
+    """Match the fixed-width task name emitted by OSHAL diagnostics."""
+    prefix = f"[Task] {task_name}"
+    suffix = line[len(prefix) :].lstrip() if line.startswith(prefix) else ""
+    return suffix.startswith(":")
+
+
 def parse_args() -> argparse.Namespace:
     """Parse command-line arguments for the smoke test script.
 
@@ -67,8 +74,8 @@ def parse_args() -> argparse.Namespace:
     """
     parser = argparse.ArgumentParser(
         description=(
-            "Connect to the prism-kit USB CDC ports and verify that the debug "
-            "console and command channel enumerate separately."
+            "Connect to Prism Kit USB CDC ports to verify debug console "
+            "markers and, in full mode, the command channel."
         )
     )
     parser.add_argument(
@@ -147,12 +154,25 @@ def parse_args() -> argparse.Namespace:
         help="Skip the visual LED Rainbow3 sequence test.",
     )
     parser.add_argument(
+        "--debug-only",
+        action="store_true",
+        help=(
+            "Require one debug CDC port and boot/task markers; skip command "
+            "loopback and Rainbow3 phases."
+        ),
+    )
+    parser.add_argument(
         "--rainbow-step-delay",
         type=rainbow3.parse_step_delay_ms,
         default=DEFAULT_RAINBOW_STEP_DELAY_MS,
         help="Milliseconds between Rainbow3 sequence steps. Default: %(default)s ms.",
     )
-    return parser.parse_args()
+    args = parser.parse_args()
+    if args.debug_only and args.command_port:
+        parser.error("--debug-only cannot be combined with --command-port.")
+    if args.debug_only and args.no_default_requirements:
+        parser.error("--debug-only always requires the built-in boot/task markers.")
+    return args
 
 
 def repo_root() -> Path:
@@ -250,6 +270,16 @@ class SmokeTest:
         self.seen_optional: set[str] = set()
         self.role_ports: dict[str, str] = {}
 
+    def _debug_only(self) -> bool:
+        """Return whether this run uses the single-port debug-only profile."""
+        return bool(getattr(self.args, "debug_only", False))
+
+    def _uses_default_requirements(self) -> bool:
+        """Return whether standard boot and task markers remain mandatory."""
+        return self._debug_only() or not getattr(
+            self.args, "no_default_requirements", False
+        )
+
     # ── Public API ─────────────────────────────────────────────────
 
     def run(self) -> int:
@@ -274,6 +304,11 @@ class SmokeTest:
             return 1
 
         self._report_success()
+
+        if self._debug_only():
+            if self.args.dump_logs:
+                self._dump_debug_console()
+            return 0
 
         loopback_ok = self._run_loopback()
 
@@ -354,13 +389,20 @@ class SmokeTest:
         roles = resolve_roles_by_interface(self.ports)
         if roles["debug"] is not None and "debug" not in self.role_ports:
             self.role_ports["debug"] = roles["debug"]
-        if roles["command"] is not None and "command" not in self.role_ports:
+        if (
+            not self._debug_only()
+            and roles["command"] is not None
+            and "command" not in self.role_ports
+        ):
             self.role_ports["command"] = roles["command"]
 
         # Report how each role was resolved
         for role, device in (
             ("debug", self.role_ports.get("debug")),
-            ("command", self.role_ports.get("command")),
+            (
+                "command",
+                None if self._debug_only() else self.role_ports.get("command"),
+            ),
         ):
             if device is None:
                 continue
@@ -377,11 +419,12 @@ class SmokeTest:
 
     def _capture_console(self) -> None:
         required_markers = [str(m) for m in self.args.require]
-        if not self.args.no_default_requirements and "debug" not in self.role_ports:
+        if self._uses_default_requirements() and (
+            self._debug_only() or "debug" not in self.role_ports
+        ):
             required_markers.extend(DEFAULT_REQUIRED_MARKERS)
-        task_markers = [
-            marker for markers in DEFAULT_TASK_MARKERS.values() for marker in markers
-        ]
+        if self._debug_only():
+            required_markers.extend(DEFAULT_OPTIONAL_MARKERS)
         (
             self.captured_lines,
             seen_required,
@@ -396,24 +439,28 @@ class SmokeTest:
             optional_markers=DEFAULT_OPTIONAL_MARKERS,
             debug_marker=(
                 DEFAULT_DEBUG_MARKER
-                if not self.args.no_default_requirements
+                if self._uses_default_requirements()
                 and "debug" not in self.role_ports
                 else ""
             ),
             command_marker="",
             quiet=self.args.quiet,
             stop_early=False,
+            reconnect_disconnected_ports=self._debug_only(),
         )
         self.seen_required = seen_required
-        self.seen_optional.update(
-            marker
-            for marker in task_markers
-            if any(
-                marker in line
-                for lines in self.captured_lines.values()
-                for line in lines
-            )
-        )
+        all_captured_lines = [
+            line for lines in self.captured_lines.values() for line in lines
+        ]
+        for task_name, markers in DEFAULT_TASK_MARKERS.items():
+            for marker in markers:
+                if any(marker in line for line in all_captured_lines):
+                    self.seen_optional.add(marker)
+                elif marker == f"[Task] {task_name}:" and any(
+                    _is_padded_task_runtime_marker(line, task_name)
+                    for line in all_captured_lines
+                ):
+                    self.seen_optional.add(marker)
         # Merge console-captured roles into any roles already resolved by
         # interface number.  Interface-number resolution takes priority.
         for role in ("debug", "command"):
@@ -424,13 +471,17 @@ class SmokeTest:
 
     def _validate_markers(self) -> bool:
         required_markers = [str(m) for m in self.args.require]
-        if not self.args.no_default_requirements and "debug" not in self.role_ports:
+        if self._uses_default_requirements() and (
+            self._debug_only() or "debug" not in self.role_ports
+        ):
             required_markers.extend(DEFAULT_REQUIRED_MARKERS)
+        if self._debug_only():
+            required_markers.extend(DEFAULT_OPTIONAL_MARKERS)
         missing_markers = [
             marker for marker in required_markers if marker not in self.seen_required
         ]
         missing_tasks = []
-        if not self.args.no_default_requirements:
+        if self._uses_default_requirements():
             missing_tasks = [
                 task_name
                 for task_name, markers in DEFAULT_TASK_MARKERS.items()
@@ -448,6 +499,16 @@ class SmokeTest:
         for task_name in missing_tasks:
             print(
                 f"- task {task_name} start or runtime diagnostic",
+                file=sys.stderr,
+            )
+        if self._debug_only() and any(
+            marker in missing_markers
+            for marker in (DEFAULT_DEBUG_MARKER, *DEFAULT_OPTIONAL_MARKERS)
+        ):
+            print(
+                "The debug and boot messages are emitted during startup. "
+                "Start another capture and press the board RESET button after "
+                "the capture prompt appears.",
                 file=sys.stderr,
             )
         if self.args.dump_logs and any(self.captured_lines.values()):
@@ -473,7 +534,15 @@ class SmokeTest:
         The command port is resolved later by exclusion (the non-debug port)
         rather than by a dedicated banner.
         """
-        if self.args.no_default_requirements:
+        if self._debug_only() and len(self.ports) != 1:
+            print(
+                "Smoke test failed. Debug-only mode requires exactly one "
+                "matching CDC ACM port.",
+                file=sys.stderr,
+            )
+            return False
+
+        if not self._uses_default_requirements():
             return True
 
         if "debug" not in self.role_ports:
@@ -496,10 +565,13 @@ class SmokeTest:
     # ── Phase: report success ──────────────────────────────────────
 
     def _report_success(self) -> None:
-        print("Smoke test passed.")
-        if not self.args.no_default_requirements:
+        if self._debug_only():
+            print("Debug-only smoke test passed.")
+        else:
+            print("Smoke test passed.")
+        if self._uses_default_requirements():
             print(f"Debug port: {self.role_ports['debug']}")
-            if "command" in self.role_ports:
+            if not self._debug_only() and "command" in self.role_ports:
                 print(f"Command port: {self.role_ports['command']}")
         if self.seen_optional:
             print("Observed optional markers:")

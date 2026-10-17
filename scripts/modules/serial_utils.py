@@ -444,6 +444,7 @@ def capture_console(
     command_marker: str = "",
     quiet: bool = False,
     stop_early: bool = True,
+    reconnect_disconnected_ports: bool = False,
 ) -> tuple[dict[str, list[str]], set[str], set[str], dict[str, str]]:
     """Open serial ports and capture console output.
 
@@ -455,6 +456,11 @@ def capture_console(
     *role_ports* maps ``"debug"`` / ``"command"`` to the device path where
     *debug_marker* / *command_marker* was first seen. If a marker is empty,
     the corresponding role is never set.
+
+    When *reconnect_disconnected_ports* is true, serial read failures are
+    treated as a temporary device disconnect. The same device path is reopened
+    until the capture timeout, which lets callers capture startup output after
+    a board reset that briefly removes its USB CDC device.
     """
     captured_lines: dict[str, list[str]] = {port.device: [] for port in ports}
     seen_required: set[str] = set()
@@ -462,6 +468,9 @@ def capture_console(
     role_ports: dict[str, str] = {}
     deadline = time.monotonic() + capture_timeout
     check_roles = bool(debug_marker) and bool(command_marker)
+    reconnect_delay_seconds = 0.1
+    retry_after: dict[str, float] = {}
+    reconnecting: set[str] = set()
 
     serial_ports: dict[str, Any] = {}
     for port in ports:
@@ -473,22 +482,87 @@ def capture_console(
                 write_timeout=0.2,
             )
         except Exception as exc:
+            if reconnect_disconnected_ports:
+                retry_after[port.device] = (
+                    time.monotonic() + reconnect_delay_seconds
+                )
+                reconnecting.add(port.device)
+                print(
+                    f"Warning: waiting for serial port {port.device} to open — {exc}",
+                    flush=True,
+                )
+                continue
             print(
                 f"Warning: skipping port {port.device} — {exc}",
                 flush=True,
             )
 
-    if not serial_ports:
+    if not serial_ports and not reconnect_disconnected_ports:
         print(
             "Error: none of the discovered serial ports could be opened.",
             flush=True,
         )
         return captured_lines, seen_required, seen_optional, role_ports
 
+    if reconnect_disconnected_ports:
+        print(
+            "Console capture is active. Press the board RESET button now to "
+            "capture boot markers.",
+            flush=True,
+        )
+
     try:
         while time.monotonic() <= deadline:
-            for device, serial_port in serial_ports.items():
-                raw_line = serial_port.readline()
+            for port in ports:
+                device = port.device
+                serial_port = serial_ports.get(device)
+                if serial_port is None:
+                    if time.monotonic() < retry_after.get(device, 0.0):
+                        continue
+                    try:
+                        serial_port = serial_module.Serial(
+                            device,
+                            baudrate=baudrate,
+                            timeout=0.05,
+                            write_timeout=0.2,
+                        )
+                    except Exception as exc:
+                        retry_after[device] = (
+                            time.monotonic() + reconnect_delay_seconds
+                        )
+                        if device not in reconnecting:
+                            print(
+                                f"Serial port {device} is unavailable; "
+                                "waiting for USB CDC to return.",
+                                flush=True,
+                            )
+                        reconnecting.add(device)
+                        continue
+                    serial_ports[device] = serial_port
+                    if device in reconnecting:
+                        reconnecting.remove(device)
+                        print(f"Serial port {device} reconnected.", flush=True)
+
+                try:
+                    raw_line = serial_port.readline()
+                except OSError:
+                    if not reconnect_disconnected_ports:
+                        raise
+                    try:
+                        serial_port.close()
+                    except Exception:
+                        pass
+                    serial_ports.pop(device, None)
+                    retry_after[device] = time.monotonic() + reconnect_delay_seconds
+                    if device not in reconnecting:
+                        print(
+                            f"Serial port {device} disconnected; waiting for USB "
+                            "CDC to return.",
+                            flush=True,
+                        )
+                    reconnecting.add(device)
+                    continue
+
                 if not raw_line:
                     continue
 
@@ -512,6 +586,8 @@ def capture_console(
                 role_ports=role_ports,
             ):
                 return captured_lines, seen_required, seen_optional, role_ports
+            if reconnect_disconnected_ports and not serial_ports:
+                time.sleep(0.05)
     finally:
         for serial_port in serial_ports.values():
             serial_port.close()

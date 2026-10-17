@@ -30,10 +30,10 @@ The Zephyr-only binding schemas and vendor prefix live under
 `DTS_ROOT` before configuration. BAL owns the board overlay that instantiates
 those schemas; the project root does not own a separate binding directory.
 
-The backend is currently Zephyr-based. It includes an nRF52 GPIO resource path
-for the standalone XIAO Sense blinky demo, while the SAMD21 PWM-plus-DMA path is
-the first timing-specific WS2812 engine. The public transport contract remains
-independent from PWM versus future SPI signaling.
+The backend is currently Zephyr-based. It includes nRF52 GPIO and WS2812 SPI
+resource paths for the XIAO Sense profile, while the SAMD21 PWM-plus-DMA path
+continues to serve the existing board. The public transport contract remains
+independent of the selected SPI or PWM signaling implementation.
 The task interface is intentionally C++-only because no current C-shaped
 integration point needs to create or manage tasks directly.
 The Zephyr project integration defines task stack objects and passes them
@@ -57,6 +57,10 @@ for the current HW backend implementation and OSHAL for execution services.
 Steady-state APP logic talks to the Prism Kit strip contract rather than to BAL
 strip objects directly. APP also owns backend selection in `app/CMakeLists.txt`
 and starts backend-specific runtime helpers such as the current `app_hw` task.
+For the normal XIAO Sense image, the Zephyr composition selects the Sense BAL
+policy and OSHAL's `worldsemi,ws2812-spi` adapter. The board publishes one CDC
+ACM debug console and no command CDC resource, so OSHAL exposes a null command
+port while APP runs its default animation.
 
 ## Boot Flow
 

@@ -357,3 +357,153 @@ class SmokeRainbow3Test(TestCase):
         self.assertEqual(smoke.run(), 0)
         rainbow_phase.assert_called_once()
         loopback.assert_called()
+
+    def test_debug_only_cli_rejects_command_port_and_disabled_markers(self) -> None:
+        """Accept the debug-only flag but reject contradictory smoke settings.
+
+        Goal: Keep the one-port debug profile strict about its built-in boot
+        and task markers and prevent callers from supplying a command port.
+        Steps: Parse the standalone flag, then parse it with each contradictory
+        option and verify argparse rejects those combinations.
+        """
+        with patch("sys.argv", ["smoke-test", "--debug-only"]):
+            self.assertTrue(parse_args().debug_only)
+
+        for option in ("--command-port", "--no-default-requirements"):
+            argv = ["smoke-test", "--debug-only"]
+            if option == "--command-port":
+                argv.extend([option, "COM8"])
+            else:
+                argv.append(option)
+            with patch("sys.argv", argv), redirect_stderr(StringIO()):
+                with self.assertRaises(SystemExit):
+                    parse_args()
+
+    def test_debug_only_requires_boot_and_each_task_marker(self) -> None:
+        """Require the boot banner and both APP task lifecycle markers.
+
+        Goal: A one-port run passes marker validation only after boot and the
+        app_main/app_hw task evidence have all been observed.
+        Steps: Supply the debug and task markers without the boot banner,
+        confirm failure, then add boot evidence and remove each task marker in
+        turn to verify every required class of evidence gates success.
+        """
+        smoke = SmokeTest(
+            argparse.Namespace(
+                debug_only=True,
+                no_default_requirements=False,
+                require=[],
+                dump_logs=False,
+            )
+        )
+        smoke.role_ports["debug"] = "COM7"
+        smoke.seen_required.add("DebugPort online on")
+        smoke.seen_optional.update(
+            {"Task app_main start", "Task app_hw start"}
+        )
+
+        with redirect_stderr(StringIO()):
+            self.assertFalse(smoke._validate_markers())
+
+        smoke.seen_required.add("Booting Zephyr OS build")
+        self.assertTrue(smoke._validate_markers())
+        for task_marker in ("Task app_main start", "Task app_hw start"):
+            smoke.seen_optional.remove(task_marker)
+            with redirect_stderr(StringIO()):
+                self.assertFalse(smoke._validate_markers())
+            smoke.seen_optional.add(task_marker)
+
+    @patch("scripts.smoke_test.capture_console")
+    def test_debug_only_accepts_padded_task_runtime_diagnostics(
+        self, capture_console: Mock
+    ) -> None:
+        """Accept OSHAL's fixed-width task names in runtime diagnostics.
+
+        Goal: Match the actual ``[Task]`` line format used by the Zephyr
+        diagnostics formatter, which pads task names before the colon.
+        Steps: Capture padded app_main/app_hw lines with boot and debug markers,
+        run smoke marker extraction, and require the complete debug profile.
+        """
+        capture_console.return_value = (
+            {
+                "COM8": [
+                    "[Task] app_main    : cpu=  0.0% stack 524/1536 (34%)",
+                    "[Task] app_hw      : cpu=  0.6% stack 504/1024 (49%)",
+                ]
+            },
+            {"DebugPort online on", "Booting Zephyr OS build"},
+            set(),
+            {"debug": "COM8"},
+        )
+        smoke = SmokeTest(
+            argparse.Namespace(
+                debug_only=True,
+                no_default_requirements=False,
+                require=[],
+                baudrate=115200,
+                capture_timeout=30.0,
+                quiet=False,
+            )
+        )
+        smoke.role_ports["debug"] = "COM8"
+
+        smoke._capture_console()
+
+        self.assertTrue(smoke._validate_markers())
+        self.assertTrue(
+            capture_console.call_args.kwargs["reconnect_disconnected_ports"]
+        )
+
+    def test_debug_only_requires_exactly_one_matching_port(self) -> None:
+        """Reject extra matching serial ports even when debug was identified.
+
+        Goal: Bind debug-only smoke acceptance to one enumerated CDC ACM port.
+        Steps: Provide a resolved debug port with two discovered matches and
+        verify failure, then retain only the debug port and verify success.
+        """
+        smoke = SmokeTest(
+            argparse.Namespace(
+                debug_only=True,
+                no_default_requirements=False,
+                dump_logs=False,
+            )
+        )
+        smoke.role_ports["debug"] = "COM7"
+        smoke.ports = [object(), object()]
+
+        with redirect_stderr(StringIO()):
+            self.assertFalse(smoke._validate_roles())
+
+        smoke.ports = [object()]
+        self.assertTrue(smoke._validate_roles())
+
+    def test_debug_only_skips_command_and_rainbow_phases(self) -> None:
+        """Complete marker smoke without entering either command phase.
+
+        Goal: The debug-only orchestration must finish after console evidence
+        without invoking loopback or Rainbow3 serial commands.
+        Steps: Replace discovery, capture, validation, and command phases with
+        deterministic fakes, run the debug-only profile, and assert both
+        command phases remain untouched.
+        """
+        smoke = SmokeTest(
+            argparse.Namespace(
+                debug_only=True,
+                list_ports=False,
+                no_default_requirements=False,
+                dump_logs=False,
+            )
+        )
+        smoke._import_serial = Mock(return_value=True)
+        smoke._discover_ports = Mock()
+        smoke._resolve_roles_by_interface = Mock()
+        smoke._capture_console = Mock()
+        smoke._validate_markers = Mock(return_value=True)
+        smoke._validate_roles = Mock(return_value=True)
+        smoke._report_success = Mock()
+        smoke._run_loopback = Mock(return_value=True)
+        smoke._run_rainbow3_sequence = Mock(return_value=True)
+
+        self.assertEqual(smoke.run(), 0)
+        smoke._run_loopback.assert_not_called()
+        smoke._run_rainbow3_sequence.assert_not_called()
