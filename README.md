@@ -88,6 +88,10 @@ requires `--load-address`.
 The generic OSHAL `blinky` demo uses only OSHAL APIs and the selected board's
 `gpio0` resource, and omits the BAL and APP runtime. Its selected-board
 Devicetree requirements are checked by a Zephyr-side configuration source.
+The blink loop runs as an OSHAL task named `blinky`; when the CDC ACM debug
+port is ready, task lifecycle and 10-second runtime diagnostics are printed
+there. This demo enables OSHAL task diagnostics directly; they do not depend
+on Zephyr's `CONFIG_LOG` or the `--debug-opt` optimization option.
 It is available on the XIAO nRF52840 Sense and the existing SAMD21 profile. On
 a first build, pass the board explicitly, for example
 `uv run build --board xiao_nrf52_sense --oshal-demo blinky`.
