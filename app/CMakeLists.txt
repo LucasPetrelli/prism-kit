@@ -43,7 +43,8 @@ target_sources(app PRIVATE src/blink_app.cpp
                          controller/instructions/set_multiple_color_hsv.cpp
                          controller/instructions/set_single_color_hsv.cpp
                          controller/instructions/fade.cpp
-                         controller/instructions/run_group.cpp)
+                         controller/instructions/run_group.cpp
+                         controller/oklab.cpp)
 
 if(PRISM_KIT_LOG_EVB)
   target_compile_definitions(app PRIVATE PRISM_KIT_LOG_EVB)
