@@ -45,6 +45,7 @@ class OshalDemoSelectionTest(TestCase):
                     cmake_minimum_required(VERSION 3.20)
                     project(oshal_demo_selection_test LANGUAGES C CXX)
                     add_library(zephyr_interface INTERFACE)
+                    add_library(zephyr_generated_headers INTERFACE)
                     if(OSHAL_TEST_SOC STREQUAL "nrf52")
                         set(CONFIG_SOC_FAMILY_NORDIC_NRF ON)
                         set(CONFIG_SOC_SERIES_NRF52X ON)
@@ -77,23 +78,6 @@ class OshalDemoSelectionTest(TestCase):
                 capture_output=True,
                 text=True,
             )
-
-    def assert_reserved_demo_rejected(
-        self,
-        demo_name: str,
-        expected_message: str,
-    ) -> None:
-        """Assert CMake rejects a reserved selector with its Step diagnostic.
-
-        Args:
-            demo_name: Reserved OSHAL demo selector.
-            expected_message: Stable diagnostic text expected in CMake output.
-        """
-        result = self.configure_demo(demo_name)
-        output = result.stdout + result.stderr
-
-        self.assertNotEqual(result.returncode, 0, output)
-        self.assertIn(expected_message, output)
 
     def test_blinky_is_supported_for_samd21_gpio0_profile(self) -> None:
         """Goal: allow the generic GPIO demo on the SAMD21 profile.
@@ -130,13 +114,48 @@ class OshalDemoSelectionTest(TestCase):
             "OSHAL_DEMO='samd21-dma-pwm' requires the SAMD21 backend.", output
         )
 
-    def test_ws2812_spi_is_reserved_until_step_two(self) -> None:
-        """Goal: keep Step 2's transport demo out of the Step 0 implementation.
+    def test_ws2812_spi_is_supported_for_nrf52(self) -> None:
+        """Goal: select the standalone SPI transport demo on nRF52.
 
         Steps: configure the real OSHAL dispatcher with ``ws2812-spi`` and
-        verify CMake fails with the explicit Step 2 reservation diagnostic.
+        verify its target backend accepts the demo.
         """
-        self.assert_reserved_demo_rejected(
-            "ws2812-spi",
-            "OSHAL_DEMO='ws2812-spi' is reserved but not implemented until Step 2.",
+        result = self.configure_demo("ws2812-spi", "nrf52")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_ws2812_spi_rejects_samd21_with_actionable_error(self) -> None:
+        """Goal: prevent an SPI demo selection from using the PWM transport.
+
+        Steps: configure ``ws2812-spi`` with the SAMD21 fixture and verify the
+        selected demo reports its nRF52 backend requirement.
+        """
+        result = self.configure_demo("ws2812-spi", "samd21")
+        output = result.stdout + result.stderr
+
+        self.assertNotEqual(result.returncode, 0, output)
+        self.assertIn(
+            "OSHAL_DEMO='ws2812-spi' requires the nRF52 backend.", output
+        )
+
+    def test_ws2812_spi_probe_is_supported_for_nrf52(self) -> None:
+        """Select the isolated direct-SPI timing probe on the nRF52 backend.
+
+        Steps: configure the real OSHAL dispatcher with
+        ``ws2812-spi-probe`` and verify it accepts the nRF52 backend.
+        """
+        result = self.configure_demo("ws2812-spi-probe", "nrf52")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_ws2812_spi_probe_rejects_samd21_with_actionable_error(self) -> None:
+        """Keep the direct-SPI probe unavailable on the SAMD21 backend.
+
+        Steps: configure ``ws2812-spi-probe`` with the SAMD21 fixture and
+        verify the selected demo reports its nRF52 backend requirement.
+        """
+        result = self.configure_demo("ws2812-spi-probe", "samd21")
+        output = result.stdout + result.stderr
+
+        self.assertNotEqual(result.returncode, 0, output)
+        self.assertIn(
+            "OSHAL_DEMO='ws2812-spi-probe' requires the nRF52 backend.", output
         )

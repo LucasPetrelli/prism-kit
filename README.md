@@ -96,6 +96,20 @@ It is available on the XIAO nRF52840 Sense and the existing SAMD21 profile. On
 a first build, pass the board explicitly, for example
 `uv run build --board xiao_nrf52_sense --oshal-demo blinky`.
 
+The standalone `ws2812-spi` OSHAL demo exercises the XIAO nRF52840 Sense
+`transport0` with off, white, and alternating red/blue seven-pixel frames. Build
+it with `uv run build --board xiao_nrf52_sense --oshal-demo ws2812-spi`; this
+explicit selector builds the OSHAL demo image and keeps the normal Prism APP and
+BAL runtime out of it. Step 2 demo and diagnostic code is not part of the normal
+product image; that integration is reserved for Step 3.
+
+The diagnostic `ws2812-spi-probe` demo reuses those OSHAL patterns but sends
+each frame through its direct-SPI timing probe, with a low prefix and a
+64-microsecond zero tail. It is target-side diagnostic firmware selected only
+for capture work, not host test code or the product transport. Build it with
+`uv run build --board xiao_nrf52_sense --oshal-demo ws2812-spi-probe`; it
+measures the SPI waveform and does not replace the stock-driver adapter.
+
 ### Debug Traces
 
 Trace output is sent through the debug port. APP trace variables are set in

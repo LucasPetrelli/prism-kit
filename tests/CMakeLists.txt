@@ -20,6 +20,8 @@ add_executable(controller_test
   controller_command_test.cpp
   hw_task_setup_test.cpp
   instruction_header_compile_test.cpp
+  nrf52_ws2812_test.cpp
+  nrf52_ws2812_spi_probe_test.cpp
   samd21_ws2812_test.cpp
   ../app/controller/controller.cpp
   ../app/controller/instructions.cpp

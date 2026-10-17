@@ -18,6 +18,7 @@ Usage::
     uv run build --clean
     uv run build --skip-lint
     uv run build --board seeeduino_xiao --oshal-demo samd21-dma-pwm
+    uv run build --board xiao_nrf52_sense --oshal-demo ws2812-spi-probe
 """
 
 from __future__ import annotations
@@ -56,7 +57,13 @@ CONFIG_BOARD_TARGETS = {
     "seeeduino_xiao": "seeeduino_xiao/samd21g18a",
     "xiao_nrf52_sense": "xiao_ble/nrf52840/sense",
 }
-OSHAL_DEMOS = ("none", "blinky", "samd21-dma-pwm", "ws2812-spi")
+OSHAL_DEMOS = (
+    "none",
+    "blinky",
+    "samd21-dma-pwm",
+    "ws2812-spi",
+    "ws2812-spi-probe",
+)
 
 
 def parse_args() -> argparse.Namespace:
@@ -99,8 +106,8 @@ def parse_args() -> argparse.Namespace:
         default="none",
         metavar="NAME",
         help=(
-            "Select a lower-case OSHAL demo (none, blinky, samd21-dma-pwm, or "
-            "ws2812-spi)."
+            "Select a lower-case OSHAL demo (none, blinky, samd21-dma-pwm, "
+            "ws2812-spi, or ws2812-spi-probe)."
         ),
     )
     parser.add_argument(
@@ -554,6 +561,17 @@ def main() -> int:
         extra_conf_files.append(root / "prj.noopt.conf")
     elif args.debug_opt:
         extra_conf_files.append(root / "prj.debug.conf")
+    # OSHAL owns optional Zephyr Kconfig fragments for its standalone demos.
+    oshal_demo_conf = (
+        root
+        / "oshal"
+        / "config"
+        / "zephyr"
+        / "demos"
+        / f"{args.oshal_demo}.conf"
+    )
+    if oshal_demo_conf.is_file():
+        extra_conf_files.append(oshal_demo_conf)
 
     os.chdir(root)
 
