@@ -100,6 +100,17 @@ class Controller {
   /// @return Success or the first runtime group-execution failure this tick.
   ControllerStatus Run();
 
+  /// @brief Configure the shared Fade and Gradient update period.
+  /// @param period_ms Nonzero milliseconds, strictly less than half the
+  ///     uint32 timestamp range.
+  /// @return Invalid argument for an unsupported period, busy while a program
+  ///     is active, or success while editable or completed.
+  ControllerStatus SetRefreshPeriodMs(std::uint32_t period_ms);
+
+  /// @brief Return the shared Fade and Gradient update period.
+  /// @return Configured period in milliseconds; defaults to 20 ms.
+  std::uint32_t RefreshPeriodMs() const;
+
   /// @brief Register a timestamp callback for timing-aware execution.
   /// @param callback Function returning the current timestamp in milliseconds.
   void SetTimestampCallback(TimestampCallback callback);
@@ -287,6 +298,8 @@ class Controller {
   std::uint32_t min_scheduled_timeout_{0U};
   /// @brief Current editable, active, or completed program state.
   ProgramState state_{ProgramState::kEditable};
+  /// @brief Shared Fade and Gradient update period; retained across resets.
+  std::uint32_t refresh_period_ms_{20U};
   /// @brief Fixed shared instruction indexes grouped and sorted by mark.
   std::uint32_t group_indices_[kMaxInstructions]{};
   /// @brief Compact group metadata built at Start().

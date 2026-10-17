@@ -29,6 +29,8 @@ const char* prism::InstructionToString(InstructionTag tag) {
       return "RunGroup";
     case InstructionTag::kFade:
       return "Fade";
+    case InstructionTag::kGradient:
+      return "Gradient";
 #if defined(PRISM_CONTROLLER_TESTING)
     case InstructionTag::kTestTimed:
       return "TimedInstruction";

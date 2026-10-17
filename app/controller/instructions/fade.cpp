@@ -20,8 +20,6 @@ prism::Fade::Fade(const prism::FadePayload& payload)
 
 namespace {
 
-constexpr std::uint32_t kFadeUpdateIntervalMs = 100U;
-
 std::uint8_t InterpolateValue(std::uint8_t start, std::uint8_t target,
                               std::uint32_t elapsed, std::uint32_t duration) {
   const std::uint32_t difference =
@@ -51,10 +49,11 @@ prism::color::RgbColor ScaleRgbColor(prism::color::RgbColor start,
 }
 
 std::uint32_t DelayToFadeUpdate(std::uint32_t timestamp,
-                                std::uint32_t remaining_ms) {
-  const std::uint32_t phase = timestamp % kFadeUpdateIntervalMs;
+                                std::uint32_t remaining_ms,
+                                std::uint32_t refresh_period_ms) {
+  const std::uint32_t phase = timestamp % refresh_period_ms;
   const std::uint32_t until_grid =
-    (phase == 0U) ? kFadeUpdateIntervalMs : kFadeUpdateIntervalMs - phase;
+    (phase == 0U) ? refresh_period_ms : refresh_period_ms - phase;
   return (remaining_ms < until_grid) ? remaining_ms : until_grid;
 }
 
@@ -90,7 +89,8 @@ std::uint32_t prism::Fade::Execute(std::uint32_t timestamp) {
       controller->RequestShow();
       return 0U;
     }
-    return DelayToFadeUpdate(timestamp, duration_ms);
+    return DelayToFadeUpdate(timestamp, duration_ms,
+                             controller->RefreshPeriodMs());
   }
 
   const std::uint32_t elapsed = timestamp - start_time_;
@@ -104,7 +104,8 @@ std::uint32_t prism::Fade::Execute(std::uint32_t timestamp) {
   if (complete) {
     return 0U;
   }
-  return DelayToFadeUpdate(timestamp, duration_ms - elapsed);
+  return DelayToFadeUpdate(timestamp, duration_ms - elapsed,
+                           controller->RefreshPeriodMs());
 }
 
 void prism::Fade::ToString(char* buf, std::size_t size) const {

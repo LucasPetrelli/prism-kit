@@ -3,6 +3,7 @@
 
 #include "prism/controller_instruction.hpp"
 #include "prism/fade.hpp"
+#include "prism/gradient.hpp"
 #include "prism/instruction_memory_slot.hpp"
 #include "prism/instruction_types.hpp"
 #include "prism/pending_instruction_queue_view.hpp"

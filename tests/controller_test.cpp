@@ -11,7 +11,9 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "mock_strip.hpp"
+#include "oklab.hpp"
 #include "prism/color.hpp"
+#include "prism/gradient.hpp"
 #include "prism/instruction.hpp"
 
 // ====================================================================
@@ -65,6 +67,22 @@ void AddFade(prism::Controller& controller, std::uint8_t index,
   payload.index = index;
   prism::Fade fade{payload};
   EXPECT_EQ(controller.AddInstruction(&fade),
+            prism::ControllerStatus::kSuccess);
+}
+
+void AddGradient(prism::Controller& controller, std::uint8_t index,
+                 prism::color::RgbColor target, std::uint16_t duration_ms,
+                 prism::Mark mark = 0U, prism::GroupId group_id = 0U) {
+  prism::GradientPayload payload{};
+  payload.mark = mark;
+  payload.r = target.red;
+  payload.g = target.green;
+  payload.b = target.blue;
+  payload.duration_ms = duration_ms;
+  payload.index = index;
+  payload.group_id = group_id;
+  prism::Gradient gradient{payload};
+  EXPECT_EQ(controller.AddInstruction(&gradient),
             prism::ControllerStatus::kSuccess);
 }
 
@@ -243,6 +261,116 @@ TEST_F(ControllerTest, FadeUpdatesUseSharedTwentyMillisecondGrid) {
   EXPECT_EQ(g_last_scheduled_delay, 20U);
 }
 
+/// @brief Goal: validate refresh-period defaults, bounds, and lifecycle rules.
+/// @details Steps: change the period while editable, reject zero and half-range
+///     values, reject changes while active, then verify reset and completed
+///     programs preserve or accept configuration as specified.
+TEST_F(ControllerTest, RefreshPeriodValidatesAndPersistsAcrossReset) {
+  EXPECT_EQ(controller_.RefreshPeriodMs(), 20U);
+  EXPECT_EQ(controller_.SetRefreshPeriodMs(15U),
+            prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(controller_.RefreshPeriodMs(), 15U);
+
+  EXPECT_EQ(controller_.SetRefreshPeriodMs(0U),
+            prism::ControllerStatus::kInvalidArgument);
+  EXPECT_EQ(controller_.SetRefreshPeriodMs(0x80000000U),
+            prism::ControllerStatus::kInvalidArgument);
+  EXPECT_EQ(
+    controller_.SetRefreshPeriodMs(std::numeric_limits<std::uint32_t>::max()),
+    prism::ControllerStatus::kInvalidArgument);
+  EXPECT_EQ(controller_.RefreshPeriodMs(), 15U);
+
+  AddFade(controller_, 0U, 0U, 20U);
+  ASSERT_EQ(controller_.Start(), prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(controller_.SetRefreshPeriodMs(25U),
+            prism::ControllerStatus::kBusy);
+  EXPECT_EQ(controller_.RefreshPeriodMs(), 15U);
+
+  controller_.ResetInstructions();
+  EXPECT_EQ(controller_.RefreshPeriodMs(), 15U);
+  ASSERT_EQ(controller_.Start(), prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(controller_.SetRefreshPeriodMs(25U),
+            prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(controller_.RefreshPeriodMs(), 25U);
+  EXPECT_EQ(controller_.SetRefreshPeriodMs(0x7FFFFFFFU),
+            prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(controller_.RefreshPeriodMs(), 0x7FFFFFFFU);
+}
+
+/// @brief Goal: prove Fade consumes a non-default period on its absolute grid.
+/// @details Steps: activate at t=7 with a 15 ms period, verify the first wake
+///     at t=15, then complete and replay to confirm the period remains active.
+TEST_F(ControllerTest, FadeUsesConfiguredPeriodAndRetainsItOnReplay) {
+  constexpr std::uint8_t index = 0U;
+  constexpr prism::color::RgbColor source{100U, 0U, 0U};
+  constexpr prism::color::RgbColor first_sample{87U, 0U, 0U};
+  constexpr prism::color::RgbColor target{0U, 0U, 0U};
+  constexpr std::uint16_t duration_ms = 60U;
+  auto* led = mock_strip_.MutableLed(index);
+
+  ASSERT_EQ(controller_.SetRefreshPeriodMs(15U),
+            prism::ControllerStatus::kSuccess);
+  AddFade(controller_, index, 0U, duration_ms);
+  g_fake_time = 7U;
+  ASSERT_EQ(controller_.Start(), prism::ControllerStatus::kSuccess);
+  EXPECT_CALL(*led, Color()).WillOnce(testing::Return(source));
+  EXPECT_CALL(mock_strip_, Show()).Times(0);
+  EXPECT_EQ(controller_.Run(), prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(g_last_scheduled_delay, 8U);
+
+  g_fake_time = 15U;
+  g_last_scheduled_delay = 0U;
+  EXPECT_CALL(*led, SetColor(first_sample)).WillOnce(testing::Return(0));
+  EXPECT_CALL(mock_strip_, Show()).Times(1);
+  EXPECT_EQ(controller_.Run(), prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(g_last_scheduled_delay, 15U);
+
+  g_fake_time = 67U;
+  g_last_scheduled_delay = 0U;
+  EXPECT_CALL(*led, SetColor(target)).WillOnce(testing::Return(0));
+  EXPECT_CALL(mock_strip_, Show()).Times(1);
+  EXPECT_EQ(controller_.Run(), prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(g_last_scheduled_delay, 0U);
+
+  ASSERT_EQ(controller_.Start(), prism::ControllerStatus::kSuccess);
+  EXPECT_CALL(*led, Color()).WillOnce(testing::Return(target));
+  EXPECT_CALL(mock_strip_, Show()).Times(0);
+  EXPECT_EQ(controller_.Run(), prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(g_last_scheduled_delay, 8U);
+  EXPECT_EQ(controller_.RefreshPeriodMs(), 15U);
+}
+
+/// @brief Goal: prove Gradient consumes the configured period relative to
+/// start.
+/// @details Steps: activate at t=7 with a 15 ms period, then verify the first
+///     interpolation sample and next wake occur at elapsed 15 ms.
+TEST_F(ControllerTest, GradientUsesConfiguredStartRelativePeriod) {
+  constexpr std::uint8_t index = 2U;
+  constexpr prism::color::RgbColor source{40U, 100U, 180U};
+  constexpr prism::color::RgbColor target{220U, 50U, 10U};
+  constexpr std::uint16_t duration_ms = 60U;
+  auto* led = mock_strip_.MutableLed(index);
+
+  ASSERT_EQ(controller_.SetRefreshPeriodMs(15U),
+            prism::ControllerStatus::kSuccess);
+  AddGradient(controller_, index, target, duration_ms);
+  g_fake_time = 7U;
+  ASSERT_EQ(controller_.Start(), prism::ControllerStatus::kSuccess);
+  EXPECT_CALL(*led, Color()).WillOnce(testing::Return(source));
+  EXPECT_CALL(mock_strip_, Show()).Times(0);
+  EXPECT_EQ(controller_.Run(), prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(g_last_scheduled_delay, 15U);
+
+  g_fake_time = 22U;
+  g_last_scheduled_delay = 0U;
+  const auto sample =
+    prism::controller_detail::InterpolateRgb(source, target, 15U, duration_ms);
+  EXPECT_CALL(*led, SetColor(sample)).WillOnce(testing::Return(0));
+  EXPECT_CALL(mock_strip_, Show()).Times(1);
+  EXPECT_EQ(controller_.Run(), prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(g_last_scheduled_delay, 15U);
+}
+
 TEST_F(ControllerTest, FadeElapsedTimeIsWrapSafe) {
   constexpr std::uint8_t index = 0U;
   constexpr std::uint32_t start_time =
@@ -342,6 +470,331 @@ TEST_F(ControllerTest,
 
   ASSERT_EQ(controller_.Start(), prism::ControllerStatus::kSuccess);
   EXPECT_CALL(mock_strip_, Show()).Times(1);
+  EXPECT_EQ(controller_.Run(), prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(g_last_scheduled_delay, 0U);
+}
+
+// ====================================================================
+// Gradient instruction tests
+// ====================================================================
+
+TEST_F(ControllerTest, GradientZeroDurationAppliesExactTargetImmediately) {
+  constexpr std::uint8_t index = 2U;
+  constexpr prism::color::RgbColor source{10U, 20U, 30U};
+  constexpr prism::color::RgbColor target{241U, 127U, 63U};
+  auto* led = mock_strip_.MutableLed(index);
+
+  AddGradient(controller_, index, target, 0U);
+  ASSERT_EQ(controller_.Start(), prism::ControllerStatus::kSuccess);
+  EXPECT_CALL(*led, Color()).WillOnce(testing::Return(source));
+  EXPECT_CALL(*led, SetColor(target)).WillOnce(testing::Return(0));
+  EXPECT_CALL(mock_strip_, Show()).Times(1);
+
+  EXPECT_EQ(controller_.Run(), prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(g_last_scheduled_delay, 0U);
+}
+
+TEST_F(ControllerTest, GradientCompletesOnExactGridBoundary) {
+  constexpr std::uint8_t index = 1U;
+  constexpr prism::color::RgbColor source{180U, 20U, 60U};
+  constexpr prism::color::RgbColor target{30U, 190U, 220U};
+  constexpr std::uint16_t duration_ms = 40U;
+  auto* led = mock_strip_.MutableLed(index);
+
+  AddGradient(controller_, index, target, duration_ms);
+  g_fake_time = 7U;
+  ASSERT_EQ(controller_.Start(), prism::ControllerStatus::kSuccess);
+  EXPECT_CALL(*led, Color()).WillOnce(testing::Return(source));
+  EXPECT_CALL(mock_strip_, Show()).Times(0);
+  EXPECT_EQ(controller_.Run(), prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(g_last_scheduled_delay, 20U);
+
+  g_fake_time = 27U;
+  g_last_scheduled_delay = 0U;
+  const auto midpoint =
+    prism::controller_detail::InterpolateRgb(source, target, 20U, duration_ms);
+  EXPECT_CALL(*led, SetColor(midpoint)).WillOnce(testing::Return(0));
+  EXPECT_CALL(mock_strip_, Show()).Times(1);
+  EXPECT_EQ(controller_.Run(), prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(g_last_scheduled_delay, 20U);
+
+  g_fake_time = 47U;
+  g_last_scheduled_delay = 0U;
+  EXPECT_CALL(*led, SetColor(target)).WillOnce(testing::Return(0));
+  EXPECT_CALL(mock_strip_, Show()).Times(1);
+  EXPECT_EQ(controller_.Run(), prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(g_last_scheduled_delay, 0U);
+}
+
+TEST_F(ControllerTest, GradientLateRunSkipsMissedSamplesAndCompletesOffGrid) {
+  constexpr std::uint8_t index = 4U;
+  constexpr prism::color::RgbColor source{200U, 30U, 15U};
+  constexpr prism::color::RgbColor target{15U, 90U, 240U};
+  constexpr std::uint16_t duration_ms = 45U;
+  auto* led = mock_strip_.MutableLed(index);
+
+  AddGradient(controller_, index, target, duration_ms);
+  ASSERT_EQ(controller_.Start(), prism::ControllerStatus::kSuccess);
+  EXPECT_CALL(*led, Color()).WillOnce(testing::Return(source));
+  EXPECT_CALL(mock_strip_, Show()).Times(0);
+  EXPECT_EQ(controller_.Run(), prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(g_last_scheduled_delay, 20U);
+
+  g_fake_time = 33U;
+  g_last_scheduled_delay = 0U;
+  const auto late_sample =
+    prism::controller_detail::InterpolateRgb(source, target, 33U, duration_ms);
+  EXPECT_CALL(*led, SetColor(late_sample)).WillOnce(testing::Return(0));
+  EXPECT_CALL(mock_strip_, Show()).Times(1);
+  EXPECT_EQ(controller_.Run(), prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(g_last_scheduled_delay, 7U);
+
+  g_fake_time = 40U;
+  g_last_scheduled_delay = 0U;
+  const auto grid_sample =
+    prism::controller_detail::InterpolateRgb(source, target, 40U, duration_ms);
+  EXPECT_CALL(*led, SetColor(grid_sample)).WillOnce(testing::Return(0));
+  EXPECT_CALL(mock_strip_, Show()).Times(1);
+  EXPECT_EQ(controller_.Run(), prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(g_last_scheduled_delay, 5U);
+
+  g_fake_time = 45U;
+  g_last_scheduled_delay = 0U;
+  EXPECT_CALL(*led, SetColor(target)).WillOnce(testing::Return(0));
+  EXPECT_CALL(mock_strip_, Show()).Times(1);
+  EXPECT_EQ(controller_.Run(), prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(g_last_scheduled_delay, 0U);
+}
+
+TEST_F(ControllerTest, GradientElapsedTimeIsWrapSafe) {
+  constexpr std::uint8_t index = 0U;
+  constexpr std::uint32_t start_time =
+    std::numeric_limits<std::uint32_t>::max() - 9U;
+  constexpr prism::color::RgbColor source{150U, 70U, 10U};
+  constexpr prism::color::RgbColor target{10U, 80U, 170U};
+  constexpr std::uint16_t duration_ms = 25U;
+  auto* led = mock_strip_.MutableLed(index);
+
+  AddGradient(controller_, index, target, duration_ms);
+  g_fake_time = start_time;
+  ASSERT_EQ(controller_.Start(), prism::ControllerStatus::kSuccess);
+  EXPECT_CALL(*led, Color()).WillOnce(testing::Return(source));
+  EXPECT_CALL(mock_strip_, Show()).Times(0);
+  EXPECT_EQ(controller_.Run(), prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(g_last_scheduled_delay, 20U);
+
+  g_fake_time = 10U;
+  g_last_scheduled_delay = 0U;
+  const auto sample =
+    prism::controller_detail::InterpolateRgb(source, target, 20U, duration_ms);
+  EXPECT_CALL(*led, SetColor(sample)).WillOnce(testing::Return(0));
+  EXPECT_CALL(mock_strip_, Show()).Times(1);
+  EXPECT_EQ(controller_.Run(), prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(g_last_scheduled_delay, 5U);
+
+  g_fake_time = 15U;
+  g_last_scheduled_delay = 0U;
+  EXPECT_CALL(*led, SetColor(target)).WillOnce(testing::Return(0));
+  EXPECT_CALL(mock_strip_, Show()).Times(1);
+  EXPECT_EQ(controller_.Run(), prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(g_last_scheduled_delay, 0U);
+}
+
+TEST_F(ControllerTest, GradientInvalidIndexCompletesWithoutWrites) {
+  AddGradient(controller_, 9U, prism::color::RgbColor{10U, 20U, 30U}, 40U);
+  ASSERT_EQ(controller_.Start(), prism::ControllerStatus::kSuccess);
+  EXPECT_CALL(mock_strip_, Show()).Times(0);
+
+  EXPECT_EQ(controller_.Run(), prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(g_last_scheduled_delay, 0U);
+}
+
+TEST_F(ControllerTest, GradientCapturesSameMarkColorAfterSetColor) {
+  constexpr std::uint8_t index = 3U;
+  constexpr prism::Mark mark = 20U;
+  constexpr prism::color::RgbColor source{45U, 100U, 180U};
+  constexpr prism::color::RgbColor target{220U, 75U, 25U};
+  auto* led = mock_strip_.MutableLed(index);
+
+  prism::SetSingleColor set_color;
+  set_color.mark = mark;
+  set_color.color = source;
+  set_color.index = index;
+  ASSERT_EQ(controller_.AddInstruction(&set_color),
+            prism::ControllerStatus::kSuccess);
+  AddGradient(controller_, index, target, 40U, mark);
+  ASSERT_EQ(controller_.Start(), prism::ControllerStatus::kSuccess);
+
+  EXPECT_CALL(*led, Color()).Times(0);
+  EXPECT_CALL(*led, SetColor(testing::_)).Times(0);
+  EXPECT_CALL(mock_strip_, Show()).Times(0);
+  EXPECT_EQ(controller_.Run(), prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(g_last_scheduled_delay, mark);
+
+  g_fake_time = mark;
+  g_last_scheduled_delay = 0U;
+  testing::InSequence same_mark_order;
+  EXPECT_CALL(*led, SetColor(source)).WillOnce(testing::Return(0));
+  EXPECT_CALL(*led, Color()).WillOnce(testing::Return(source));
+  EXPECT_CALL(mock_strip_, Show()).Times(1);
+  EXPECT_EQ(controller_.Run(), prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(g_last_scheduled_delay, 20U);
+
+  g_fake_time = 40U;
+  g_last_scheduled_delay = 0U;
+  const auto sample =
+    prism::controller_detail::InterpolateRgb(source, target, 20U, 40U);
+  EXPECT_CALL(*led, SetColor(sample)).WillOnce(testing::Return(0));
+  EXPECT_CALL(mock_strip_, Show()).Times(1);
+  EXPECT_EQ(controller_.Run(), prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(g_last_scheduled_delay, 20U);
+
+  g_fake_time = 60U;
+  g_last_scheduled_delay = 0U;
+  EXPECT_CALL(*led, SetColor(target)).WillOnce(testing::Return(0));
+  EXPECT_CALL(mock_strip_, Show()).Times(1);
+  EXPECT_EQ(controller_.Run(), prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(g_last_scheduled_delay, 0U);
+}
+
+TEST_F(ControllerTest, GradientGroupReplayCapturesThenCurrentStagedColor) {
+  constexpr std::uint8_t index = 5U;
+  constexpr prism::color::RgbColor initial{10U, 40U, 90U};
+  constexpr prism::color::RgbColor replay_source{190U, 110U, 20U};
+  constexpr prism::color::RgbColor target{20U, 160U, 235U};
+  auto* led = mock_strip_.MutableLed(index);
+
+  AddGradient(controller_, index, target, 40U);
+  prism::SetSingleColor seed_replay;
+  seed_replay.mark = 40U;
+  seed_replay.color = replay_source;
+  seed_replay.index = index;
+  ASSERT_EQ(controller_.AddInstruction(&seed_replay),
+            prism::ControllerStatus::kSuccess);
+  ASSERT_EQ(controller_.Start(1U), prism::ControllerStatus::kSuccess);
+
+  EXPECT_CALL(*led, Color()).WillOnce(testing::Return(initial));
+  EXPECT_CALL(mock_strip_, Show()).Times(0);
+  EXPECT_EQ(controller_.Run(), prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(g_last_scheduled_delay, 20U);
+
+  g_fake_time = 20U;
+  g_last_scheduled_delay = 0U;
+  const auto first_pass_sample =
+    prism::controller_detail::InterpolateRgb(initial, target, 20U, 40U);
+  EXPECT_CALL(*led, SetColor(first_pass_sample)).WillOnce(testing::Return(0));
+  EXPECT_CALL(mock_strip_, Show()).Times(1);
+  EXPECT_EQ(controller_.Run(), prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(g_last_scheduled_delay, 20U);
+
+  g_fake_time = 40U;
+  g_last_scheduled_delay = 0U;
+  {
+    testing::InSequence replay_order;
+    EXPECT_CALL(*led, SetColor(target)).WillOnce(testing::Return(0));
+    EXPECT_CALL(*led, SetColor(replay_source)).WillOnce(testing::Return(0));
+    EXPECT_CALL(*led, Color()).WillOnce(testing::Return(replay_source));
+    EXPECT_CALL(mock_strip_, Show()).Times(1);
+  }
+  EXPECT_EQ(controller_.Run(), prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(g_last_scheduled_delay, 20U);
+
+  g_fake_time = 60U;
+  g_last_scheduled_delay = 0U;
+  const auto replay_sample =
+    prism::controller_detail::InterpolateRgb(replay_source, target, 20U, 40U);
+  EXPECT_CALL(*led, SetColor(replay_sample)).WillOnce(testing::Return(0));
+  EXPECT_CALL(mock_strip_, Show()).Times(1);
+  EXPECT_EQ(controller_.Run(), prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(g_last_scheduled_delay, 20U);
+
+  g_fake_time = 80U;
+  g_last_scheduled_delay = 0U;
+  {
+    testing::InSequence replay_completion_order;
+    EXPECT_CALL(*led, SetColor(target)).WillOnce(testing::Return(0));
+    EXPECT_CALL(*led, SetColor(replay_source)).WillOnce(testing::Return(0));
+    EXPECT_CALL(mock_strip_, Show()).Times(1);
+  }
+  EXPECT_EQ(controller_.Run(), prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(g_last_scheduled_delay, 0U);
+}
+
+TEST_F(ControllerTest, GradientResetLeavesLastStagedSampleInPlace) {
+  constexpr std::uint8_t index = 6U;
+  constexpr prism::color::RgbColor source{100U, 30U, 40U};
+  constexpr prism::color::RgbColor target{15U, 220U, 180U};
+  constexpr std::uint16_t duration_ms = 60U;
+  prism::color::RgbColor staged = source;
+  auto* led = mock_strip_.MutableLed(index);
+
+  AddGradient(controller_, index, target, duration_ms);
+  ASSERT_EQ(controller_.Start(), prism::ControllerStatus::kSuccess);
+  EXPECT_CALL(*led, Color()).WillOnce(testing::Return(source));
+  EXPECT_CALL(mock_strip_, Show()).Times(0);
+  EXPECT_EQ(controller_.Run(), prism::ControllerStatus::kSuccess);
+
+  g_fake_time = 20U;
+  g_last_scheduled_delay = 0U;
+  const auto last_sample =
+    prism::controller_detail::InterpolateRgb(source, target, 20U, duration_ms);
+  EXPECT_CALL(*led, SetColor(last_sample))
+    .WillOnce([&staged](const prism::color::RgbColor& color) {
+      staged = color;
+      return 0;
+    });
+  EXPECT_CALL(mock_strip_, Show()).Times(1);
+  EXPECT_EQ(controller_.Run(), prism::ControllerStatus::kSuccess);
+
+  controller_.ResetInstructions();
+  g_fake_time = 100U;
+  EXPECT_CALL(*led, SetColor(testing::_)).Times(0);
+  EXPECT_CALL(mock_strip_, Show()).Times(0);
+  EXPECT_EQ(controller_.Run(), prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(staged, last_sample);
+}
+
+TEST_F(ControllerTest, GradientsOnOnePixelKeepOrderAndCoalesceShow) {
+  constexpr std::uint8_t index = 1U;
+  constexpr prism::color::RgbColor source{100U, 70U, 40U};
+  constexpr prism::color::RgbColor first_target{240U, 30U, 100U};
+  constexpr prism::color::RgbColor second_target{20U, 180U, 250U};
+  constexpr std::uint16_t duration_ms = 40U;
+  auto* led = mock_strip_.MutableLed(index);
+
+  AddGradient(controller_, index, first_target, duration_ms);
+  AddGradient(controller_, index, second_target, duration_ms);
+  ASSERT_EQ(controller_.Start(), prism::ControllerStatus::kSuccess);
+  EXPECT_CALL(*led, Color())
+    .WillOnce(testing::Return(source))
+    .WillOnce(testing::Return(source));
+  EXPECT_CALL(mock_strip_, Show()).Times(0);
+  EXPECT_EQ(controller_.Run(), prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(g_last_scheduled_delay, 20U);
+
+  g_fake_time = 20U;
+  g_last_scheduled_delay = 0U;
+  const auto first_sample = prism::controller_detail::InterpolateRgb(
+    source, first_target, 20U, duration_ms);
+  const auto second_sample = prism::controller_detail::InterpolateRgb(
+    source, second_target, 20U, duration_ms);
+  {
+    testing::InSequence update_order;
+    EXPECT_CALL(*led, SetColor(first_sample)).WillOnce(testing::Return(0));
+    EXPECT_CALL(*led, SetColor(second_sample)).WillOnce(testing::Return(0));
+    EXPECT_CALL(mock_strip_, Show()).Times(1);
+  }
+  EXPECT_EQ(controller_.Run(), prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(g_last_scheduled_delay, 20U);
+
+  g_fake_time = 40U;
+  g_last_scheduled_delay = 0U;
+  {
+    testing::InSequence endpoint_order;
+    EXPECT_CALL(*led, SetColor(first_target)).WillOnce(testing::Return(0));
+    EXPECT_CALL(*led, SetColor(second_target)).WillOnce(testing::Return(0));
+    EXPECT_CALL(mock_strip_, Show()).Times(1);
+  }
   EXPECT_EQ(controller_.Run(), prism::ControllerStatus::kSuccess);
   EXPECT_EQ(g_last_scheduled_delay, 0U);
 }

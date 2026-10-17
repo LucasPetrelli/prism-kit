@@ -43,6 +43,7 @@ target_sources(app PRIVATE src/blink_app.cpp
                          controller/instructions/set_multiple_color_hsv.cpp
                          controller/instructions/set_single_color_hsv.cpp
                          controller/instructions/fade.cpp
+                         controller/instructions/gradient.cpp
                          controller/instructions/run_group.cpp
                          controller/oklab.cpp)
 

@@ -5,6 +5,7 @@
 
 #include "prism/controller_instruction.hpp"
 #include "prism/fade.hpp"
+#include "prism/gradient.hpp"
 #include "prism/instruction_types.hpp"
 #include "prism/run_group_instruction.hpp"
 #include "prism/set_multiple_color.hpp"
@@ -46,6 +47,9 @@ bool prism::InstructionMemorySlot::Set(const ControllerInstruction* instr) {
       break;
     case InstructionTag::kFade:
       ::new (&fade) Fade(*static_cast<const Fade*>(instr));
+      break;
+    case InstructionTag::kGradient:
+      ::new (&gradient) Gradient(*static_cast<const Gradient*>(instr));
       break;
 #if defined(PRISM_CONTROLLER_TESTING)
     case InstructionTag::kTestTimed:
@@ -128,6 +132,8 @@ prism::ControllerInstruction* prism::InstructionMemorySlot::Active() {
       return &run_group;
     case InstructionTag::kFade:
       return &fade;
+    case InstructionTag::kGradient:
+      return &gradient;
 #if defined(PRISM_CONTROLLER_TESTING)
     case InstructionTag::kTestTimed:
       return &test_timed;
@@ -154,6 +160,8 @@ const prism::ControllerInstruction* prism::InstructionMemorySlot::Active()
       return &run_group;
     case InstructionTag::kFade:
       return &fade;
+    case InstructionTag::kGradient:
+      return &gradient;
 #if defined(PRISM_CONTROLLER_TESTING)
     case InstructionTag::kTestTimed:
       return &test_timed;
@@ -198,6 +206,9 @@ void prism::InstructionMemorySlot::Destroy() {
       break;
     case InstructionTag::kFade:
       fade.~Fade();
+      break;
+    case InstructionTag::kGradient:
+      gradient.~Gradient();
       break;
 #if defined(PRISM_CONTROLLER_TESTING)
     case InstructionTag::kTestTimed:

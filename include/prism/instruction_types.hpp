@@ -46,6 +46,8 @@ enum class InstructionTag : std::uint8_t {
   kRunGroup,
   /// @brief Fade the HSV value of one staged pixel.
   kFade,
+  /// @brief Interpolate one staged pixel to an RGB target in OKLab.
+  kGradient,
 #if defined(PRISM_CONTROLLER_TESTING)
   /// @brief Host-test-only timed instruction.
   kTestTimed,
@@ -111,6 +113,17 @@ struct FadePayload {
   std::uint8_t index;
   GroupId group_id;
 };
+
+/// @brief Fixed-width configuration for a one-pixel Gradient instruction.
+struct GradientPayload {
+  Mark mark;
+  std::uint8_t r;
+  std::uint8_t g;
+  std::uint8_t b;
+  std::uint16_t duration_ms;
+  std::uint8_t index;
+  GroupId group_id;
+};
 #pragma pack(pop)
 
 /// @brief Controller-side configuration for a RunGroup instruction.
@@ -141,6 +154,9 @@ static_assert(
 static_assert(
   sizeof(FadePayload) == 11U,
   "FadePayload must be 11 bytes (mark, percent, duration, index, group)");
+static_assert(
+  sizeof(GradientPayload) == 12U,
+  "GradientPayload must be 12 bytes (mark, rgb, duration, index, group)");
 
 }  // namespace prism
 

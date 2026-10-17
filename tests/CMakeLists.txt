@@ -34,6 +34,7 @@ add_executable(controller_test
   ../app/controller/instructions/set_multiple_color_hsv.cpp
   ../app/controller/instructions/set_single_color_hsv.cpp
   ../app/controller/instructions/fade.cpp
+  ../app/controller/instructions/gradient.cpp
   ../app/controller/instructions/run_group.cpp
   ../app/controller/instructions/test_timed_instruction.cpp
   ../app/controller/oklab.cpp

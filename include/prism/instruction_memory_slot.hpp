@@ -5,6 +5,7 @@
 #include <cstdint>
 
 #include "prism/fade.hpp"
+#include "prism/gradient.hpp"
 #include "prism/instruction_types.hpp"
 #include "prism/run_group_instruction.hpp"
 #include "prism/set_multiple_color.hpp"
@@ -35,6 +36,8 @@ struct InstructionMemorySlot {
     RunGroupInstruction run_group;
     /// @brief Active member: one-pixel Fade instruction.
     Fade fade;
+    /// @brief Active member: one-pixel OKLab Gradient instruction.
+    Gradient gradient;
 #if defined(PRISM_CONTROLLER_TESTING)
     /// @brief Active member: host-test timed instruction.
     test::TimedInstruction test_timed;
@@ -121,6 +124,18 @@ struct InstructionMemorySlot {
   /// @brief True once a concrete union member has been constructed.
   bool active_;
 };
+
+static_assert(sizeof(Fade) >= sizeof(SetMultipleColor) &&
+                sizeof(Fade) >= sizeof(SetSingleColor) &&
+                sizeof(Fade) >= sizeof(SetMultipleColorHsv) &&
+                sizeof(Fade) >= sizeof(SetSingleColorHsv) &&
+                sizeof(Fade) >= sizeof(RunGroupInstruction),
+              "Fade must remain the largest pre-Gradient instruction member");
+static_assert(
+  sizeof(Gradient) <= sizeof(Fade) + 8U,
+  "Gradient may grow each of 28 instruction slots by at most 8 bytes");
+static_assert(8U * kMaxInstructions <= 256U,
+              "Gradient instruction-pool growth must stay within 256 bytes");
 
 }  // namespace prism
 

@@ -322,6 +322,27 @@ void prism::Controller::SetTimestampCallback(TimestampCallback callback) {
   get_timestamp_ = callback;
 }
 
+prism::ControllerStatus prism::Controller::SetRefreshPeriodMs(
+  std::uint32_t period_ms) {
+  constexpr std::uint32_t timestamp_half_range = 0x80000000U;
+  if (period_ms == 0U || period_ms >= timestamp_half_range) {
+    DebugLog("SetRefreshPeriodMs rejected period=%u",
+             static_cast<unsigned>(period_ms));
+    return ControllerStatus::kInvalidArgument;
+  }
+  if (state_ == ProgramState::kActive) {
+    DebugLog("SetRefreshPeriodMs rejected while active");
+    return ControllerStatus::kBusy;
+  }
+  refresh_period_ms_ = period_ms;
+  DebugLog("SetRefreshPeriodMs(%u)", static_cast<unsigned>(period_ms));
+  return ControllerStatus::kSuccess;
+}
+
+std::uint32_t prism::Controller::RefreshPeriodMs() const {
+  return refresh_period_ms_;
+}
+
 void prism::Controller::SetScheduleCallback(ScheduleCallback callback) {
   DebugLog("SetScheduleCallback(%p)", reinterpret_cast<void*>(callback));
   schedule_next_run_ = callback;
