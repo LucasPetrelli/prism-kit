@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+import io
 import os
 from pathlib import Path
 import re
@@ -54,8 +55,11 @@ class _OutputTee:
         self._read_descriptors: list[int] = []
         self._write_descriptors: list[int] = []
         self._threads: list[threading.Thread] = []
-        self._windows_api: tuple[object, dict[int, int | None]] | None = None
+        self._windows_api: object | None = None
         self._redirected_windows_handles: list[int] = []
+        self._saved_python_streams: dict[int, object] = {}
+        self._redirected_python_streams: dict[int, io.TextIOWrapper] = {}
+        self._redirected_python_dunder_streams: set[int] = set()
 
     def start(self) -> None:
         """Redirect stdout and stderr through reader threads into the log."""
@@ -63,32 +67,26 @@ class _OutputTee:
         self._saved_descriptors = {
             descriptor: os.dup(descriptor) for descriptor in _STREAM_DESCRIPTORS
         }
-        if os.name == "nt":
-            self._save_windows_standard_handles()
 
         try:
+            if os.name == "nt":
+                self._configure_windows_api()
+                self._saved_python_streams = {1: sys.stdout, 2: sys.stderr}
             for descriptor in _STREAM_DESCRIPTORS:
                 self._redirect_stream(descriptor)
         except BaseException:
             self.stop()
             raise
 
-    def _save_windows_standard_handles(self) -> None:
-        """Save Win32 standard handles because subprocesses use them directly."""
+    def _configure_windows_api(self) -> None:
+        """Load Win32 standard-handle APIs used by subprocesses."""
         import ctypes
         from ctypes import wintypes
 
         kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
-        kernel32.GetStdHandle.argtypes = [wintypes.DWORD]
-        kernel32.GetStdHandle.restype = wintypes.HANDLE
         kernel32.SetStdHandle.argtypes = [wintypes.DWORD, wintypes.HANDLE]
         kernel32.SetStdHandle.restype = wintypes.BOOL
-        handle_ids = {1: 0xFFFFFFF5, 2: 0xFFFFFFF4}
-        saved_handles = {
-            descriptor: kernel32.GetStdHandle(handle_id)
-            for descriptor, handle_id in handle_ids.items()
-        }
-        self._windows_api = (kernel32, saved_handles)
+        self._windows_api = kernel32
 
     def _redirect_stream(self, descriptor: int) -> None:
         """Connect one process stream to a pipe and start its tee reader."""
@@ -102,8 +100,9 @@ class _OutputTee:
         self._write_descriptors.remove(write_descriptor)
 
         if self._windows_api is not None:
-            self._set_windows_standard_handle(descriptor)
             self._redirected_windows_handles.append(descriptor)
+            self._set_windows_standard_handle(descriptor)
+            self._redirect_python_console_stream(descriptor)
 
         thread = threading.Thread(
             target=self._relay_output,
@@ -121,7 +120,7 @@ class _OutputTee:
 
         if self._windows_api is None:
             return
-        kernel32, _ = self._windows_api
+        kernel32 = self._windows_api
         handle_ids = {1: 0xFFFFFFF5, 2: 0xFFFFFFF4}
         handle = msvcrt.get_osfhandle(descriptor)
         if not kernel32.SetStdHandle(handle_ids[descriptor], handle):
@@ -129,16 +128,76 @@ class _OutputTee:
 
             raise ctypes.WinError(ctypes.get_last_error())
 
+    def _redirect_python_console_stream(self, descriptor: int) -> None:
+        """Use file-descriptor text I/O while a Windows console stream is piped."""
+        console_io_type = getattr(io, "_WindowsConsoleIO", None)
+        if console_io_type is None:
+            return
+
+        stream = self._saved_python_streams[descriptor]
+        stream_buffer = getattr(stream, "buffer", None)
+        raw_stream = getattr(stream_buffer, "raw", stream_buffer)
+        if not isinstance(raw_stream, console_io_type):
+            return
+
+        redirected_stream = io.TextIOWrapper(
+            io.FileIO(descriptor, mode="wb", closefd=False),
+            encoding=getattr(stream, "encoding", None),
+            errors=getattr(stream, "errors", None),
+            line_buffering=getattr(stream, "line_buffering", False),
+            write_through=getattr(stream, "write_through", False),
+        )
+        self._redirected_python_streams[descriptor] = redirected_stream
+        if descriptor == 1:
+            sys.stdout = redirected_stream
+            dunder_stream_name = "__stdout__"
+        else:
+            sys.stderr = redirected_stream
+            dunder_stream_name = "__stderr__"
+
+        if getattr(sys, dunder_stream_name, None) is stream:
+            self._redirected_python_dunder_streams.add(descriptor)
+            setattr(sys, dunder_stream_name, redirected_stream)
+
     def _restore_windows_standard_handle(self, descriptor: int) -> None:
-        """Restore a saved Win32 standard handle."""
+        """Restore the Win32 handle from the restored C-runtime descriptor."""
         if self._windows_api is None:
             return
-        kernel32, saved_handles = self._windows_api
-        handle_ids = {1: 0xFFFFFFF5, 2: 0xFFFFFFF4}
-        if not kernel32.SetStdHandle(handle_ids[descriptor], saved_handles[descriptor]):
-            import ctypes
+        import ctypes
+        import msvcrt
 
-            self._record_error(ctypes.WinError(ctypes.get_last_error()))
+        kernel32 = self._windows_api
+        handle_ids = {1: 0xFFFFFFF5, 2: 0xFFFFFFF4}
+        try:
+            handle = msvcrt.get_osfhandle(descriptor)
+            if not kernel32.SetStdHandle(handle_ids[descriptor], handle):
+                self._record_error(ctypes.WinError(ctypes.get_last_error()))
+        except OSError as exc:
+            self._record_error(exc)
+
+    def _restore_python_console_stream(self, descriptor: int) -> None:
+        """Restore the original Python stream after its descriptor is restored."""
+        redirected_stream = self._redirected_python_streams.pop(descriptor, None)
+        if redirected_stream is None:
+            return
+
+        original_stream = self._saved_python_streams[descriptor]
+        if descriptor == 1:
+            sys.stdout = original_stream
+            dunder_stream_name = "__stdout__"
+        else:
+            sys.stderr = original_stream
+            dunder_stream_name = "__stderr__"
+
+        if descriptor in self._redirected_python_dunder_streams:
+            setattr(sys, dunder_stream_name, original_stream)
+
+        try:
+            redirected_stream.close()
+        except OSError as exc:
+            self._record_error(exc)
+        except ValueError as exc:
+            self._record_error(OSError(str(exc)))
 
     def _record_error(self, error: OSError) -> None:
         """Retain capture errors without stopping the other output stream."""
@@ -179,12 +238,15 @@ class _OutputTee:
         """Restore process streams and wait until both pipes are fully drained."""
         _flush_standard_streams()
         for descriptor in reversed(self._redirected_descriptors):
-            if descriptor in self._redirected_windows_handles:
-                self._restore_windows_standard_handle(descriptor)
             try:
                 os.dup2(self._saved_descriptors[descriptor], descriptor)
             except OSError as exc:
                 self._record_error(exc)
+            else:
+                if descriptor in self._redirected_windows_handles:
+                    self._restore_windows_standard_handle(descriptor)
+                if descriptor in self._redirected_python_streams:
+                    self._restore_python_console_stream(descriptor)
 
         for descriptor in self._write_descriptors:
             try:
@@ -212,6 +274,8 @@ class _OutputTee:
         self._saved_descriptors.clear()
         self._redirected_descriptors.clear()
         self._redirected_windows_handles.clear()
+        self._saved_python_streams.clear()
+        self._redirected_python_dunder_streams.clear()
 
 
 def _exit_code_from_result(result: object) -> int:
