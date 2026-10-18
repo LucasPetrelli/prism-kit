@@ -266,7 +266,7 @@ def run_cli(
     *,
     project_root: Path | None = None,
 ) -> int:
-    """Run one command and copy stdout/stderr to ``log/*.log``.
+    """Run one command and copy stdout/stderr to ``logs/*.log``.
 
     Args:
         script_name: Stable CLI name used in the log filename.
@@ -279,7 +279,7 @@ def run_cli(
     safe_name = re.sub(r"[^A-Za-z0-9._-]+", "-", script_name).strip("-_.")
     safe_name = safe_name or "script"
     timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-    log_directory = (project_root or _project_root()) / "log"
+    log_directory = (project_root or _project_root()) / "logs"
     log_directory.mkdir(parents=True, exist_ok=True)
 
     temporary_descriptor, temporary_name = tempfile.mkstemp(
