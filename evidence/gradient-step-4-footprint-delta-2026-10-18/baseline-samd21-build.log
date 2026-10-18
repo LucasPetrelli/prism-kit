@@ -1,0 +1,135 @@
+Using CPython 3.14.3 interpreter at: C:\Users\Lucas\AppData\Local\Python\pythoncore-3.14-64\python.exe
+Creating virtual environment at: .venv
+WARN Retrying to persist temporary file to C:\Users\Lucas\AppData\Local\Packages\sandbox.{64119c02-f07d-4ef8-9ec7-6d4e84b22ea4}\AC\uv\cache\sdists-v9\editable\3e36546a39c75cac\revision.rev: failed to persist temporary file: Access is denied. (os error 5)
+WARN Retrying to persist temporary file to C:\Users\Lucas\AppData\Local\Packages\sandbox.{64119c02-f07d-4ef8-9ec7-6d4e84b22ea4}\AC\uv\cache\sdists-v9\editable\3e36546a39c75cac\revision.rev: failed to persist temporary file: Access is denied. (os error 5)
+WARN Retry attempt #0. Sleeping 1.8225259s before the next attempt
+WARN Retry attempt #0. Sleeping 1.1563924s before the next attempt
+WARN Retry attempt #0. Sleeping 1.2462997s before the next attempt
+WARN Retry attempt #0. Sleeping 1.6138167s before the next attempt
+WARN Retry attempt #0. Sleeping 1.7402045s before the next attempt
+WARN Retry attempt #0. Sleeping 1.485569s before the next attempt
+WARN Retry attempt #0. Sleeping 1.4552844s before the next attempt
+WARN Retry attempt #0. Sleeping 1.8078838s before the next attempt
+WARN Retry attempt #0. Sleeping 1.5147338s before the next attempt
+WARN Retry attempt #0. Sleeping 1.3843045s before the next attempt
+WARN Retry attempt #0. Sleeping 1.9807315s before the next attempt
+WARN Retry attempt #0. Sleeping 1.8828889s before the next attempt
+WARN Retry attempt #0. Sleeping 1.1819773s before the next attempt
+WARN Retry attempt #0. Sleeping 1.5465577s before the next attempt
+WARN Retry attempt #0. Sleeping 1.9467359s before the next attempt
+WARN Retry attempt #0. Sleeping 1.4986354s before the next attempt
+WARN Retry attempt #0. Sleeping 1.2413976s before the next attempt
+WARN Retry attempt #0. Sleeping 1.3919018s before the next attempt
+WARN Retry attempt #0. Sleeping 1.5900423s before the next attempt
+WARN Retry attempt #0. Sleeping 1.9317259s before the next attempt
+WARN Retry attempt #0. Sleeping 1.7621356s before the next attempt
+WARN Retry attempt #0. Sleeping 1.0087989s before the next attempt
+WARN Retry attempt #0. Sleeping 1.5719896s before the next attempt
+WARN Retry attempt #0. Sleeping 1.307376s before the next attempt
+WARN Retry attempt #0. Sleeping 1.7039312s before the next attempt
+WARN Retry attempt #0. Sleeping 1.0524664s before the next attempt
+WARN Retry attempt #0. Sleeping 1.9799055s before the next attempt
+WARN Retry attempt #0. Sleeping 1.1845359s before the next attempt
+WARN Retry attempt #0. Sleeping 1.9095254s before the next attempt
+WARN Retry attempt #0. Sleeping 1.6720666s before the next attempt
+WARN Retry attempt #0. Sleeping 1.4866312s before the next attempt
+WARN Retry attempt #0. Sleeping 1.1659211s before the next attempt
+WARN Retry attempt #0. Sleeping 1.1190201s before the next attempt
+WARN Retry attempt #0. Sleeping 1.5633739s before the next attempt
+WARN Retry attempt #0. Sleeping 1.5402224s before the next attempt
+WARN Retry attempt #0. Sleeping 1.7312514s before the next attempt
+WARN Retry attempt #0. Sleeping 1.9629396s before the next attempt
+WARN Retry attempt #0. Sleeping 1.7190581s before the next attempt
+WARN Retry attempt #0. Sleeping 1.5506626s before the next attempt
+WARN Retry attempt #0. Sleeping 1.9626936s before the next attempt
+WARN Retry attempt #0. Sleeping 1.7549431s before the next attempt
+WARN Retrying to persist temporary file to C:\Users\Lucas\AppData\Local\Packages\sandbox.{64119c02-f07d-4ef8-9ec7-6d4e84b22ea4}\AC\uv\cache\sdists-v9\editable\3e36546a39c75cac\revision.rev: failed to persist temporary file: Access is denied. (os error 5)
+WARN Retrying to persist temporary file to C:\Users\Lucas\AppData\Local\Packages\sandbox.{64119c02-f07d-4ef8-9ec7-6d4e84b22ea4}\AC\uv\cache\sdists-v9\editable\3e36546a39c75cac\revision.rev: failed to persist temporary file: Access is denied. (os error 5)
+WARN Retrying to persist temporary file to C:\Users\Lucas\AppData\Local\Packages\sandbox.{64119c02-f07d-4ef8-9ec7-6d4e84b22ea4}\AC\uv\cache\sdists-v9\editable\3e36546a39c75cac\revision.rev: failed to persist temporary file: Access is denied. (os error 5)
+WARN Retrying to persist temporary file to C:\Users\Lucas\AppData\Local\Packages\sandbox.{64119c02-f07d-4ef8-9ec7-6d4e84b22ea4}\AC\uv\cache\sdists-v9\editable\3e36546a39c75cac\revision.rev: failed to persist temporary file: Access is denied. (os error 5)
+WARN Retrying to persist temporary file to C:\Users\Lucas\AppData\Local\Packages\sandbox.{64119c02-f07d-4ef8-9ec7-6d4e84b22ea4}\AC\uv\cache\sdists-v9\editable\3e36546a39c75cac\revision.rev: failed to persist temporary file: Access is denied. (os error 5)
+WARN Retry attempt #1. Sleeping 2.9091807s before the next attempt
+WARN Retry attempt #1. Sleeping 2.2504194s before the next attempt
+WARN Retry attempt #1. Sleeping 2.0809889s before the next attempt
+WARN Retry attempt #1. Sleeping 1.0503625s before the next attempt
+WARN Retry attempt #1. Sleeping 3.0397914s before the next attempt
+WARN Retry attempt #1. Sleeping 2.6456218s before the next attempt
+WARN Retry attempt #1. Sleeping 2.5482261s before the next attempt
+WARN Retry attempt #1. Sleeping 1.8570212s before the next attempt
+WARN Retry attempt #1. Sleeping 2.3031192s before the next attempt
+WARN Retrying to persist temporary file to C:\Users\Lucas\AppData\Local\Packages\sandbox.{64119c02-f07d-4ef8-9ec7-6d4e84b22ea4}\AC\uv\cache\sdists-v9\editable\3e36546a39c75cac\revision.rev: failed to persist temporary file: Access is denied. (os error 5)
+WARN Retry attempt #1. Sleeping 1.4961915s before the next attempt
+WARN Retry attempt #1. Sleeping 1.9986968s before the next attempt
+WARN Retry attempt #1. Sleeping 2.9555668s before the next attempt
+WARN Retry attempt #1. Sleeping 1.2498104s before the next attempt
+WARN Retry attempt #1. Sleeping 2.598396s before the next attempt
+WARN Retry attempt #1. Sleeping 1.6240508s before the next attempt
+WARN Retry attempt #1. Sleeping 1.6342894s before the next attempt
+WARN Retry attempt #1. Sleeping 2.9026265s before the next attempt
+WARN Retry attempt #1. Sleeping 2.8467524s before the next attempt
+WARN Retry attempt #1. Sleeping 2.6063256s before the next attempt
+WARN Retry attempt #1. Sleeping 3.428524s before the next attempt
+WARN Retry attempt #1. Sleeping 2.75556s before the next attempt
+WARN Retry attempt #1. Sleeping 2.0857982s before the next attempt
+WARN Retry attempt #1. Sleeping 1.6449108s before the next attempt
+WARN Retry attempt #1. Sleeping 3.5063192s before the next attempt
+WARN Retry attempt #1. Sleeping 2.4784945s before the next attempt
+WARN Retry attempt #1. Sleeping 3.0996444s before the next attempt
+WARN Retry attempt #1. Sleeping 3.1282316s before the next attempt
+WARN Retry attempt #1. Sleeping 2.9652594s before the next attempt
+WARN Retry attempt #1. Sleeping 3.9461964s before the next attempt
+WARN Retry attempt #1. Sleeping 2.5391052s before the next attempt
+WARN Retry attempt #1. Sleeping 2.8188192s before the next attempt
+WARN Retry attempt #1. Sleeping 1.2380097s before the next attempt
+WARN Retry attempt #1. Sleeping 2.0769617s before the next attempt
+WARN Retry attempt #1. Sleeping 3.2274295s before the next attempt
+WARN Retry attempt #1. Sleeping 2.4913331s before the next attempt
+WARN Retry attempt #1. Sleeping 1.2323207s before the next attempt
+WARN Retry attempt #1. Sleeping 2.2061771s before the next attempt
+WARN Retry attempt #1. Sleeping 1.2747475s before the next attempt
+WARN Retry attempt #1. Sleeping 3.0278227s before the next attempt
+WARN Retry attempt #1. Sleeping 3.8961083s before the next attempt
+WARN Retry attempt #1. Sleeping 1.2689933s before the next attempt
+WARN Retry attempt #2. Sleeping 3.1478903s before the next attempt
+WARN Retrying to persist temporary file to C:\Users\Lucas\AppData\Local\Packages\sandbox.{64119c02-f07d-4ef8-9ec7-6d4e84b22ea4}\AC\uv\cache\sdists-v9\editable\3e36546a39c75cac\revision.rev: failed to persist temporary file: Access is denied. (os error 5)
+WARN Retry attempt #2. Sleeping 7.4604403s before the next attempt
+WARN Retry attempt #2. Sleeping 1.5975546s before the next attempt
+WARN Retry attempt #2. Sleeping 1.4400533s before the next attempt
+WARN Retry attempt #2. Sleeping 3.9737518s before the next attempt
+WARN Retry attempt #2. Sleeping 5.2101264s before the next attempt
+WARN Retry attempt #2. Sleeping 5.3419105s before the next attempt
+WARN Retry attempt #2. Sleeping 4.8354287s before the next attempt
+WARN Retry attempt #2. Sleeping 4.9556311s before the next attempt
+WARN Retry attempt #2. Sleeping 5.0208071s before the next attempt
+WARN Retry attempt #2. Sleeping 5.4171261s before the next attempt
+WARN Retry attempt #2. Sleeping 3.3834093s before the next attempt
+WARN Retry attempt #2. Sleeping 5.1827582s before the next attempt
+WARN Retry attempt #2. Sleeping 3.2783133s before the next attempt
+WARN Retry attempt #2. Sleeping 1.1498269s before the next attempt
+WARN Retry attempt #2. Sleeping 6.4110305s before the next attempt
+WARN Retry attempt #2. Sleeping 2.9981681s before the next attempt
+WARN Retry attempt #2. Sleeping 4.0131547s before the next attempt
+WARN Retry attempt #2. Sleeping 1.0276773s before the next attempt
+WARN Retry attempt #2. Sleeping 2.6588771s before the next attempt
+WARN Retry attempt #2. Sleeping 7.0427019s before the next attempt
+WARN Retry attempt #2. Sleeping 5.9104707s before the next attempt
+WARN Retry attempt #2. Sleeping 1.1425942s before the next attempt
+WARN Retry attempt #2. Sleeping 3.2156669s before the next attempt
+WARN Retry attempt #2. Sleeping 2.7858797s before the next attempt
+WARN Retry attempt #2. Sleeping 3.0795269s before the next attempt
+WARN Retry attempt #2. Sleeping 7.5624797s before the next attempt
+WARN Retry attempt #2. Sleeping 1.5996058s before the next attempt
+WARN Retry attempt #2. Sleeping 7.0456906s before the next attempt
+WARN Retry attempt #2. Sleeping 6.0595038s before the next attempt
+  × Failed to download `license-expression==30.4.4`
+  ├─▶ Request failed after 3 retries in 4.4s
+  ├─▶ Failed to fetch:
+  │   `https://files.pythonhosted.org/packages/af/40/791891d4c0c4dab4c5e187c17261cedc26285fd41541577f900470a45a4d/license_expression-30.4.4-py3-none-any.whl`
+  ├─▶ error sending request for url
+  │   (https://files.pythonhosted.org/packages/af/40/791891d4c0c4dab4c5e187c17261cedc26285fd41541577f900470a45a4d/license_expression-30.4.4-py3-none-any.whl)
+  ├─▶ client error (Connect)
+  ├─▶ dns error
+  ╰─▶ No such host is known. (os error 11001)
+  help: `license-expression` (v30.4.4) was included because `prism-kit`
+        (v0.1.0) depends on `reuse` (v6.2.0) which depends on
+        `license-expression`

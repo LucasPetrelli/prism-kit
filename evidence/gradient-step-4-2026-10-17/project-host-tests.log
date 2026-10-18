@@ -1,0 +1,1797 @@
+-- Configuring done (2.1s)
+-- Generating done (0.3s)
+-- Build files have been written to: C:/dev/west-zephyr/prism-kit/tests/build
+[  5%] Built target gtest
+[ 10%] Built target gmock
+[ 15%] Built target gmock_main
+[ 17%] Building CXX object CMakeFiles/controller_test.dir/C_/dev/west-zephyr/prism-kit/app/controller/oklab.cpp.obj
+[ 20%] Linking CXX executable controller_test.exe
+[ 94%] Built target controller_test
+[100%] Built target gtest_main
+Running main() from gmock_main.cc
+[==========] Running 118 tests from 9 test suites.
+[----------] Global test environment set-up.
+[----------] 6 tests from Samd21Ws2812TransportTest
+[ RUN      ] Samd21Ws2812TransportTest.TwentyOneByteFrameKeepsDataAndAddsOneZeroTail
+[       OK ] Samd21Ws2812TransportTest.TwentyOneByteFrameKeepsDataAndAddsOneZeroTail (0 ms)
+[ RUN      ] Samd21Ws2812TransportTest.ThirtyTwoByteFrameFitsThe281EntrySequence
+[       OK ] Samd21Ws2812TransportTest.ThirtyTwoByteFrameFitsThe281EntrySequence (0 ms)
+[ RUN      ] Samd21Ws2812TransportTest.SmallerBackendCapacityReservesPreambleAndTail
+[       OK ] Samd21Ws2812TransportTest.SmallerBackendCapacityReservesPreambleAndTail (0 ms)
+[ RUN      ] Samd21Ws2812TransportTest.BackendCapacityUsedOnlyByPreambleAndTailHasNoPayloadRoom
+[       OK ] Samd21Ws2812TransportTest.BackendCapacityUsedOnlyByPreambleAndTailHasNoPayloadRoom (0 ms)
+[ RUN      ] Samd21Ws2812TransportTest.ThirtyThreeByteFrameIsRejected
+[       OK ] Samd21Ws2812TransportTest.ThirtyThreeByteFrameIsRejected (0 ms)
+[ RUN      ] Samd21Ws2812TransportTest.LogsFrameBytesAndPulseSequence
+[       OK ] Samd21Ws2812TransportTest.LogsFrameBytesAndPulseSequence (0 ms)
+[----------] 6 tests from Samd21Ws2812TransportTest (0 ms total)
+
+[----------] 5 tests from Nrf52Ws2812SpiProbeTest
+[ RUN      ] Nrf52Ws2812SpiProbeTest.EncodesInputBytesMswFirstWithFiveBitSymbols
+[       OK ] Nrf52Ws2812SpiProbeTest.EncodesInputBytesMswFirstWithFiveBitSymbols (0 ms)
+[ RUN      ] Nrf52Ws2812SpiProbeTest.UsesConfiguredAllZeroAndAllOneSymbols
+[       OK ] Nrf52Ws2812SpiProbeTest.UsesConfiguredAllZeroAndAllOneSymbols (0 ms)
+[ RUN      ] Nrf52Ws2812SpiProbeTest.AddsLowPrefixAndThirtyTwoByteZeroTail
+[       OK ] Nrf52Ws2812SpiProbeTest.AddsLowPrefixAndThirtyTwoByteZeroTail (0 ms)
+[ RUN      ] Nrf52Ws2812SpiProbeTest.RejectsNullAndOutOfBoundsInputsBeforeWrite
+[       OK ] Nrf52Ws2812SpiProbeTest.RejectsNullAndOutOfBoundsInputsBeforeWrite (0 ms)
+[ RUN      ] Nrf52Ws2812SpiProbeTest.MapsSpiErrorsToBackendStatus
+[       OK ] Nrf52Ws2812SpiProbeTest.MapsSpiErrorsToBackendStatus (0 ms)
+[----------] 5 tests from Nrf52Ws2812SpiProbeTest (0 ms total)
+
+[----------] 4 tests from Nrf52Ws2812FrameTest
+[ RUN      ] Nrf52Ws2812FrameTest.ConvertsSevenGrbTripletsToRgbPixels
+[       OK ] Nrf52Ws2812FrameTest.ConvertsSevenGrbTripletsToRgbPixels (0 ms)
+[ RUN      ] Nrf52Ws2812FrameTest.RequiresTheCompleteSevenPixelFrame
+[       OK ] Nrf52Ws2812FrameTest.RequiresTheCompleteSevenPixelFrame (0 ms)
+[ RUN      ] Nrf52Ws2812FrameTest.RejectsNullFrameAndPixelBuffer
+[       OK ] Nrf52Ws2812FrameTest.RejectsNullFrameAndPixelBuffer (0 ms)
+[ RUN      ] Nrf52Ws2812FrameTest.MapsDriverFailureToBackendStatus
+[       OK ] Nrf52Ws2812FrameTest.MapsDriverFailureToBackendStatus (0 ms)
+[----------] 4 tests from Nrf52Ws2812FrameTest (0 ms total)
+
+[----------] 1 test from HwTaskStackTest
+[ RUN      ] HwTaskStackTest.StartPassesCallerOwnedStackToOshal
+[       OK ] HwTaskStackTest.StartPassesCallerOwnedStackToOshal (0 ms)
+[----------] 1 test from HwTaskStackTest (0 ms total)
+
+[----------] 1 test from HwTaskSetupTest
+[ RUN      ] HwTaskSetupTest.RegistrationFailureLogsAndAbortsSetup
+[       OK ] HwTaskSetupTest.RegistrationFailureLogsAndAbortsSetup (0 ms)
+[----------] 1 test from HwTaskSetupTest (0 ms total)
+
+[----------] 16 tests from ControllerCommandProtocolTest
+[ RUN      ] ControllerCommandProtocolTest.RegistersFourteenCommandsWithLoopback
+[       OK ] ControllerCommandProtocolTest.RegistersFourteenCommandsWithLoopback (0 ms)
+[ RUN      ] ControllerCommandProtocolTest.RegistrationFailureIsReturned
+[       OK ] ControllerCommandProtocolTest.RegistrationFailureIsReturned (0 ms)
+[ RUN      ] ControllerCommandProtocolTest.RemovedDelayTagRemainsUnassigned
+[       OK ] ControllerCommandProtocolTest.RemovedDelayTagRemainsUnassigned (0 ms)
+[ RUN      ] ControllerCommandProtocolTest.DecodesFadeFieldsLittleEndian
+[       OK ] ControllerCommandProtocolTest.DecodesFadeFieldsLittleEndian (0 ms)
+[ RUN      ] ControllerCommandProtocolTest.DecodesGradientFieldsLittleEndian
+[       OK ] ControllerCommandProtocolTest.DecodesGradientFieldsLittleEndian (0 ms)
+[ RUN      ] ControllerCommandProtocolTest.AcceptsZeroAndMaximumGradientMarksAndDurations
+[       OK ] ControllerCommandProtocolTest.AcceptsZeroAndMaximumGradientMarksAndDurations (0 ms)
+[ RUN      ] ControllerCommandProtocolTest.ExistingCommandTagsRemainCompatible
+[       OK ] ControllerCommandProtocolTest.ExistingCommandTagsRemainCompatible (0 ms)
+[ RUN      ] ControllerCommandProtocolTest.DecodesGroupedRgbRangeLittleEndian
+[       OK ] ControllerCommandProtocolTest.DecodesGroupedRgbRangeLittleEndian (0 ms)
+[ RUN      ] ControllerCommandProtocolTest.DecodesGroupedRgbSingleLittleEndian
+[       OK ] ControllerCommandProtocolTest.DecodesGroupedRgbSingleLittleEndian (0 ms)
+[ RUN      ] ControllerCommandProtocolTest.DecodesGroupedHsvSingleLittleEndian
+[       OK ] ControllerCommandProtocolTest.DecodesGroupedHsvSingleLittleEndian (0 ms)
+[ RUN      ] ControllerCommandProtocolTest.DecodesGroupedHsvRangeLittleEndian
+[       OK ] ControllerCommandProtocolTest.DecodesGroupedHsvRangeLittleEndian (0 ms)
+[ RUN      ] ControllerCommandProtocolTest.DecodesRunGroupAndStartFields
+[       OK ] ControllerCommandProtocolTest.DecodesRunGroupAndStartFields (0 ms)
+[ RUN      ] ControllerCommandProtocolTest.RejectsShortAndOverlongNewPayloads
+[       OK ] ControllerCommandProtocolTest.RejectsShortAndOverlongNewPayloads (0 ms)
+[ RUN      ] ControllerCommandProtocolTest.PreservesLegacyMinimumLengthsAndTrailingByteAcceptance
+[       OK ] ControllerCommandProtocolTest.PreservesLegacyMinimumLengthsAndTrailingByteAcceptance (0 ms)
+[ RUN      ] ControllerCommandProtocolTest.LegacyResetAndRunIgnorePayloadLength
+[       OK ] ControllerCommandProtocolTest.LegacyResetAndRunIgnorePayloadLength (0 ms)
+[ RUN      ] ControllerCommandProtocolTest.MailboxCapacityFailureIsLoggedAndAtomic
+[       OK ] ControllerCommandProtocolTest.MailboxCapacityFailureIsLoggedAndAtomic (0 ms)
+[----------] 16 tests from ControllerCommandProtocolTest (0 ms total)
+
+[----------] 8 tests from ControllerCommandDispatchTest
+[ RUN      ] ControllerCommandDispatchTest.LegacyRunAndNewStartUseSuccessGatedImmediateTick
+
+GMOCK WARNING:
+Uninteresting mock function call - returning default value.
+    Function call: Name()
+          Returns: NULL
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(0)
+          Returns: 0x2408fb98370
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+[       OK ] ControllerCommandDispatchTest.LegacyRunAndNewStartUseSuccessGatedImmediateTick (0 ms)
+[ RUN      ] ControllerCommandDispatchTest.TimerProgressRunsLaterMarksWithoutImplicitStart
+
+GMOCK WARNING:
+Uninteresting mock function call - returning default value.
+    Function call: Name()
+          Returns: NULL
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(1)
+          Returns: 0x2408fb98498
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+[       OK ] ControllerCommandDispatchTest.TimerProgressRunsLaterMarksWithoutImplicitStart (0 ms)
+[ RUN      ] ControllerCommandDispatchTest.RunGroupCommandRoutesGroupedInstructionToTargetGroup
+
+GMOCK WARNING:
+Uninteresting mock function call - returning default value.
+    Function call: Name()
+          Returns: NULL
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(0)
+          Returns: 0x2408fb98370
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+[       OK ] ControllerCommandDispatchTest.RunGroupCommandRoutesGroupedInstructionToTargetGroup (0 ms)
+[ RUN      ] ControllerCommandDispatchTest.FadeCommandPreservesGroupedFieldsThroughExecution
+
+GMOCK WARNING:
+Uninteresting mock function call - returning default value.
+    Function call: Name()
+          Returns: NULL
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(1)
+          Returns: 0x2408fb98498
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(1)
+          Returns: 0x2408fb98498
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+[       OK ] ControllerCommandDispatchTest.FadeCommandPreservesGroupedFieldsThroughExecution (0 ms)
+[ RUN      ] ControllerCommandDispatchTest.GradientCommandRoutesGroupedInstructionIntoPool
+
+GMOCK WARNING:
+Uninteresting mock function call - returning default value.
+    Function call: Name()
+          Returns: NULL
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(2)
+          Returns: 0x2408fb985c0
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(2)
+          Returns: 0x2408fb985c0
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+[       OK ] ControllerCommandDispatchTest.GradientCommandRoutesGroupedInstructionIntoPool (0 ms)
+[ RUN      ] ControllerCommandDispatchTest.FailedStartDoesNotRun
+
+GMOCK WARNING:
+Uninteresting mock function call - returning default value.
+    Function call: Name()
+          Returns: NULL
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+[       OK ] ControllerCommandDispatchTest.FailedStartDoesNotRun (0 ms)
+[ RUN      ] ControllerCommandDispatchTest.MutationCapacityAndBusyStatusesAreReturned
+
+GMOCK WARNING:
+Uninteresting mock function call - returning default value.
+    Function call: Name()
+          Returns: NULL
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+[       OK ] ControllerCommandDispatchTest.MutationCapacityAndBusyStatusesAreReturned (0 ms)
+[ RUN      ] ControllerCommandDispatchTest.StartRepeatPolicyIsForwarded
+
+GMOCK WARNING:
+Uninteresting mock function call - returning default value.
+    Function call: Name()
+          Returns: NULL
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+[       OK ] ControllerCommandDispatchTest.StartRepeatPolicyIsForwarded (0 ms)
+[----------] 8 tests from ControllerCommandDispatchTest (0 ms total)
+
+[----------] 4 tests from OklabTest
+[ RUN      ] OklabTest.ReferenceVectorsStayWithinOneSrgbCodeValue
+[       OK ] OklabTest.ReferenceVectorsStayWithinOneSrgbCodeValue (0 ms)
+[ RUN      ] OklabTest.NeutralGrayRoundTripsAcrossTheSrgbByteRange
+[       OK ] OklabTest.NeutralGrayRoundTripsAcrossTheSrgbByteRange (0 ms)
+[ RUN      ] OklabTest.InterpolationRoundsDeterministicallyAndHandlesFullDurationRange
+[       OK ] OklabTest.InterpolationRoundsDeterministicallyAndHandlesFullDurationRange (0 ms)
+[ RUN      ] OklabTest.FixedPointCoordinatesStayInsideConservativeMatrixBounds
+[       OK ] OklabTest.FixedPointCoordinatesStayInsideConservativeMatrixBounds (2 ms)
+[----------] 4 tests from OklabTest (2 ms total)
+
+[----------] 73 tests from ControllerTest
+[ RUN      ] ControllerTest.FadeCapturesActivationColorInterpolatesAndFinishesLate
+
+GMOCK WARNING:
+Uninteresting mock function call - returning default value.
+    Function call: Name()
+          Returns: NULL
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(2)
+          Returns: 0x2408fb985c0
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(2)
+          Returns: 0x2408fb985c0
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(2)
+          Returns: 0x2408fb985c0
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+[       OK ] ControllerTest.FadeCapturesActivationColorInterpolatesAndFinishesLate (0 ms)
+[ RUN      ] ControllerTest.Fade400PercentSaturatesValueAt255
+
+GMOCK WARNING:
+Uninteresting mock function call - returning default value.
+    Function call: Name()
+          Returns: NULL
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(1)
+          Returns: 0x2408fb98498
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+[       OK ] ControllerTest.Fade400PercentSaturatesValueAt255 (0 ms)
+[ RUN      ] ControllerTest.FadeZeroDurationAppliesTargetImmediately
+
+GMOCK WARNING:
+Uninteresting mock function call - returning default value.
+    Function call: Name()
+          Returns: NULL
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(0)
+          Returns: 0x2408fb98370
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+[       OK ] ControllerTest.FadeZeroDurationAppliesTargetImmediately (0 ms)
+[ RUN      ] ControllerTest.FadeBlackInputRemainsBlackWhileFadingUp
+
+GMOCK WARNING:
+Uninteresting mock function call - returning default value.
+    Function call: Name()
+          Returns: NULL
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(4)
+          Returns: 0x2408fb98810
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(4)
+          Returns: 0x2408fb98810
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(4)
+          Returns: 0x2408fb98810
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+[       OK ] ControllerTest.FadeBlackInputRemainsBlackWhileFadingUp (0 ms)
+[ RUN      ] ControllerTest.FadeZeroDurationDoesNotPermitRepeatedRootGroup
+
+GMOCK WARNING:
+Uninteresting mock function call - returning default value.
+    Function call: Name()
+          Returns: NULL
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+[       OK ] ControllerTest.FadeZeroDurationDoesNotPermitRepeatedRootGroup (0 ms)
+[ RUN      ] ControllerTest.FadeReplayCapturesNewStagedColor
+
+GMOCK WARNING:
+Uninteresting mock function call - returning default value.
+    Function call: Name()
+          Returns: NULL
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(0)
+          Returns: 0x2408fb98370
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(0)
+          Returns: 0x2408fb98370
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(0)
+          Returns: 0x2408fb98370
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(0)
+          Returns: 0x2408fb98370
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+[       OK ] ControllerTest.FadeReplayCapturesNewStagedColor (0 ms)
+[ RUN      ] ControllerTest.FadeUpdatesUseSharedTwentyMillisecondGrid
+
+GMOCK WARNING:
+Uninteresting mock function call - returning default value.
+    Function call: Name()
+          Returns: NULL
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(0)
+          Returns: 0x2408fb98370
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(1)
+          Returns: 0x2408fb98498
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(0)
+          Returns: 0x2408fb98370
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(1)
+          Returns: 0x2408fb98498
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+[       OK ] ControllerTest.FadeUpdatesUseSharedTwentyMillisecondGrid (0 ms)
+[ RUN      ] ControllerTest.RefreshPeriodValidatesAndPersistsAcrossReset
+
+GMOCK WARNING:
+Uninteresting mock function call - returning default value.
+    Function call: Name()
+          Returns: NULL
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+[       OK ] ControllerTest.RefreshPeriodValidatesAndPersistsAcrossReset (0 ms)
+[ RUN      ] ControllerTest.FadeUsesConfiguredPeriodAndRetainsItOnReplay
+
+GMOCK WARNING:
+Uninteresting mock function call - returning default value.
+    Function call: Name()
+          Returns: NULL
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(0)
+          Returns: 0x2408fb98370
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(0)
+          Returns: 0x2408fb98370
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(0)
+          Returns: 0x2408fb98370
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(0)
+          Returns: 0x2408fb98370
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+[       OK ] ControllerTest.FadeUsesConfiguredPeriodAndRetainsItOnReplay (0 ms)
+[ RUN      ] ControllerTest.GradientUsesConfiguredStartRelativePeriod
+
+GMOCK WARNING:
+Uninteresting mock function call - returning default value.
+    Function call: Name()
+          Returns: NULL
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(2)
+          Returns: 0x2408fb985c0
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(2)
+          Returns: 0x2408fb985c0
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+[       OK ] ControllerTest.GradientUsesConfiguredStartRelativePeriod (0 ms)
+[ RUN      ] ControllerTest.FadeElapsedTimeIsWrapSafe
+
+GMOCK WARNING:
+Uninteresting mock function call - returning default value.
+    Function call: Name()
+          Returns: NULL
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(0)
+          Returns: 0x2408fb98370
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(0)
+          Returns: 0x2408fb98370
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(0)
+          Returns: 0x2408fb98370
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+[       OK ] ControllerTest.FadeElapsedTimeIsWrapSafe (0 ms)
+[ RUN      ] ControllerTest.FadesUseSingleRunTimestampForActivationAndScheduling
+
+GMOCK WARNING:
+Uninteresting mock function call - returning default value.
+    Function call: Name()
+          Returns: NULL
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(0)
+          Returns: 0x2408fb98370
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(1)
+          Returns: 0x2408fb98498
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+[       OK ] ControllerTest.FadesUseSingleRunTimestampForActivationAndScheduling (0 ms)
+[ RUN      ] ControllerTest.FadeTwentyFiveThenFourHundredPercentCharacterizesPalette
+
+GMOCK WARNING:
+Uninteresting mock function call - returning default value.
+    Function call: Name()
+          Returns: NULL
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(0)
+          Returns: 0x2408fb98370
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(0)
+          Returns: 0x2408fb98370
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(1)
+          Returns: 0x2408fb98498
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(1)
+          Returns: 0x2408fb98498
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(2)
+          Returns: 0x2408fb985c0
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(2)
+          Returns: 0x2408fb985c0
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(3)
+          Returns: 0x2408fb986e8
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(3)
+          Returns: 0x2408fb986e8
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(4)
+          Returns: 0x2408fb98810
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(4)
+          Returns: 0x2408fb98810
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(5)
+          Returns: 0x2408fb98938
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(5)
+          Returns: 0x2408fb98938
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(6)
+          Returns: 0x2408fb98a60
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(6)
+          Returns: 0x2408fb98a60
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+[       OK ] ControllerTest.FadeTwentyFiveThenFourHundredPercentCharacterizesPalette (0 ms)
+[ RUN      ] ControllerTest.GradientZeroDurationAppliesExactTargetImmediately
+
+GMOCK WARNING:
+Uninteresting mock function call - returning default value.
+    Function call: Name()
+          Returns: NULL
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(2)
+          Returns: 0x2408fba3860
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+[       OK ] ControllerTest.GradientZeroDurationAppliesExactTargetImmediately (0 ms)
+[ RUN      ] ControllerTest.GradientCompletesOnExactGridBoundary
+
+GMOCK WARNING:
+Uninteresting mock function call - returning default value.
+    Function call: Name()
+          Returns: NULL
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(1)
+          Returns: 0x2408fba3738
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(1)
+          Returns: 0x2408fba3738
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(1)
+          Returns: 0x2408fba3738
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+[       OK ] ControllerTest.GradientCompletesOnExactGridBoundary (0 ms)
+[ RUN      ] ControllerTest.GradientLateRunSkipsMissedSamplesAndCompletesOffGrid
+
+GMOCK WARNING:
+Uninteresting mock function call - returning default value.
+    Function call: Name()
+          Returns: NULL
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(4)
+          Returns: 0x2408fba3ab0
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(4)
+          Returns: 0x2408fba3ab0
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(4)
+          Returns: 0x2408fba3ab0
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(4)
+          Returns: 0x2408fba3ab0
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+[       OK ] ControllerTest.GradientLateRunSkipsMissedSamplesAndCompletesOffGrid (0 ms)
+[ RUN      ] ControllerTest.GradientElapsedTimeIsWrapSafe
+
+GMOCK WARNING:
+Uninteresting mock function call - returning default value.
+    Function call: Name()
+          Returns: NULL
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(0)
+          Returns: 0x2408fba3610
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(0)
+          Returns: 0x2408fba3610
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(0)
+          Returns: 0x2408fba3610
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+[       OK ] ControllerTest.GradientElapsedTimeIsWrapSafe (0 ms)
+[ RUN      ] ControllerTest.GradientInvalidIndexCompletesWithoutWrites
+
+GMOCK WARNING:
+Uninteresting mock function call - returning default value.
+    Function call: Name()
+          Returns: NULL
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(9)
+          Returns: NULL
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+[       OK ] ControllerTest.GradientInvalidIndexCompletesWithoutWrites (0 ms)
+[ RUN      ] ControllerTest.GradientCapturesSameMarkColorAfterSetColor
+
+GMOCK WARNING:
+Uninteresting mock function call - returning default value.
+    Function call: Name()
+          Returns: NULL
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(3)
+          Returns: 0x2408fba3988
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(3)
+          Returns: 0x2408fba3988
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(3)
+          Returns: 0x2408fba3988
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(3)
+          Returns: 0x2408fba3988
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+[       OK ] ControllerTest.GradientCapturesSameMarkColorAfterSetColor (0 ms)
+[ RUN      ] ControllerTest.GradientGroupReplayCapturesThenCurrentStagedColor
+
+GMOCK WARNING:
+Uninteresting mock function call - returning default value.
+    Function call: Name()
+          Returns: NULL
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(5)
+          Returns: 0x2408fba3bd8
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(5)
+          Returns: 0x2408fba3bd8
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(5)
+          Returns: 0x2408fba3bd8
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(5)
+          Returns: 0x2408fba3bd8
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(5)
+          Returns: 0x2408fba3bd8
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(5)
+          Returns: 0x2408fba3bd8
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(5)
+          Returns: 0x2408fba3bd8
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(5)
+          Returns: 0x2408fba3bd8
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+[       OK ] ControllerTest.GradientGroupReplayCapturesThenCurrentStagedColor (0 ms)
+[ RUN      ] ControllerTest.GradientResetLeavesLastStagedSampleInPlace
+
+GMOCK WARNING:
+Uninteresting mock function call - returning default value.
+    Function call: Name()
+          Returns: NULL
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(6)
+          Returns: 0x2408fba3d00
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(6)
+          Returns: 0x2408fba3d00
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+[       OK ] ControllerTest.GradientResetLeavesLastStagedSampleInPlace (0 ms)
+[ RUN      ] ControllerTest.GradientsOnOnePixelKeepOrderAndCoalesceShow
+
+GMOCK WARNING:
+Uninteresting mock function call - returning default value.
+    Function call: Name()
+          Returns: NULL
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(1)
+          Returns: 0x2408fba3738
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(1)
+          Returns: 0x2408fba3738
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(1)
+          Returns: 0x2408fba3738
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(1)
+          Returns: 0x2408fba3738
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(1)
+          Returns: 0x2408fba3738
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(1)
+          Returns: 0x2408fba3738
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+[       OK ] ControllerTest.GradientsOnOnePixelKeepOrderAndCoalesceShow (0 ms)
+[ RUN      ] ControllerTest.SetSingleColorHsvConvertsAndDispatches
+
+GMOCK WARNING:
+Uninteresting mock function call - returning default value.
+    Function call: Name()
+          Returns: NULL
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(2)
+          Returns: 0x2408fba3860
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+[       OK ] ControllerTest.SetSingleColorHsvConvertsAndDispatches (0 ms)
+[ RUN      ] ControllerTest.SetMultipleColorHsvFillsRange
+
+GMOCK WARNING:
+Uninteresting mock function call - returning default value.
+    Function call: Name()
+          Returns: NULL
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(0)
+          Returns: 0x2408fba3610
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(1)
+          Returns: 0x2408fba3738
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(2)
+          Returns: 0x2408fba3860
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+[       OK ] ControllerTest.SetMultipleColorHsvFillsRange (0 ms)
+[ RUN      ] ControllerTest.SetSingleColorHsvWithNullStripIsNoop
+
+GMOCK WARNING:
+Uninteresting mock function call - returning default value.
+    Function call: Name()
+          Returns: NULL
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+[       OK ] ControllerTest.SetSingleColorHsvWithNullStripIsNoop (0 ms)
+[ RUN      ] ControllerTest.SlotReusesRgbThenHsv
+
+GMOCK WARNING:
+Uninteresting mock function call - returning default value.
+    Function call: Name()
+          Returns: NULL
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(0)
+          Returns: 0x2408fba3610
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(1)
+          Returns: 0x2408fba3738
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+[       OK ] ControllerTest.SlotReusesRgbThenHsv (0 ms)
+[ RUN      ] ControllerTest.SetSingleColorDispatchesToCorrectLed
+
+GMOCK WARNING:
+Uninteresting mock function call - returning default value.
+    Function call: Name()
+          Returns: NULL
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(3)
+          Returns: 0x2408fba3988
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+[       OK ] ControllerTest.SetSingleColorDispatchesToCorrectLed (0 ms)
+[ RUN      ] ControllerTest.SetSingleColorWithNullStripIsNoop
+
+GMOCK WARNING:
+Uninteresting mock function call - returning default value.
+    Function call: Name()
+          Returns: NULL
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+[       OK ] ControllerTest.SetSingleColorWithNullStripIsNoop (0 ms)
+[ RUN      ] ControllerTest.SetMultipleColorFillsRange
+
+GMOCK WARNING:
+Uninteresting mock function call - returning default value.
+    Function call: Name()
+          Returns: NULL
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(1)
+          Returns: 0x2408fba3738
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(2)
+          Returns: 0x2408fba3860
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+[       OK ] ControllerTest.SetMultipleColorFillsRange (0 ms)
+[ RUN      ] ControllerTest.RunIteratesAllSlots
+
+GMOCK WARNING:
+Uninteresting mock function call - returning default value.
+    Function call: Name()
+          Returns: NULL
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(0)
+          Returns: 0x2408fba3610
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - returning default value.
+    Function call: SetColor(@0x2408fba3f7c 3-byte object <FF-00 00>)
+          Returns: 0
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(1)
+          Returns: 0x2408fba3738
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - returning default value.
+    Function call: SetColor(@0x2408fba3fc4 3-byte object <00-FF 00>)
+          Returns: 0
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(2)
+          Returns: 0x2408fba3860
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - returning default value.
+    Function call: SetColor(@0x2408fba400c 3-byte object <00-00 FF>)
+          Returns: 0
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+[       OK ] ControllerTest.RunIteratesAllSlots (0 ms)
+[ RUN      ] ControllerTest.RunOnEmptyControllerIsNoop
+
+GMOCK WARNING:
+Uninteresting mock function call - returning default value.
+    Function call: Name()
+          Returns: NULL
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+[       OK ] ControllerTest.RunOnEmptyControllerIsNoop (0 ms)
+[ RUN      ] ControllerTest.RunOnLoadedEditableProgramIsNoop
+
+GMOCK WARNING:
+Uninteresting mock function call - returning default value.
+    Function call: Name()
+          Returns: NULL
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+[       OK ] ControllerTest.RunOnLoadedEditableProgramIsNoop (0 ms)
+[ RUN      ] ControllerTest.StartDefersMarkZeroWorkUntilRun
+
+GMOCK WARNING:
+Uninteresting mock function call - returning default value.
+    Function call: Name()
+          Returns: NULL
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(0)
+          Returns: 0x2408fba3610
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+[       OK ] ControllerTest.StartDefersMarkZeroWorkUntilRun (0 ms)
+[ RUN      ] ControllerTest.ResetInstructionsClearsState
+
+GMOCK WARNING:
+Uninteresting mock function call - returning default value.
+    Function call: Name()
+          Returns: NULL
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+[       OK ] ControllerTest.ResetInstructionsClearsState (0 ms)
+[ RUN      ] ControllerTest.SlotExecuteDispatchesCorrectly
+
+GMOCK WARNING:
+Uninteresting mock function call - returning default value.
+    Function call: Name()
+          Returns: NULL
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(5)
+          Returns: 0x2408fba3bd8
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+[       OK ] ControllerTest.SlotExecuteDispatchesCorrectly (0 ms)
+[ RUN      ] ControllerTest.SlotCanBeReused
+
+GMOCK WARNING:
+Uninteresting mock function call - returning default value.
+    Function call: Name()
+          Returns: NULL
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(2)
+          Returns: 0x2408fba3860
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(0)
+          Returns: 0x2408fba3610
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(1)
+          Returns: 0x2408fba3738
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+[       OK ] ControllerTest.SlotCanBeReused (0 ms)
+[ RUN      ] ControllerTest.InstructionsSortedByMark
+
+GMOCK WARNING:
+Uninteresting mock function call - returning default value.
+    Function call: Name()
+          Returns: NULL
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(2)
+          Returns: 0x2408fba3860
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(1)
+          Returns: 0x2408fba3738
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(0)
+          Returns: 0x2408fba3610
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+[       OK ] ControllerTest.InstructionsSortedByMark (0 ms)
+[ RUN      ] ControllerTest.PickNewInstructionsHonorsMark
+
+GMOCK WARNING:
+Uninteresting mock function call - returning default value.
+    Function call: Name()
+          Returns: NULL
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(0)
+          Returns: 0x2408fba3610
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+[       OK ] ControllerTest.PickNewInstructionsHonorsMark (0 ms)
+[ RUN      ] ControllerTest.LookAheadTimeoutFromExecuting
+
+GMOCK WARNING:
+Uninteresting mock function call - returning default value.
+    Function call: Name()
+          Returns: NULL
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(0)
+          Returns: 0x2408fba3610
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+[       OK ] ControllerTest.LookAheadTimeoutFromExecuting (0 ms)
+[ RUN      ] ControllerTest.LookAheadTimeoutFromMarkWhenNoExecuting
+
+GMOCK WARNING:
+Uninteresting mock function call - returning default value.
+    Function call: Name()
+          Returns: NULL
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+[       OK ] ControllerTest.LookAheadTimeoutFromMarkWhenNoExecuting (0 ms)
+[ RUN      ] ControllerTest.RunStillWorksWithMarks
+
+GMOCK WARNING:
+Uninteresting mock function call - returning default value.
+    Function call: Name()
+          Returns: NULL
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(0)
+          Returns: 0x2408fba3610
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(1)
+          Returns: 0x2408fba3738
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(2)
+          Returns: 0x2408fba3860
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+[       OK ] ControllerTest.RunStillWorksWithMarks (0 ms)
+[ RUN      ] ControllerTest.ResetInstructionsClearsStateWithMarks
+
+GMOCK WARNING:
+Uninteresting mock function call - returning default value.
+    Function call: Name()
+          Returns: NULL
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+[       OK ] ControllerTest.ResetInstructionsClearsStateWithMarks (0 ms)
+[ RUN      ] ControllerTest.RunGroupSlotStoresItsMembershipAndTarget
+
+GMOCK WARNING:
+Uninteresting mock function call - returning default value.
+    Function call: Name()
+          Returns: NULL
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+[       OK ] ControllerTest.RunGroupSlotStoresItsMembershipAndTarget (0 ms)
+[ RUN      ] ControllerTest.TimedTestInstructionSlotYieldsAndResets
+
+GMOCK WARNING:
+Uninteresting mock function call - returning default value.
+    Function call: Name()
+          Returns: NULL
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+[       OK ] ControllerTest.TimedTestInstructionSlotYieldsAndResets (0 ms)
+[ RUN      ] ControllerTest.GroupRuntimeResetRetainsItsRecord
+
+GMOCK WARNING:
+Uninteresting mock function call - returning default value.
+    Function call: Name()
+          Returns: NULL
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+[       OK ] ControllerTest.GroupRuntimeResetRetainsItsRecord (0 ms)
+[ RUN      ] ControllerTest.AddInstructionReportsNullAndCapacityFailures
+
+GMOCK WARNING:
+Uninteresting mock function call - returning default value.
+    Function call: Name()
+          Returns: NULL
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+[       OK ] ControllerTest.AddInstructionReportsNullAndCapacityFailures (0 ms)
+[ RUN      ] ControllerTest.MaximumGroupCountIncludesImplicitRoot
+
+GMOCK WARNING:
+Uninteresting mock function call - returning default value.
+    Function call: Name()
+          Returns: NULL
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+[       OK ] ControllerTest.MaximumGroupCountIncludesImplicitRoot (0 ms)
+[ RUN      ] ControllerTest.SevenStaggeredForeverChildrenRepeatConcurrently
+
+GMOCK WARNING:
+Uninteresting mock function call - returning default value.
+    Function call: Name()
+          Returns: NULL
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(0)
+          Returns: 0x2408fba3610
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(1)
+          Returns: 0x2408fba3738
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(2)
+          Returns: 0x2408fba3860
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(3)
+          Returns: 0x2408fba3988
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(4)
+          Returns: 0x2408fba3ab0
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(5)
+          Returns: 0x2408fba3bd8
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(6)
+          Returns: 0x2408fba3d00
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+[       OK ] ControllerTest.SevenStaggeredForeverChildrenRepeatConcurrently (0 ms)
+[ RUN      ] ControllerTest.SparseGroupIdsResolveRunGroupTargets
+
+GMOCK WARNING:
+Uninteresting mock function call - returning default value.
+    Function call: Name()
+          Returns: NULL
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+[       OK ] ControllerTest.SparseGroupIdsResolveRunGroupTargets (0 ms)
+[ RUN      ] ControllerTest.EmptyRootIsValidWithNonRootInstructions
+
+GMOCK WARNING:
+Uninteresting mock function call - returning default value.
+    Function call: Name()
+          Returns: NULL
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+[       OK ] ControllerTest.EmptyRootIsValidWithNonRootInstructions (0 ms)
+[ RUN      ] ControllerTest.RunGroupRejectsMissingAndRootTargets
+
+GMOCK WARNING:
+Uninteresting mock function call - returning default value.
+    Function call: Name()
+          Returns: NULL
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+[       OK ] ControllerTest.RunGroupRejectsMissingAndRootTargets (0 ms)
+[ RUN      ] ControllerTest.RunGroupRejectsCycles
+
+GMOCK WARNING:
+Uninteresting mock function call - returning default value.
+    Function call: Name()
+          Returns: NULL
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+[       OK ] ControllerTest.RunGroupRejectsCycles (0 ms)
+[ RUN      ] ControllerTest.RepeatedZeroTimeGroupsFailPreflight
+
+GMOCK WARNING:
+Uninteresting mock function call - returning default value.
+    Function call: Name()
+          Returns: NULL
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+[       OK ] ControllerTest.RepeatedZeroTimeGroupsFailPreflight (0 ms)
+[ RUN      ] ControllerTest.RepeatedGroupsRequireAndAcceptPositiveBoundaries
+
+GMOCK WARNING:
+Uninteresting mock function call - returning default value.
+    Function call: Name()
+          Returns: NULL
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+[       OK ] ControllerTest.RepeatedGroupsRequireAndAcceptPositiveBoundaries (0 ms)
+[ RUN      ] ControllerTest.NestedChildBoundaryPropagatesToRepeatedRoot
+
+GMOCK WARNING:
+Uninteresting mock function call - returning default value.
+    Function call: Name()
+          Returns: NULL
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+[       OK ] ControllerTest.NestedChildBoundaryPropagatesToRepeatedRoot (0 ms)
+[ RUN      ] ControllerTest.ChildForeverRepeatWithoutBoundaryFailsPreflight
+
+GMOCK WARNING:
+Uninteresting mock function call - returning default value.
+    Function call: Name()
+          Returns: NULL
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+[       OK ] ControllerTest.ChildForeverRepeatWithoutBoundaryFailsPreflight (0 ms)
+[ RUN      ] ControllerTest.ParentProgressesWhileChildUsesLocalMarks
+
+GMOCK WARNING:
+Uninteresting mock function call - returning default value.
+    Function call: Name()
+          Returns: NULL
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(0)
+          Returns: 0x2408fba3610
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(1)
+          Returns: 0x2408fba3738
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+[       OK ] ControllerTest.ParentProgressesWhileChildUsesLocalMarks (0 ms)
+[ RUN      ] ControllerTest.SchedulesEarliestDeadlineAcrossActiveGroups
+
+GMOCK WARNING:
+Uninteresting mock function call - returning default value.
+    Function call: Name()
+          Returns: NULL
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(0)
+          Returns: 0x2408fba3610
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+[       OK ] ControllerTest.SchedulesEarliestDeadlineAcrossActiveGroups (0 ms)
+[ RUN      ] ControllerTest.FiniteChildRepeatReplaysTimedInstruction
+
+GMOCK WARNING:
+Uninteresting mock function call - returning default value.
+    Function call: Name()
+          Returns: NULL
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+[       OK ] ControllerTest.FiniteChildRepeatReplaysTimedInstruction (0 ms)
+[ RUN      ] ControllerTest.FiniteRootRepeatReplaysTimedInstruction
+
+GMOCK WARNING:
+Uninteresting mock function call - returning default value.
+    Function call: Name()
+          Returns: NULL
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+[       OK ] ControllerTest.FiniteRootRepeatReplaysTimedInstruction (0 ms)
+[ RUN      ] ControllerTest.RootForeverRepeatsAcrossTimedBoundary
+
+GMOCK WARNING:
+Uninteresting mock function call - returning default value.
+    Function call: Name()
+          Returns: NULL
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+[       OK ] ControllerTest.RootForeverRepeatsAcrossTimedBoundary (0 ms)
+[ RUN      ] ControllerTest.NestedChildBoundaryDelaysRepeatedRootUntilChainCompletes
+
+GMOCK WARNING:
+Uninteresting mock function call - returning default value.
+    Function call: Name()
+          Returns: NULL
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(2)
+          Returns: 0x2408fba3860
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(2)
+          Returns: 0x2408fba3860
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+[       OK ] ControllerTest.NestedChildBoundaryDelaysRepeatedRootUntilChainCompletes (0 ms)
+[ RUN      ] ControllerTest.ActiveGroupConflictLeavesFirstInvocationRunning
+
+GMOCK WARNING:
+Uninteresting mock function call - returning default value.
+    Function call: Name()
+          Returns: NULL
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(3)
+          Returns: 0x2408fba3988
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+[       OK ] ControllerTest.ActiveGroupConflictLeavesFirstInvocationRunning (0 ms)
+[ RUN      ] ControllerTest.RepeatedGroupStopsWhenOnlyChildBoundaryConflicts
+
+GMOCK WARNING:
+Uninteresting mock function call - returning default value.
+    Function call: Name()
+          Returns: NULL
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(4)
+          Returns: 0x2408fba3ab0
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+[       OK ] ControllerTest.RepeatedGroupStopsWhenOnlyChildBoundaryConflicts (0 ms)
+[ RUN      ] ControllerTest.FailedChildCallObservesItsPositiveMarkWhenDue
+
+GMOCK WARNING:
+Uninteresting mock function call - returning default value.
+    Function call: Name()
+          Returns: NULL
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(5)
+          Returns: 0x2408fba3bd8
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+[       OK ] ControllerTest.FailedChildCallObservesItsPositiveMarkWhenDue (0 ms)
+[ RUN      ] ControllerTest.ChildTimedBoundaryPropagatesToRepeatedRoot
+
+GMOCK WARNING:
+Uninteresting mock function call - returning default value.
+    Function call: Name()
+          Returns: NULL
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+[       OK ] ControllerTest.ChildTimedBoundaryPropagatesToRepeatedRoot (0 ms)
+[ RUN      ] ControllerTest.RepeatedBoundaryMismatchReturnsInvalidProgram
+
+GMOCK WARNING:
+Uninteresting mock function call - returning default value.
+    Function call: Name()
+          Returns: NULL
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+[       OK ] ControllerTest.RepeatedBoundaryMismatchReturnsInvalidProgram (0 ms)
+[ RUN      ] ControllerTest.WorkedTimelineKeepsParentAndChildPassesInSync
+
+GMOCK WARNING:
+Uninteresting mock function call - returning default value.
+    Function call: Name()
+          Returns: NULL
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(0)
+          Returns: 0x2408fba3610
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(0)
+          Returns: 0x2408fba3610
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(1)
+          Returns: 0x2408fba3738
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(1)
+          Returns: 0x2408fba3738
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(1)
+          Returns: 0x2408fba3738
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(0)
+          Returns: 0x2408fba3610
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(1)
+          Returns: 0x2408fba3738
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+[       OK ] ControllerTest.WorkedTimelineKeepsParentAndChildPassesInSync (0 ms)
+[ RUN      ] ControllerTest.TimestampWrapPreservesMarksAndDeadlines
+
+GMOCK WARNING:
+Uninteresting mock function call - returning default value.
+    Function call: Name()
+          Returns: NULL
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(4)
+          Returns: 0x2408fba3ab0
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+[       OK ] ControllerTest.TimestampWrapPreservesMarksAndDeadlines (0 ms)
+[ RUN      ] ControllerTest.ResetAbortsChildTimedWorkAndStaleTick
+
+GMOCK WARNING:
+Uninteresting mock function call - returning default value.
+    Function call: Name()
+          Returns: NULL
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+[       OK ] ControllerTest.ResetAbortsChildTimedWorkAndStaleTick (0 ms)
+[ RUN      ] ControllerTest.CompletedProgramReplayUsesFreshOrigin
+
+GMOCK WARNING:
+Uninteresting mock function call - returning default value.
+    Function call: Name()
+          Returns: NULL
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+[       OK ] ControllerTest.CompletedProgramReplayUsesFreshOrigin (0 ms)
+[ RUN      ] ControllerTest.EqualMarksPreserveInsertionOrder
+
+GMOCK WARNING:
+Uninteresting mock function call - returning default value.
+    Function call: Name()
+          Returns: NULL
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(0)
+          Returns: 0x2408fba3610
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(1)
+          Returns: 0x2408fba3738
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+[       OK ] ControllerTest.EqualMarksPreserveInsertionOrder (0 ms)
+[ RUN      ] ControllerTest.AddInstructionLocksAfterStartAndCompletion
+
+GMOCK WARNING:
+Uninteresting mock function call - returning default value.
+    Function call: Name()
+          Returns: NULL
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+
+GMOCK WARNING:
+Uninteresting mock function call - taking default action specified at:
+C:\dev\west-zephyr\prism-kit\tests\mock_strip.hpp:53:
+    Function call: Led(0)
+          Returns: 0x2408fba3610
+NOTE: You can safely ignore the above warning unless this call should not happen.  Do not suppress it by blindly adding an EXPECT_CALL() if you don't mean to enforce the call.  See https://github.com/google/googletest/blob/main/docs/gmock_cook_book.md#knowing-when-to-expect-useoncall for details.
+[       OK ] ControllerTest.AddInstructionLocksAfterStartAndCompletion (0 ms)
+[----------] 73 tests from ControllerTest (6 ms total)
+
+[----------] Global test environment tear-down
+[==========] 118 tests from 9 test suites ran. (11 ms total)
+[  PASSED  ] 118 tests.
+-- Configuring done (1.3s)
+-- Generating done (0.2s)
+-- Build files have been written to: C:/dev/west-zephyr/prism-kit/protocol/tests/build
+[ 28%] Built target gtest
+[ 57%] Built target gtest_main
+[100%] Built target protocol_test
+Running main() from C:\dev\west-zephyr\prism-kit\protocol\tests\build\_deps\googletest-src\googletest\src\gtest_main.cc
+[==========] Running 34 tests from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 34 tests from ProtocolTest
+[ RUN      ] ProtocolTest.Constructor_DefaultConfig
+[       OK ] ProtocolTest.Constructor_DefaultConfig (0 ms)
+[ RUN      ] ProtocolTest.Constructor_NullWrite
+[       OK ] ProtocolTest.Constructor_NullWrite (0 ms)
+[ RUN      ] ProtocolTest.Constructor_BothNull
+[       OK ] ProtocolTest.Constructor_BothNull (0 ms)
+[ RUN      ] ProtocolTest.AddHandler_Success
+[       OK ] ProtocolTest.AddHandler_Success (0 ms)
+[ RUN      ] ProtocolTest.AddHandler_DuplicateTag
+[       OK ] ProtocolTest.AddHandler_DuplicateTag (0 ms)
+[ RUN      ] ProtocolTest.AddHandler_NullHandler
+[       OK ] ProtocolTest.AddHandler_NullHandler (0 ms)
+[ RUN      ] ProtocolTest.AddHandler_TableFull
+[       OK ] ProtocolTest.AddHandler_TableFull (0 ms)
+[ RUN      ] ProtocolTest.AddHandler_LoopbackAlreadyRegistered
+[       OK ] ProtocolTest.AddHandler_LoopbackAlreadyRegistered (0 ms)
+[ RUN      ] ProtocolTest.Send_ValidFrame
+[       OK ] ProtocolTest.Send_ValidFrame (0 ms)
+[ RUN      ] ProtocolTest.Send_ZeroLengthFrame
+[       OK ] ProtocolTest.Send_ZeroLengthFrame (0 ms)
+[ RUN      ] ProtocolTest.Send_InvalidFrame
+[       OK ] ProtocolTest.Send_InvalidFrame (0 ms)
+[ RUN      ] ProtocolTest.Send_DataCopied
+[       OK ] ProtocolTest.Send_DataCopied (0 ms)
+[ RUN      ] ProtocolTest.Send_BusyTx
+[       OK ] ProtocolTest.Send_BusyTx (0 ms)
+[ RUN      ] ProtocolTest.Rx_MinimalFrame
+[       OK ] ProtocolTest.Rx_MinimalFrame (0 ms)
+[ RUN      ] ProtocolTest.Rx_FrameWithData
+[       OK ] ProtocolTest.Rx_FrameWithData (0 ms)
+[ RUN      ] ProtocolTest.Rx_ChecksumMismatch
+[       OK ] ProtocolTest.Rx_ChecksumMismatch (0 ms)
+[ RUN      ] ProtocolTest.Rx_MultipleFrames
+[       OK ] ProtocolTest.Rx_MultipleFrames (0 ms)
+[ RUN      ] ProtocolTest.Rx_GarbageBeforeSync
+[       OK ] ProtocolTest.Rx_GarbageBeforeSync (0 ms)
+[ RUN      ] ProtocolTest.Rx_LengthExceedsMax
+[       OK ] ProtocolTest.Rx_LengthExceedsMax (0 ms)
+[ RUN      ] ProtocolTest.Rx_StreamReader_Basic
+[       OK ] ProtocolTest.Rx_StreamReader_Basic (0 ms)
+[ RUN      ] ProtocolTest.Rx_StreamReader_MultipleFrames
+[       OK ] ProtocolTest.Rx_StreamReader_MultipleFrames (0 ms)
+[ RUN      ] ProtocolTest.Rx_StreamReader_NoData
+[       OK ] ProtocolTest.Rx_StreamReader_NoData (0 ms)
+[ RUN      ] ProtocolTest.Rx_StreamReader_LargeReadAhead
+[       OK ] ProtocolTest.Rx_StreamReader_LargeReadAhead (0 ms)
+[ RUN      ] ProtocolTest.Loopback_EchoesBack
+[       OK ] ProtocolTest.Loopback_EchoesBack (0 ms)
+[ RUN      ] ProtocolTest.Loopback_AfterUserFrame
+[       OK ] ProtocolTest.Loopback_AfterUserFrame (0 ms)
+[ RUN      ] ProtocolTest.Edge_MaxPayloadLength
+[       OK ] ProtocolTest.Edge_MaxPayloadLength (0 ms)
+[ RUN      ] ProtocolTest.Edge_NoReaderData
+[       OK ] ProtocolTest.Edge_NoReaderData (0 ms)
+[ RUN      ] ProtocolTest.Edge_ZeroLengthReaderData
+[       OK ] ProtocolTest.Edge_ZeroLengthReaderData (0 ms)
+[ RUN      ] ProtocolTest.Edge_HeaderBytesWithSpecialValues
+[       OK ] ProtocolTest.Edge_HeaderBytesWithSpecialValues (0 ms)
+[ RUN      ] ProtocolTest.Timeout_DisabledWhenZero
+[       OK ] ProtocolTest.Timeout_DisabledWhenZero (0 ms)
+[ RUN      ] ProtocolTest.Timeout_CompletesBeforeDeadline
+[       OK ] ProtocolTest.Timeout_CompletesBeforeDeadline (0 ms)
+[ RUN      ] ProtocolTest.Timeout_ResetsOnExpiry
+[       OK ] ProtocolTest.Timeout_ResetsOnExpiry (0 ms)
+[ RUN      ] ProtocolTest.Timeout_ResetsOnlyWhenExpired
+[       OK ] ProtocolTest.Timeout_ResetsOnlyWhenExpired (0 ms)
+[ RUN      ] ProtocolTest.Timeout_NoTimestampCallbackDisablesTimeout
+[       OK ] ProtocolTest.Timeout_NoTimestampCallbackDisablesTimeout (0 ms)
+[----------] 34 tests from ProtocolTest (0 ms total)
+
+[----------] Global test environment tear-down
+[==========] 34 tests from 1 test suite ran. (0 ms total)
+[  PASSED  ] 34 tests.
+
+--- Configuring: controller_test ---
+  cmake -B C:\dev\west-zephyr\prism-kit\tests\build -S C:\dev\west-zephyr\prism-kit\tests -G MinGW Makefiles
+  Building: cmake --build C:\dev\west-zephyr\prism-kit\tests\build
+  Running: C:\dev\west-zephyr\prism-kit\tests\build\controller_test.exe
+
+--- Configuring: protocol_test ---
+  cmake -B C:\dev\west-zephyr\prism-kit\protocol\tests\build -S C:\dev\west-zephyr\prism-kit\protocol\tests -G MinGW Makefiles
+  Building: cmake --build C:\dev\west-zephyr\prism-kit\protocol\tests\build
+  Running: C:\dev\west-zephyr\prism-kit\protocol\tests\build\protocol_test.exe
+
+========================================
+Results: 2/2 test suites passed
+All test suites passed.

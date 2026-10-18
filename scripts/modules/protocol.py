@@ -16,6 +16,7 @@ Wire format (matches ``protocol::Frame`` in ``protocol/include/frame.hpp``):
 - RunGroup tag: 0x010B
 - Start tag: 0x010C
 - Fade tag: 0x010D
+- Gradient tag: 0x010E
 - Delay was 0x0104 — removed; use mark gaps instead.
 - Checksum: XOR of tag + length + data bytes.
 """
@@ -39,6 +40,7 @@ TAG_SET_SINGLE_COLOR_GROUPED = 0x0108
 TAG_RUN_GROUP = 0x010B
 TAG_START = 0x010C
 TAG_FADE = 0x010D
+TAG_GRADIENT = 0x010E
 
 
 def build_frame(tag: int, payload: bytes) -> bytes:
@@ -182,6 +184,30 @@ def build_fade_grouped_frame(
         + group_id.to_bytes(4, "little")
     )
     return build_frame(TAG_FADE, payload)
+
+
+def build_gradient_grouped_frame(
+    mark: int,
+    r: int,
+    g: int,
+    b: int,
+    duration_ms: int,
+    index: int,
+    group_id: int,
+) -> bytes:
+    """Build a group-aware one-pixel Gradient frame.
+
+    Payload: ``mark(2 LE) r(1) g(1) b(1) duration_ms(2 LE) index(1)
+    group_id(4 LE)`` (12 bytes).
+    """
+    payload = (
+        mark.to_bytes(2, "little")
+        + bytes([r, g, b])
+        + duration_ms.to_bytes(2, "little")
+        + bytes([index])
+        + group_id.to_bytes(4, "little")
+    )
+    return build_frame(TAG_GRADIENT, payload)
 
 
 def build_reset_instructions_frame() -> bytes:

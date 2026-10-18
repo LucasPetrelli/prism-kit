@@ -38,6 +38,7 @@ rainbow2 = "scripts.rainbow2:main"
 rainbow3 = "scripts.rainbow3:main"
 rainbow4 = "scripts.rainbow4:main"
 fade = "scripts.fade:main"
+gradient = "scripts.gradient:main"
 set-color = "scripts.set_color:main"
 
 [build-system]

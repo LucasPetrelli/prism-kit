@@ -1,0 +1,6 @@
+{
+  "command": "git worktree add --detach C:\\dev\\west-zephyr\\prism-kit\\tmp\\embedded-rom-ram-delta\\step4-20261018-run01\\baseline 6e36566976fdfd43884b4178f9964bffd86132c9",
+  "raw_log": "baseline-worktree.log",
+  "exit_code": 0,
+  "working_directory": "C:\\dev\\west-zephyr\\prism-kit"
+}

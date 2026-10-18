@@ -1,0 +1,1 @@
+Standalone --version probes did not produce compiler stdout in PowerShell. Use the successful project build logs as the toolchain version evidence; see toolchain-identification.json.

@@ -1,0 +1,115 @@
+{
+  "step": 4,
+  "project": "C:\\dev\\west-zephyr\\prism-kit",
+  "checks": [
+    {
+      "name": "focused-python-tests",
+      "command": "uv run python -m unittest discover -s scripts/tests -p test_gradient.py",
+      "argv": [
+        "uv",
+        "run",
+        "python",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "scripts/tests",
+        "-p",
+        "test_gradient.py"
+      ],
+      "working_directory": "C:\\dev\\west-zephyr\\prism-kit",
+      "started_at_utc": "2026-10-18T00:40:38.957769+00:00",
+      "exit_code": 0,
+      "raw_log": "focused-python-tests.log",
+      "finished_at_utc": "2026-10-18T00:40:42.851296+00:00"
+    },
+    {
+      "name": "python-lint",
+      "command": "uv run lint-python",
+      "argv": [
+        "uv",
+        "run",
+        "lint-python"
+      ],
+      "working_directory": "C:\\dev\\west-zephyr\\prism-kit",
+      "started_at_utc": "2026-10-18T00:40:42.851804+00:00",
+      "exit_code": 0,
+      "raw_log": "python-lint.log",
+      "finished_at_utc": "2026-10-18T00:40:43.592279+00:00"
+    },
+    {
+      "name": "project-lint",
+      "command": "uv run lint",
+      "argv": [
+        "uv",
+        "run",
+        "lint"
+      ],
+      "working_directory": "C:\\dev\\west-zephyr\\prism-kit",
+      "started_at_utc": "2026-10-18T00:40:43.592822+00:00",
+      "exit_code": 0,
+      "raw_log": "project-lint.log",
+      "finished_at_utc": "2026-10-18T00:41:03.639397+00:00"
+    },
+    {
+      "name": "project-host-tests",
+      "command": "uv run unit-tests",
+      "argv": [
+        "uv",
+        "run",
+        "unit-tests"
+      ],
+      "working_directory": "C:\\dev\\west-zephyr\\prism-kit",
+      "started_at_utc": "2026-10-18T00:41:03.639814+00:00",
+      "exit_code": 0,
+      "raw_log": "project-host-tests.log",
+      "finished_at_utc": "2026-10-18T00:41:11.721283+00:00"
+    },
+    {
+      "name": "format-check",
+      "command": "uv run format --check",
+      "argv": [
+        "uv",
+        "run",
+        "format",
+        "--check"
+      ],
+      "working_directory": "C:\\dev\\west-zephyr\\prism-kit",
+      "started_at_utc": "2026-10-18T00:41:11.721819+00:00",
+      "exit_code": 0,
+      "raw_log": "format-check.log",
+      "finished_at_utc": "2026-10-18T00:41:13.427404+00:00"
+    },
+    {
+      "name": "xiao-nrf52-sense-build",
+      "command": "uv run build --board xiao_nrf52_sense --clean",
+      "argv": [
+        "uv",
+        "run",
+        "build",
+        "--board",
+        "xiao_nrf52_sense",
+        "--clean"
+      ],
+      "working_directory": "C:\\dev\\west-zephyr\\prism-kit",
+      "started_at_utc": "2026-10-18T00:41:13.427849+00:00",
+      "exit_code": 0,
+      "raw_log": "xiao-nrf52-sense-build.log",
+      "finished_at_utc": "2026-10-18T00:43:01.925332+00:00"
+    },
+    {
+      "name": "diff-check",
+      "command": "git diff --check",
+      "argv": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "working_directory": "C:\\dev\\west-zephyr\\prism-kit",
+      "started_at_utc": "2026-10-18T00:43:01.925965+00:00",
+      "exit_code": 0,
+      "raw_log": "diff-check.log",
+      "finished_at_utc": "2026-10-18T00:43:01.991165+00:00"
+    }
+  ]
+}

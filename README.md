@@ -65,6 +65,23 @@ uv run lint-python
 uv run lint
 ```
 
+### One-pixel Gradient command
+
+Run one timed transition from a pixel's currently staged RGB value to a target
+color with `uv run gradient --port COM8 --index 3 --target 0000FF
+--duration-ms 1500`. The command accepts an optional root-relative `--mark`
+(default `0`) and `--baudrate` (default `115200`); the pixel index must be in
+`0..6`, and mark and duration use the protocol's unsigned 16-bit millisecond
+fields. It resets the queued instruction program, adds one Gradient to root
+group `0`, then starts that group for one pass. Reset leaves the currently
+staged LED colors unchanged.
+
+The grouped Gradient payload is exactly 12 bytes: `mark:u16` little-endian,
+target RGB bytes, `duration_ms:u16` little-endian, `index:u8`, and `group_id:u32`
+little-endian. The command protocol is one-way and has no acceptance
+acknowledgement; a successful serial write does not confirm that the controller
+accepted the command.
+
 Use `uv run flash` and `uv run smoke-test` for hardware validation when the
 required target and probe are available. The normal XIAO Sense image is
 configured with two CDC ACM interfaces: the debug console and the command
