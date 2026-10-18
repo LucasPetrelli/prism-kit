@@ -34,9 +34,33 @@ import subprocess
 import sys
 
 if __package__:
-    from .build_provenance import write_build_provenance
+    from .build_record import (
+        BuildRecordError,
+        existing_build_record_path,
+        collect_toolchain_identity,
+        pristine_revision,
+        read_report_usage,
+        write_build_record,
+    )
+    from .build_provenance import (
+        build_config_path,
+        sha256_file,
+        write_build_provenance,
+    )
 else:
-    from build_provenance import write_build_provenance
+    from build_record import (
+        BuildRecordError,
+        existing_build_record_path,
+        collect_toolchain_identity,
+        pristine_revision,
+        read_report_usage,
+        write_build_record,
+    )
+    from build_provenance import (
+        build_config_path,
+        sha256_file,
+        write_build_provenance,
+    )
 
 DEFAULT_TOOLCHAIN_ROOT = Path(
     r"C:\Program Files (x86)\Arm GNU Toolchain arm-none-eabi\14.2 rel1"
@@ -371,7 +395,7 @@ def run_west_build(
     extra_conf_files: list[Path],
     pristine: str = "auto",
     oshal_demo: str = "none",
-) -> None:
+) -> str:
     """Invoke ``west build`` with the project's standard configuration.
 
     Args:
@@ -383,6 +407,9 @@ def run_west_build(
         pristine: West pristine level — ``"auto"`` (default) for incremental
             builds or ``"always"`` for a full clean rebuild.
         oshal_demo: OSHAL demo profile forwarded to CMake on every build.
+
+    Returns:
+        The combined stdout and stderr output from the successful build.
     """
     env = os.environ.copy()
     env["ZEPHYR_TOOLCHAIN_VARIANT"] = "gnuarmemb"
@@ -395,24 +422,74 @@ def run_west_build(
         extra_conf_value = ";".join(str(path) for path in extra_conf_files)
         cmake_args.append(f"-DEXTRA_CONF_FILE={extra_conf_value}")
 
-    subprocess.run(
-        [
-            str(python_exe),
-            "-m",
-            "west",
-            "build",
-            "-b",
-            board_target,
-            "--pristine",
-            pristine,
-            ".",
-            "--",
-            *cmake_args,
-        ],
+    command = [
+        str(python_exe),
+        "-m",
+        "west",
+        "build",
+        "-b",
+        board_target,
+        "--pristine",
+        pristine,
+        ".",
+        "--",
+        *cmake_args,
+    ]
+    process = subprocess.Popen(
+        command,
         cwd=root,
         env=env,
-        check=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        errors="replace",
     )
+    output_lines: list[str] = []
+    if process.stdout is not None:
+        for line in process.stdout:
+            sys.stdout.write(line)
+            sys.stdout.flush()
+            output_lines.append(line)
+    return_code = process.wait()
+    if return_code != 0:
+        raise subprocess.CalledProcessError(return_code, command)
+    return "".join(output_lines)
+
+
+def run_size_report_targets(
+    root: Path,
+    python_exe: Path,
+    toolchain_root: Path,
+) -> None:
+    """Generate Zephyr's linked ROM and RAM reports for a new commit record.
+
+    Args:
+        root: The Prism Kit worktree whose image was built.
+        python_exe: Python interpreter that has the West module available.
+        toolchain_root: Configured GNU Arm Embedded toolchain root.
+    """
+    env = os.environ.copy()
+    env["ZEPHYR_TOOLCHAIN_VARIANT"] = "gnuarmemb"
+    env["GNUARMEMB_TOOLCHAIN_PATH"] = str(toolchain_root)
+
+    for target in ("rom_report", "ram_report"):
+        print(f"[build] Generating Zephyr {target}...")
+        command = [str(python_exe), "-m", "west", "build", "-t", target]
+        result = subprocess.run(
+            command,
+            cwd=root,
+            env=env,
+            check=False,
+            capture_output=True,
+            text=True,
+            errors="replace",
+        )
+        if result.returncode != 0:
+            if result.stdout:
+                print(result.stdout, end="")
+            if result.stderr:
+                print(result.stderr, end="", file=sys.stderr)
+            raise subprocess.CalledProcessError(result.returncode, command)
 
 
 def append_cpp_include_flags(command: str, compiler: str) -> str:
@@ -563,12 +640,7 @@ def main() -> int:
         extra_conf_files.append(root / "prj.debug.conf")
     # OSHAL owns optional Zephyr Kconfig fragments for its standalone demos.
     oshal_demo_conf = (
-        root
-        / "oshal"
-        / "config"
-        / "zephyr"
-        / "demos"
-        / f"{args.oshal_demo}.conf"
+        root / "oshal" / "config" / "zephyr" / "demos" / f"{args.oshal_demo}.conf"
     )
     if oshal_demo_conf.is_file():
         extra_conf_files.append(oshal_demo_conf)
@@ -576,10 +648,11 @@ def main() -> int:
     os.chdir(root)
 
     pristine = "always" if args.clean else "auto"
+    source_revision, source_dirty_reason = pristine_revision(root)
     if args.clean:
         remove_build_directory(root)
 
-    run_west_build(
+    build_output = run_west_build(
         root,
         python_exe,
         toolchain_root,
@@ -605,6 +678,57 @@ def main() -> int:
 
     print(f"[build] Verified Zephyr target: {provenance.board_target}")
     print(f"[build] Flash provenance: {provenance.artifact_path}")
+
+    if source_revision is None:
+        print(
+            "[build] Commit footprint record skipped: "
+            f"{source_dirty_reason or 'source revision is unavailable'}."
+        )
+    else:
+        try:
+            toolchain = collect_toolchain_identity(root, toolchain_root, build_output)
+            config_sha256 = sha256_file(build_config_path(root))
+            record_path = existing_build_record_path(
+                root,
+                source_revision,
+                board_alias,
+                config_sha256,
+                toolchain,
+            )
+            current_revision, current_dirty_reason = pristine_revision(root)
+            if current_revision != source_revision:
+                print(
+                    "[build] Commit footprint record skipped: "
+                    f"{current_dirty_reason or 'the source revision changed during the build'}."
+                )
+                return 0
+            if record_path.is_file():
+                print(f"[build] Commit footprint record already exists: {record_path}")
+                return 0
+
+            run_size_report_targets(root, python_exe, toolchain_root)
+            record = write_build_record(
+                root,
+                expected_revision=source_revision,
+                board_alias=board_alias,
+                board_target=provenance.board_target,
+                build_output=build_output,
+                usage=read_report_usage(root),
+                toolchain=toolchain,
+                command=["uv", "run", "build", *sys.argv[1:]],
+            )
+        except (BuildRecordError, OSError, subprocess.CalledProcessError) as exc:
+            print(
+                f"[build] Commit footprint record unavailable: {exc}",
+                file=sys.stderr,
+            )
+        else:
+            if record.path is None:
+                print(f"[build] Commit footprint record skipped: {record.reason}.")
+            elif record.created:
+                print(f"[build] Commit footprint record: {record.path}")
+            else:
+                print(f"[build] Commit footprint record already exists: {record.path}")
 
     return 0
 

@@ -2,6 +2,7 @@
 build/
 compile_commands.json
 __cmake_systeminformation/
+.prism-kit-build-records/
 
 # Local Python tooling.
 .venv/

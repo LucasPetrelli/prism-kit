@@ -51,6 +51,15 @@ XIAO nRF52840 Sense target. The remembered file is outside `build/` and survives
 `--clean`. Direct West/CMake callers must still select the Zephyr board target
 explicitly.
 
+After a successful build from a pristine Git commit, the wrapper saves an
+immutable linked-footprint record under `.prism-kit-build-records/`. Records
+contain the source commit, board, Kconfig fingerprint, compiler/linker identity,
+Zephyr ROM/RAM totals, linker `FLASH`/`RAM` totals when emitted by the build,
+region capacities, and hashes for the map, reports, and firmware artifact. The
+directory is gitignored, shared by linked worktrees, and survives `--clean`; a
+dirty source tree skips record creation. A matching
+commit/board/config/toolchain record is never overwritten.
+
 ```bash
 git submodule update --init --recursive
 uv sync
