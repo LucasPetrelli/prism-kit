@@ -1,8 +1,0 @@
-{
-  "source": "CMake toolchain identification in the successful project build logs",
-  "compiler": "GNU 14.2.1",
-  "linker": "GNU ld 2.43.1",
-  "zephyr": "4.3.0",
-  "raw_logs": ["baseline-samd21-final-build.log", "candidate-samd21-final-build.log", "baseline-sense-build.log", "candidate-sense-build.log"],
-  "note": "Standalone PowerShell --version probes could not launch the toolchain binaries in this shell. They were not used for version identification; the successful build logs report the versions directly."
-}

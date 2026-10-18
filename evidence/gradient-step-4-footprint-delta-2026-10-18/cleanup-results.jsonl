@@ -1,2 +1,0 @@
-{"exit_code":0,"raw_log":"cleanup-baseline.log","command":"git worktree remove --force C:\\dev\\west-zephyr\\prism-kit\\tmp\\embedded-rom-ram-delta\\step4-20261018-run01\\baseline","working_directory":"C:\\dev\\west-zephyr\\prism-kit"}
-{"exit_code":0,"raw_log":"cleanup-candidate.log","command":"git worktree remove --force C:\\dev\\west-zephyr\\prism-kit\\tmp\\embedded-rom-ram-delta\\step4-20261018-run01\\candidate","working_directory":"C:\\dev\\west-zephyr\\prism-kit"}

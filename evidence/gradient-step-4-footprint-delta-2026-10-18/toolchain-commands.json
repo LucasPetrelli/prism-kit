@@ -1,1 +1,0 @@
-[{"exit_code":null,"stderr_log":"gcc-version.stderr.log","command":"arm-none-eabi-gcc.exe --version","working_directory":"C:\\dev\\west-zephyr\\prism-kit","raw_log":"gcc-version.log"},{"exit_code":null,"stderr_log":"ld-version.stderr.log","command":"arm-none-eabi-ld.exe --version","working_directory":"C:\\dev\\west-zephyr\\prism-kit","raw_log":"ld-version.log"}]

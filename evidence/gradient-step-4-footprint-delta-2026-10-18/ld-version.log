@@ -1,1 +1,0 @@
-Standalone --version probes did not produce linker stdout in PowerShell. Use the successful project build logs as the linker version evidence; see toolchain-identification.json.

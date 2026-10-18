@@ -1,2 +1,0 @@
-git -C C:\dev\west-zephyr\prism-kit\bal archive --format=zip --output=C:\dev\west-zephyr\prism-kit\tmp\embedded-rom-ram-delta\step4-20261018-run01\bal.zip HEAD
-git -C C:\dev\west-zephyr\prism-kit\oshal archive --format=zip --output=C:\dev\west-zephyr\prism-kit\tmp\embedded-rom-ram-delta\step4-20261018-run01\oshal.zip HEAD

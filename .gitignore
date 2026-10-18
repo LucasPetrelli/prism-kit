@@ -9,9 +9,10 @@ __cmake_systeminformation/
 __pycache__/
 *.egg-info/
 
-# Temporary log file dump
-logs/*
+# Local logs and generated validation evidence; write evidence under logs/.
+/logs/
 /log/
+/evidence/
 
 # Editor and user-local build cache files.
 .vscode/*
