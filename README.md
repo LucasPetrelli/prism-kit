@@ -100,6 +100,33 @@ little-endian. The command protocol is one-way and has no acceptance
 acknowledgement; a successful serial write does not confirm that the controller
 accepted the command.
 
+### Seven-pixel Rainbow5 effect
+
+Program the phase-shifted circulating rainbow with the default LED mapping:
+
+```bash
+uv run rainbow5 --port COM8
+```
+
+By default, ring positions 0 through 5 map to LED indices `0 1 2 3 4 5`, and
+the center maps to index `6`. Override the mapping for the actual wiring with
+`--ring-indices` (six indices in logical ring order) and `--center-index`, for
+example:
+
+```bash
+uv run rainbow5 --port COM8 --ring-indices 4 1 6 0 2 5 --center-index 3
+```
+
+The effect travels toward increasing logical ring positions, so its clockwise
+or counter-clockwise direction depends on the supplied mapping. It alternates
+warm white and lavender on the center. The nominal controller cycle is 6000 ms
+and restarts after completion; this does not guarantee wall-clock timing.
+
+Use `uv run rainbow5 --port COM8 --stop` to send Reset only. Reset cancels the
+queued program and leaves the last displayed LED colors in place. Serial is
+one-way: successful writes do not confirm that the controller accepted the
+commands.
+
 Use `uv run flash` and `uv run smoke-test` for hardware validation when the
 required target and probe are available. The normal XIAO Sense image is
 configured with two CDC ACM interfaces: the debug console and the command

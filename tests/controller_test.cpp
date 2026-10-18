@@ -754,6 +754,122 @@ TEST_F(ControllerTest, GradientResetLeavesLastStagedSampleInPlace) {
   EXPECT_EQ(staged, last_sample);
 }
 
+// Goal: Verify a Rainbow5 root pass restarts at its 6000 ms completion
+// boundary. Steps: Queue four ring waypoints and two center transitions, run
+// across two passes at 1500 ms intervals, then reset and verify no later LED
+// writes occur.
+TEST_F(ControllerTest, Rainbow5TimelineRepeatsAtSixSecondCompletionBoundary) {
+  std::array<std::array<prism::color::RgbColor, 4U>, 6U> ring_targets{};
+  std::array<prism::color::RgbColor, 7U> staged{};
+  std::array<std::array<std::uint32_t, 7U>, 3U> mark_zero_reads{};
+  std::array<std::uint32_t, 7U> write_counts{};
+  constexpr prism::color::RgbColor center_warm_white{255U, 240U, 214U};
+  constexpr prism::color::RgbColor center_lavender{200U, 184U, 255U};
+
+  // Assign distinct targets for each ring position and its four waypoints.
+  for (std::size_t ring_position = 0U; ring_position < ring_targets.size();
+       ++ring_position) {
+    // Queue the four root-relative transitions for this ring position.
+    for (std::size_t waypoint = 0U;
+         waypoint < ring_targets[ring_position].size(); ++waypoint) {
+      ring_targets[ring_position][waypoint] = prism::color::RgbColor{
+        static_cast<std::uint8_t>(20U + 20U * ring_position + waypoint),
+        static_cast<std::uint8_t>(35U + 15U * ring_position + waypoint),
+        static_cast<std::uint8_t>(50U + 10U * ring_position + waypoint),
+      };
+      AddGradient(controller_, static_cast<std::uint8_t>(ring_position),
+                  ring_targets[ring_position][waypoint], 1500U,
+                  static_cast<prism::Mark>(waypoint * 1500U), 0U);
+    }
+  }
+  AddGradient(controller_, 6U, center_warm_white, 3000U, 0U);
+  AddGradient(controller_, 6U, center_lavender, 3000U, 3000U);
+
+  // Observe source-color reads and staged writes for every physical LED.
+  for (std::size_t index = 0U; index < staged.size(); ++index) {
+    auto* led = mock_strip_.MutableLed(index);
+    EXPECT_CALL(*led, Color()).WillRepeatedly([&, index]() {
+      // Count mark-zero source captures at the initial start and two restarts.
+      if (g_fake_time == 0U) {
+        ++mark_zero_reads[0U][index];
+      } else if (g_fake_time == 6000U) {
+        ++mark_zero_reads[1U][index];
+      } else if (g_fake_time == 12000U) {
+        ++mark_zero_reads[2U][index];
+      }
+      return staged[index];
+    });
+    // Keep the latest staged value and count each Gradient write.
+    EXPECT_CALL(*led, SetColor(testing::_))
+      .WillRepeatedly([&, index](const prism::color::RgbColor& color) {
+        staged[index] = color;
+        ++write_counts[index];
+        return 0;
+      });
+  }
+  EXPECT_CALL(mock_strip_, Show()).Times(8).WillRepeatedly(testing::Return(0));
+
+  // Start the root pass and verify its mark-zero work begins immediately.
+  ASSERT_EQ(controller_.Start(prism::kForeverLoopCount),
+            prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(controller_.Run(), prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(g_last_scheduled_delay, 20U);
+  // Each LED captures its staged color when its initial mark-zero transition
+  // starts.
+  for (std::size_t index = 0U; index < staged.size(); ++index) {
+    EXPECT_EQ(mark_zero_reads[0U][index], 1U);
+  }
+
+  // Sample every 1500 ms boundary across two complete 6000 ms root passes.
+  for (std::uint32_t boundary_index = 1U; boundary_index <= 8U;
+       ++boundary_index) {
+    g_fake_time = boundary_index * 1500U;
+    g_last_scheduled_delay = 0U;
+    EXPECT_EQ(controller_.Run(), prism::ControllerStatus::kSuccess);
+    const std::size_t waypoint = (boundary_index - 1U) % 4U;
+    // Check the ring endpoint reached at this boundary for every position.
+    for (std::size_t ring_position = 0U; ring_position < ring_targets.size();
+         ++ring_position) {
+      EXPECT_EQ(staged[ring_position], ring_targets[ring_position][waypoint]);
+    }
+
+    // The center endpoint alternates at the 3000 ms and 6000 ms marks.
+    if (g_fake_time == 3000U || g_fake_time == 9000U) {
+      EXPECT_EQ(staged[6U], center_warm_white);
+    } else if (g_fake_time == 6000U || g_fake_time == 12000U) {
+      EXPECT_EQ(staged[6U], center_lavender);
+    }
+
+    // A read at each 6000 ms boundary proves the next pass starts at mark zero.
+    if (g_fake_time == 6000U) {
+      for (std::size_t index = 0U; index < staged.size(); ++index) {
+        EXPECT_EQ(mark_zero_reads[1U][index], 1U);
+      }
+    } else if (g_fake_time == 12000U) {
+      for (std::size_t index = 0U; index < staged.size(); ++index) {
+        EXPECT_EQ(mark_zero_reads[2U][index], 1U);
+      }
+    }
+  }
+
+  // Snapshot write counts before reset so later runs must leave them unchanged.
+  std::uint32_t writes_before_reset = 0U;
+  for (const auto count : write_counts) {
+    writes_before_reset += count;
+  }
+  controller_.ResetInstructions();
+  g_fake_time = 12020U;
+  g_last_scheduled_delay = 0U;
+  EXPECT_EQ(controller_.Run(), prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(g_last_scheduled_delay, 0U);
+  std::uint32_t writes_after_reset = 0U;
+  // Count all pixels again after ResetInstructions cleared the active timeline.
+  for (const auto count : write_counts) {
+    writes_after_reset += count;
+  }
+  EXPECT_EQ(writes_after_reset, writes_before_reset);
+}
+
 TEST_F(ControllerTest, GradientsOnOnePixelKeepOrderAndCoalesceShow) {
   constexpr std::uint8_t index = 1U;
   constexpr prism::color::RgbColor source{100U, 70U, 40U};
