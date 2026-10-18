@@ -54,7 +54,8 @@ bool ControllerCommandSink::Register(protocol::Protocol& protocol) {
                              &HandleSetMultipleColorHsvGrouped) &&
          protocol.AddHandler(protocol::Tag::kRunGroup, &HandleRunGroup) &&
          protocol.AddHandler(protocol::Tag::kStart, &HandleStart) &&
-         protocol.AddHandler(protocol::Tag::kFade, &HandleFade);
+         protocol.AddHandler(protocol::Tag::kFade, &HandleFade) &&
+         protocol.AddHandler(protocol::Tag::kGradient, &HandleGradient);
 }
 
 void ControllerCommandSink::SetMailbox(ControllerCommandMailbox* mailbox) {
@@ -337,6 +338,25 @@ void ControllerCommandSink::HandleFade(void* context, const uint8_t* data,
   msg.fade.index = data[6];
   msg.fade.group_id = ReadLe32(data + 7);
   QueueCommand(context, msg, "Fade");
+}
+
+void ControllerCommandSink::HandleGradient(void* context, const uint8_t* data,
+                                           uint16_t length) {
+  if (!HasExactPayload(context, data, length, sizeof(prism::GradientPayload),
+                       "Gradient")) {
+    return;
+  }
+
+  ControllerCommandMessage msg{};
+  msg.cmd = ControllerCommand::kGradient;
+  msg.gradient.mark = ReadLe16(data);
+  msg.gradient.r = data[2];
+  msg.gradient.g = data[3];
+  msg.gradient.b = data[4];
+  msg.gradient.duration_ms = ReadLe16(data + 5);
+  msg.gradient.index = data[7];
+  msg.gradient.group_id = ReadLe32(data + 8);
+  QueueCommand(context, msg, "Gradient");
 }
 
 }  // namespace app::hw

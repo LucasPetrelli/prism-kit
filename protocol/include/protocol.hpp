@@ -11,7 +11,7 @@
 namespace protocol {
 
 /// @brief Maximum number of registered frame handlers, including loopback.
-constexpr size_t kMaxHandlers = 14;
+constexpr size_t kMaxHandlers = 15;
 
 /// @brief Callback to read bytes from the transport stream.
 /// @param buffer Destination buffer.

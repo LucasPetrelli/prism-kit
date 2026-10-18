@@ -296,8 +296,8 @@ class ControllerCommandProtocolTest : public ::testing::Test {
   app::hw::ControllerCommandSink* sink_{nullptr};
 };
 
-TEST_F(ControllerCommandProtocolTest, RegistersThirteenCommandsWithLoopback) {
-  EXPECT_EQ(protocol::kMaxHandlers, 14U);
+TEST_F(ControllerCommandProtocolTest, RegistersFourteenCommandsWithLoopback) {
+  EXPECT_EQ(protocol::kMaxHandlers, 15U);
   EXPECT_FALSE(
     protocol_.AddHandler(static_cast<protocol::Tag>(0x0200U), &IgnoreFrame));
   EXPECT_FALSE(sink_->Register(protocol_));
@@ -335,6 +335,66 @@ TEST_F(ControllerCommandProtocolTest, DecodesFadeFieldsLittleEndian) {
   EXPECT_EQ(message.fade.duration_ms, 2000U);
   EXPECT_EQ(message.fade.index, 0x5AU);
   EXPECT_EQ(message.fade.group_id, 0x78563412U);
+}
+
+TEST_F(ControllerCommandProtocolTest, DecodesGradientFieldsLittleEndian) {
+  EXPECT_EQ(static_cast<std::uint16_t>(protocol::Tag::kGradient), 0x010EU);
+  const std::vector<std::uint8_t> payload{
+    0x34U, 0x12U, 0x9AU, 0xBCU, 0xDEU, 0xD0U,
+    0x07U, 0x5AU, 0x12U, 0x34U, 0x56U, 0x78U,
+  };
+  Send(protocol::Tag::kGradient, payload);
+
+  const auto message = Receive();
+  EXPECT_EQ(message.cmd, app::hw::ControllerCommand::kGradient);
+  EXPECT_EQ(message.gradient.mark, 0x1234U);
+  EXPECT_EQ(message.gradient.r, 0x9AU);
+  EXPECT_EQ(message.gradient.g, 0xBCU);
+  EXPECT_EQ(message.gradient.b, 0xDEU);
+  EXPECT_EQ(message.gradient.duration_ms, 2000U);
+  EXPECT_EQ(message.gradient.index, 0x5AU);
+  EXPECT_EQ(message.gradient.group_id, 0x78563412U);
+}
+
+TEST_F(ControllerCommandProtocolTest,
+       AcceptsZeroAndMaximumGradientMarksAndDurations) {
+  Send(protocol::Tag::kGradient, std::vector<std::uint8_t>(12U, 0U));
+  auto message = Receive();
+  EXPECT_EQ(message.gradient.mark, 0U);
+  EXPECT_EQ(message.gradient.duration_ms, 0U);
+
+  Send(protocol::Tag::kGradient, std::vector<std::uint8_t>(12U, 0xFFU));
+  message = Receive();
+  EXPECT_EQ(message.gradient.mark, 0xFFFFU);
+  EXPECT_EQ(message.gradient.duration_ms, 0xFFFFU);
+}
+
+TEST_F(ControllerCommandProtocolTest, ExistingCommandTagsRemainCompatible) {
+  EXPECT_EQ(static_cast<std::uint16_t>(protocol::Tag::kSetMultipleColor),
+            0x0100U);
+  EXPECT_EQ(static_cast<std::uint16_t>(protocol::Tag::kSetSingleColor),
+            0x0101U);
+  EXPECT_EQ(static_cast<std::uint16_t>(protocol::Tag::kResetInstructions),
+            0x0102U);
+  EXPECT_EQ(static_cast<std::uint16_t>(protocol::Tag::kRun), 0x0103U);
+  EXPECT_EQ(static_cast<std::uint16_t>(protocol::Tag::kSetSingleColorHsv),
+            0x0105U);
+  EXPECT_EQ(static_cast<std::uint16_t>(protocol::Tag::kSetMultipleColorHsv),
+            0x0106U);
+  EXPECT_EQ(static_cast<std::uint16_t>(protocol::Tag::kSetMultipleColorGrouped),
+            0x0107U);
+  EXPECT_EQ(static_cast<std::uint16_t>(protocol::Tag::kSetSingleColorGrouped),
+            0x0108U);
+  EXPECT_EQ(
+    static_cast<std::uint16_t>(protocol::Tag::kSetSingleColorHsvGrouped),
+    0x0109U);
+  EXPECT_EQ(
+    static_cast<std::uint16_t>(protocol::Tag::kSetMultipleColorHsvGrouped),
+    0x010AU);
+  EXPECT_EQ(static_cast<std::uint16_t>(protocol::Tag::kRunGroup), 0x010BU);
+  EXPECT_EQ(static_cast<std::uint16_t>(protocol::Tag::kStart), 0x010CU);
+  EXPECT_EQ(static_cast<std::uint16_t>(protocol::Tag::kFade), 0x010DU);
+  EXPECT_EQ(static_cast<std::uint16_t>(protocol::Tag::kGradient), 0x010EU);
 }
 
 TEST_F(ControllerCommandProtocolTest, DecodesGroupedRgbRangeLittleEndian) {
@@ -431,7 +491,7 @@ TEST_F(ControllerCommandProtocolTest, RejectsShortAndOverlongNewPayloads) {
     protocol::Tag tag;
     std::uint16_t length;
   };
-  const std::array<PayloadSize, 7U> sizes{{
+  const std::array<PayloadSize, 8U> sizes{{
     {protocol::Tag::kSetMultipleColorGrouped, 11U},
     {protocol::Tag::kSetSingleColorGrouped, 10U},
     {protocol::Tag::kSetSingleColorHsvGrouped, 10U},
@@ -439,6 +499,7 @@ TEST_F(ControllerCommandProtocolTest, RejectsShortAndOverlongNewPayloads) {
     {protocol::Tag::kRunGroup, 12U},
     {protocol::Tag::kStart, 2U},
     {protocol::Tag::kFade, 11U},
+    {protocol::Tag::kGradient, 12U},
   }};
 
   for (const auto& size : sizes) {
@@ -653,6 +714,62 @@ TEST_F(ControllerCommandDispatchTest,
   EXPECT_EQ(app::RunControllerProgress(controller_),
             prism::ControllerStatus::kSuccess);
   EXPECT_EQ(g_last_scheduled_delay, 15U);
+  testing::Mock::VerifyAndClearExpectations(led);
+  testing::Mock::VerifyAndClearExpectations(&strip_);
+
+  g_fake_time = 25U;
+  g_last_scheduled_delay = 0U;
+  EXPECT_CALL(*led, SetColor(kTarget)).WillOnce(testing::Return(0));
+  EXPECT_CALL(strip_, Show()).WillOnce(testing::Return(0));
+  EXPECT_EQ(app::RunControllerProgress(controller_),
+            prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(g_last_scheduled_delay, 0U);
+}
+
+TEST_F(ControllerCommandDispatchTest,
+       GradientCommandRoutesGroupedInstructionIntoPool) {
+  constexpr std::uint8_t kIndex = 2U;
+  constexpr prism::GroupId kGroupId = 0x12345678U;
+  constexpr prism::color::RgbColor kStart{160U, 80U, 40U};
+  constexpr prism::color::RgbColor kTarget{25U, 50U, 75U};
+
+  app::hw::ControllerCommandMessage gradient{};
+  gradient.cmd = app::hw::ControllerCommand::kGradient;
+  gradient.gradient = {5U,  kTarget.red, kTarget.green, kTarget.blue,
+                       20U, kIndex,      kGroupId};
+  auto result = app::DispatchControllerCommand(controller_, gradient);
+  ASSERT_TRUE(result.mutation_attempted);
+  ASSERT_EQ(result.mutation_status, prism::ControllerStatus::kSuccess);
+
+  app::hw::ControllerCommandMessage start_child{};
+  start_child.cmd = app::hw::ControllerCommand::kRunGroup;
+  start_child.run_group = {0U, 0U, kGroupId, 0U};
+  ASSERT_EQ(
+    app::DispatchControllerCommand(controller_, start_child).mutation_status,
+    prism::ControllerStatus::kSuccess);
+
+  auto* led = strip_.MutableLed(kIndex);
+  EXPECT_CALL(*led, Color()).Times(0);
+  EXPECT_CALL(*led, SetColor(testing::_)).Times(0);
+  EXPECT_CALL(strip_, Show()).Times(0);
+  app::hw::ControllerCommandMessage start{};
+  start.cmd = app::hw::ControllerCommand::kStart;
+  start.start.root_additional_repeats = 0U;
+  result = app::DispatchControllerCommand(controller_, start);
+  ASSERT_EQ(result.start_status, prism::ControllerStatus::kSuccess);
+  ASSERT_EQ(result.initial_run_status, prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(g_last_scheduled_delay, 5U);
+  testing::Mock::VerifyAndClearExpectations(led);
+  testing::Mock::VerifyAndClearExpectations(&strip_);
+
+  g_fake_time = 5U;
+  g_last_scheduled_delay = 0U;
+  EXPECT_CALL(*led, Color()).WillOnce(testing::Return(kStart));
+  EXPECT_CALL(*led, SetColor(testing::_)).Times(0);
+  EXPECT_CALL(strip_, Show()).Times(0);
+  EXPECT_EQ(app::RunControllerProgress(controller_),
+            prism::ControllerStatus::kSuccess);
+  EXPECT_EQ(g_last_scheduled_delay, 20U);
   testing::Mock::VerifyAndClearExpectations(led);
   testing::Mock::VerifyAndClearExpectations(&strip_);
 

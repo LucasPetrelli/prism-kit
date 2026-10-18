@@ -36,6 +36,8 @@ enum class ControllerCommand : std::uint8_t {
   kStart,
   /// @brief Fade one staged pixel's HSV Value in a specified group.
   kFade,
+  /// @brief Interpolate one pixel to an RGB target in a specified group.
+  kGradient,
 };
 
 /// @brief Grouped RGB range fields copied from the protocol payload.
@@ -127,6 +129,8 @@ struct ControllerCommandMessage {
     StartCommandPayload start;
     /// @brief Payload for a one-pixel Fade instruction.
     prism::FadePayload fade;
+    /// @brief Payload for a one-pixel Gradient instruction.
+    prism::GradientPayload gradient;
   };
 };
 

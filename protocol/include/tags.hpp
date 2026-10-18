@@ -78,6 +78,11 @@ enum class Tag : uint16_t {
   /// Payload: mark:u16, percent:u16, duration_ms:u16, index:u8,
   ///     group_id:u32 (11 bytes).
   kFade = 0x010D,
+
+  /// @brief Interpolate one pixel to an RGB target within a controller group.
+  /// Payload: mark:u16, r, g, b, duration_ms:u16, index:u8,
+  ///     group_id:u32 (12 bytes).
+  kGradient = 0x010E,
 };
 
 }  // namespace protocol

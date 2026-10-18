@@ -3,6 +3,7 @@
 #include "hw/controller_command.hpp"
 #include "prism/controller.hpp"
 #include "prism/fade.hpp"
+#include "prism/gradient.hpp"
 #include "prism/instruction_types.hpp"
 #include "prism/run_group_instruction.hpp"
 #include "prism/set_multiple_color.hpp"
@@ -117,6 +118,12 @@ ControllerCommandResult DispatchControllerCommand(
       break;
     case app::hw::ControllerCommand::kFade: {
       const prism::Fade instruction{message.fade};
+      result.mutation_attempted = true;
+      result.mutation_status = controller.AddInstruction(&instruction);
+      break;
+    }
+    case app::hw::ControllerCommand::kGradient: {
+      const prism::Gradient instruction{message.gradient};
       result.mutation_attempted = true;
       result.mutation_status = controller.AddInstruction(&instruction);
       break;

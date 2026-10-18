@@ -321,14 +321,14 @@ TEST_F(ProtocolTest, AddHandler_NullHandler) {
 TEST_F(ProtocolTest, AddHandler_TableFull) {
   auto& proto = MakeProtocol();
 
-  // kLoopback (index 0) is pre-registered, so 7 slots left.
-  // Fill all 7 remaining slots.
+  // kLoopback (index 0) is pre-registered, so kMaxHandlers - 1 slots remain.
+  // Fill every remaining slot.
   for (uint16_t i = 1; i < kMaxHandlers; ++i) {
     Tag t{static_cast<uint16_t>(static_cast<uint16_t>(Tag::kUserMin) + i)};
     EXPECT_TRUE(proto.AddHandler(t, HandlerCallback)) << "Slot " << i;
   }
 
-  // 9th registration should fail.
+  // The next registration should fail.
   Tag t{static_cast<uint16_t>(Tag::kUserMin) + kMaxHandlers};
   EXPECT_FALSE(proto.AddHandler(t, HandlerCallback));
 }

@@ -114,6 +114,10 @@ class ControllerCommandSink {
   /// @brief Handler for a group-aware one-pixel Fade instruction.
   static void HandleFade(void* context, const uint8_t* data, uint16_t length);
 
+  /// @brief Handler for a group-aware one-pixel Gradient instruction.
+  static void HandleGradient(void* context, const uint8_t* data,
+                             uint16_t length);
+
   /// @brief Non-owning pointer to the EventMailbox owned by AppTask.
   ///     Null until SetMailbox() is called; handlers silently drop frames
   ///     while null.

@@ -34,7 +34,7 @@ parser re-synchronises.
 | `kHeaderSize`         | 4       | Tag + Length                      |
 | `kChecksumSize`       | 1       |                                   |
 | `kMaxFrameDataLength` | 256     | Max data payload bytes            |
-| `kMaxHandlers`        | 14      | Max registered `FrameHandler`s, including loopback |
+| `kMaxHandlers`        | 15      | Max registered `FrameHandler`s, including loopback |
 
 ## Tags
 
@@ -48,6 +48,10 @@ Tags are `uint16_t` values, little-endian on the wire.
 
 Controller Fade uses application tag `0x010D` with the exact 11-byte payload
 `mark:u16, percent:u16, duration_ms:u16, index:u8, group_id:u32`, with all
+multi-byte fields little-endian.
+
+Controller Gradient uses application tag `0x010E` with the exact 12-byte payload
+`mark:u16, r:u8, g:u8, b:u8, duration_ms:u16, index:u8, group_id:u32`, with all
 multi-byte fields little-endian.
 
 ## Main Files
@@ -141,5 +145,5 @@ back with the same tag and identical data. This validates the entire
 serialisation, transport, and deserialisation pipeline end-to-end.
 No explicit registration is needed.
 
-The fixed handler table holds 14 entries total, including the built-in
+The fixed handler table holds 15 entries total, including the built-in
 loopback handler.
