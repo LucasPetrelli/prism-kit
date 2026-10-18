@@ -43,7 +43,7 @@ class CliLoggingTest(TestCase):
                 "sample-command", command, project_root=root
             )
 
-            log_files = list((root / "log").glob("*.log"))
+            log_files = list((root / "logs").glob("*.log"))
             self.assertEqual(return_code, 7)
             self.assertEqual(len(log_files), 1)
             self.assertRegex(
@@ -78,7 +78,7 @@ class CliLoggingTest(TestCase):
                 cli_logging.run_cli("repeat", lambda: 0, project_root=root)
                 cli_logging.run_cli("repeat", lambda: 0, project_root=root)
 
-            log_names = sorted(path.name for path in (root / "log").glob("*.log"))
+            log_names = sorted(path.name for path in (root / "logs").glob("*.log"))
             self.assertEqual(
                 log_names,
                 [

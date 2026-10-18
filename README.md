@@ -78,7 +78,7 @@ uv run lint-python
 uv run lint
 ```
 
-Project CLI commands mirror stdout and stderr to `log/` while continuing to
+Project CLI commands mirror stdout and stderr to `logs/` while continuing to
 show output in the terminal. Each run is saved as
 `YYYYMMDD-HHMMSS-<command>-<return-code>.log`; repeated runs within one second
 receive a numeric suffix to keep earlier logs intact.
