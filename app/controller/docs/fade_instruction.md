@@ -12,7 +12,7 @@
 [protocol-tags]: ../../../protocol/include/tags.hpp
 [controller-tests]: ../../../tests/controller_test.cpp
 [command-tests]: ../../../tests/controller_command_test.cpp
-[rainbow-palette]: ../../../scripts/rainbow2.py
+[rainbow-palette]: ../../../scripts/device/rainbow2.py
 [rainbow3-tests]: ../../../scripts/tests/test_rainbow3.py
 [architecture]: ../../../docs/architecture.md
 

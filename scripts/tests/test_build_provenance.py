@@ -7,7 +7,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest import TestCase
 
-from scripts import build_provenance, flash
+from scripts.firmware import build_provenance, flash
 
 
 class BuildProvenanceTest(TestCase):

@@ -8,9 +8,9 @@ from io import StringIO
 from unittest import TestCase
 from unittest.mock import Mock, patch
 
-from scripts import rainbow3
-from scripts.modules import protocol
-from scripts.smoke_test import SmokeTest, parse_args
+from scripts.device import rainbow3
+from scripts.device.modules import protocol
+from scripts.device.smoke_test import SmokeTest, parse_args
 
 
 class FakePort:
@@ -251,10 +251,10 @@ class SmokeRainbow3Test(TestCase):
             with self.assertRaises(SystemExit):
                 parse_args()
 
-    @patch("scripts.smoke_test.threading.Thread")
-    @patch("scripts.smoke_test.threading.Event")
-    @patch("scripts.smoke_test.rainbow3.reset_rainbow3_program")
-    @patch("scripts.smoke_test.rainbow3.run_rainbow3_sequence")
+    @patch("scripts.device.smoke_test.threading.Thread")
+    @patch("scripts.device.smoke_test.threading.Event")
+    @patch("scripts.device.smoke_test.rainbow3.reset_rainbow3_program")
+    @patch("scripts.device.smoke_test.rainbow3.run_rainbow3_sequence")
     def test_phase_forwards_delay_waits_and_cleans_up(
         self,
         run_sequence: Mock,
@@ -283,10 +283,10 @@ class SmokeRainbow3Test(TestCase):
         thread_factory.return_value.start.assert_called_once()
         thread_factory.return_value.join.assert_called_once_with(timeout=1.0)
 
-    @patch("scripts.smoke_test.threading.Thread")
-    @patch("scripts.smoke_test.threading.Event")
-    @patch("scripts.smoke_test.rainbow3.reset_rainbow3_program")
-    @patch("scripts.smoke_test.rainbow3.run_rainbow3_sequence")
+    @patch("scripts.device.smoke_test.threading.Thread")
+    @patch("scripts.device.smoke_test.threading.Event")
+    @patch("scripts.device.smoke_test.rainbow3.reset_rainbow3_program")
+    @patch("scripts.device.smoke_test.rainbow3.run_rainbow3_sequence")
     def test_phase_wait_is_bounded_through_maximum_delay_clear(
         self,
         run_sequence: Mock,
@@ -312,10 +312,10 @@ class SmokeRainbow3Test(TestCase):
         event.wait.assert_called_once_with(66.034)
         reset_program.assert_called_once_with(smoke.serial, "COM8", 115200)
 
-    @patch("scripts.smoke_test.threading.Thread")
-    @patch("scripts.smoke_test.threading.Event")
-    @patch("scripts.smoke_test.rainbow3.reset_rainbow3_program")
-    @patch("scripts.smoke_test.rainbow3.run_rainbow3_sequence")
+    @patch("scripts.device.smoke_test.threading.Thread")
+    @patch("scripts.device.smoke_test.threading.Event")
+    @patch("scripts.device.smoke_test.rainbow3.reset_rainbow3_program")
+    @patch("scripts.device.smoke_test.rainbow3.run_rainbow3_sequence")
     def test_failed_program_skips_wait_but_attempts_cleanup(
         self,
         run_sequence: Mock,
@@ -335,10 +335,10 @@ class SmokeRainbow3Test(TestCase):
         event.wait.assert_not_called()
         reset_program.assert_called_once_with(smoke.serial, "COM8", 115200)
 
-    @patch("scripts.smoke_test.threading.Thread")
-    @patch("scripts.smoke_test.threading.Event")
-    @patch("scripts.smoke_test.rainbow3.reset_rainbow3_program")
-    @patch("scripts.smoke_test.rainbow3.run_rainbow3_sequence")
+    @patch("scripts.device.smoke_test.threading.Thread")
+    @patch("scripts.device.smoke_test.threading.Event")
+    @patch("scripts.device.smoke_test.rainbow3.reset_rainbow3_program")
+    @patch("scripts.device.smoke_test.rainbow3.run_rainbow3_sequence")
     def test_cleanup_failure_fails_phase(
         self,
         run_sequence: Mock,
@@ -448,7 +448,7 @@ class SmokeRainbow3Test(TestCase):
                 self.assertFalse(smoke._validate_markers())
             smoke.seen_optional.add(task_marker)
 
-    @patch("scripts.smoke_test.capture_console")
+    @patch("scripts.device.smoke_test.capture_console")
     def test_debug_only_accepts_padded_task_runtime_diagnostics(
         self, capture_console: Mock
     ) -> None:
@@ -541,7 +541,7 @@ class SmokeRainbow3Test(TestCase):
         smoke._run_loopback.assert_not_called()
         smoke._run_rainbow3_sequence.assert_not_called()
 
-    @patch("scripts.smoke_test.capture_console")
+    @patch("scripts.device.smoke_test.capture_console")
     def test_full_smoke_retries_cdc_ports_after_reset(
         self, capture_console: Mock
     ) -> None:

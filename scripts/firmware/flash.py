@@ -38,7 +38,7 @@ else:
         load_build_provenance,
     )
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
+REPO_ROOT = Path(__file__).resolve().parents[2]
 CONFIG_PATH = build_config_path(REPO_ROOT)
 BOARD_TARGET_TO_JLINK_DEVICE = {
     "seeeduino_xiao/samd21g18a": "ATSAMD21G18A",
@@ -461,5 +461,14 @@ def main() -> int:
         return 1
 
 
+def cli() -> int:
+    """Run the flash command with stdout and stderr logging."""
+    if not __package__:
+        sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+    from scripts.common.cli_logging import run_cli
+
+    return run_cli("flash", main)
+
+
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(cli())

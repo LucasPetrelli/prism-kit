@@ -8,9 +8,9 @@ import sys
 from unittest import TestCase
 from unittest.mock import patch
 
-from scripts import rainbow4
-from scripts.modules import protocol
-from scripts.rainbow2 import RAINBOW_COLORS
+from scripts.device import rainbow4
+from scripts.device.modules import protocol
+from scripts.device.rainbow2 import RAINBOW_COLORS
 
 
 class FakePort:

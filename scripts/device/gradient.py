@@ -19,11 +19,11 @@ import sys
 from pathlib import Path
 from typing import Any
 
-_REPO_ROOT = str(Path(__file__).resolve().parent.parent)
+_REPO_ROOT = str(Path(__file__).resolve().parents[2])
 if _REPO_ROOT not in sys.path:
     sys.path.insert(0, _REPO_ROOT)
 
-from scripts.modules.protocol import (  # noqa: E402
+from scripts.device.modules.protocol import (  # noqa: E402
     build_gradient_grouped_frame,
     build_reset_instructions_frame,
     build_start_frame,
@@ -297,5 +297,14 @@ def main() -> int:
     )
 
 
+def cli() -> int:
+    """Run the Gradient command with stdout and stderr logging."""
+    if not __package__:
+        sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+    from scripts.common.cli_logging import run_cli
+
+    return run_cli("gradient", main)
+
+
 if __name__ == "__main__":
-    raise SystemExit(main())
+    raise SystemExit(cli())

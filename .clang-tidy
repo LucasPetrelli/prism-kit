@@ -11,7 +11,7 @@
 #   find app/src bal/src oshal/src protocol/src include -name '*.cpp' -o -name '*.hpp' \
 #     | xargs clang-tidy -p build/
 #
-# A convenience script (scripts/lint.py) wraps this invocation — see
+# A convenience script (scripts/checks/lint.py) wraps this invocation — see
 # "Linting" in the README.
 
 ---

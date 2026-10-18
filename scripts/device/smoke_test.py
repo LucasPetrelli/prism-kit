@@ -22,15 +22,14 @@ import threading
 import time
 from typing import Sequence
 
-# Ensure the repo root is on sys.path so package imports resolve correctly
-# both when running directly (uv run scripts/smoke_test.py) and via entry
-# points (uv run smoke-test).
-_REPO_ROOT = str(Path(__file__).resolve().parent.parent)
+# Ensure the repo root is on sys.path so package imports resolve when running
+# this file directly or through the ``smoke-test`` entry point.
+_REPO_ROOT = str(Path(__file__).resolve().parents[2])
 if _REPO_ROOT not in sys.path:
     sys.path.insert(0, _REPO_ROOT)
 
-from scripts.modules import protocol
-from scripts.modules.serial_utils import (
+from scripts.device.modules import protocol
+from scripts.device.modules.serial_utils import (
     PortInfo,
     as_port_info,
     capture_console,
@@ -41,7 +40,7 @@ from scripts.modules.serial_utils import (
     group_ports_by_device,
     print_captured_lines,
 )
-from scripts import rainbow3
+from scripts.device import rainbow3
 
 DEFAULT_BAUDRATE = 115200
 DEFAULT_WAIT_FOR_PORT_SECONDS = 10.0
@@ -180,7 +179,7 @@ def repo_root() -> Path:
 
     Resolves relative to this script's location (``scripts/`` sibling).
     """
-    return Path(__file__).resolve().parent.parent
+    return Path(__file__).resolve().parents[2]
 
 
 def get_port_match_tokens(args: argparse.Namespace) -> list[str]:
@@ -334,7 +333,7 @@ class SmokeTest:
             print(
                 "pyserial is required for smoke testing. Install it with:\n"
                 "  uv add pyserial\n"
-                "  uv run scripts/smoke_test.py",
+                "  uv run smoke-test",
                 file=sys.stderr,
             )
             return False
@@ -348,7 +347,7 @@ class SmokeTest:
     def _run_list_ports(self) -> None:
         assert self.list_ports is not None  # guarded by _import_serial
         visible = [as_port_info(p) for p in self.list_ports.comports()]
-        from scripts.modules.serial_utils import list_visible_ports
+        from scripts.device.modules.serial_utils import list_visible_ports
 
         list_visible_ports(visible)
 
@@ -762,5 +761,14 @@ def main() -> int:
     return SmokeTest(parse_args()).run()
 
 
+def cli() -> int:
+    """Run the smoke-test command with stdout and stderr logging."""
+    if not __package__:
+        sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+    from scripts.common.cli_logging import run_cli
+
+    return run_cli("smoke-test", main)
+
+
 if __name__ == "__main__":
-    raise SystemExit(main())
+    raise SystemExit(cli())

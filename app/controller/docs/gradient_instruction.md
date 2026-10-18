@@ -134,7 +134,12 @@ Each ring LED uses four Gradient slots, for 24 total; the center uses two, for 2
 
 The ring segment marks and durations, plus the two center transitions, give the root a positive timed boundary at nominal 4T = 6000 ms. The root repeats only after every active Gradient has completed; it starts the next pass at that completion timestamp, making mark-zero instructions due immediately on the next controller progress pass. This is completion-relative, so scheduler lateness can add small cycle jitter; six seconds is nominal, not a wall-clock guarantee. The seam returns each ring LED from waypoint 3 to waypoint 0 and the center from lavender to warm white through another OKLab transition. A reset/stop aborts the root loop but leaves the last staged colors in place.
 
-Add a scripts/rainbow5.py entrypoint, register uv run rainbow5 in pyproject.toml, add scripts/tests/test_rainbow5.py, and document invocation and mapping in README.md. Follow the existing Rainbow4 host-programming pattern and protocol helpers. Include a --stop path that sends Reset only; report that the one-way protocol has no acceptance acknowledgement and that stop leaves the displayed colors unchanged.
+Add a `scripts/device/rainbow5.py` entrypoint, register `uv run rainbow5` in
+`pyproject.toml`, add `scripts/tests/test_rainbow5.py`, and document invocation
+and mapping in `README.md`. Follow the existing Rainbow4 host-programming
+pattern and protocol helpers. Include a `--stop` path that sends Reset only;
+report that the one-way protocol has no acceptance acknowledgement and that
+stop leaves the displayed colors unchanged.
 
 Completion criteria: the generated program contains exactly 26 grouped Gradient instructions and no initialization or RunGroup frames; mapping validation is performed before opening the serial device; the root starts with the forever sentinel; the host writes 28 frames at most; and the six-second timeline and stop behavior are covered by tests.
 

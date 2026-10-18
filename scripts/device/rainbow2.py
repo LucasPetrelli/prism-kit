@@ -21,10 +21,11 @@ from __future__ import annotations
 
 import argparse
 import sys
+from pathlib import Path
 
-sys.path.insert(0, str(__import__("pathlib").Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from scripts.modules.protocol import (  # noqa: E402
+from scripts.device.modules.protocol import (  # noqa: E402
     build_reset_instructions_frame,
     build_run_frame,
     build_set_multiple_color_frame,
@@ -145,5 +146,14 @@ def main() -> int:
     return 0 if ok else 1
 
 
+def cli() -> int:
+    """Run the rainbow2 command with stdout and stderr logging."""
+    if not __package__:
+        sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+    from scripts.common.cli_logging import run_cli
+
+    return run_cli("rainbow2", main)
+
+
 if __name__ == "__main__":
-    raise SystemExit(main())
+    raise SystemExit(cli())

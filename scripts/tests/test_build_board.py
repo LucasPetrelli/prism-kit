@@ -11,7 +11,7 @@ from tempfile import TemporaryDirectory
 from unittest import TestCase
 from unittest.mock import patch
 
-from scripts import build, build_provenance
+from scripts.firmware import build, build_provenance
 
 
 class BuildBoardSelectionTest(TestCase):

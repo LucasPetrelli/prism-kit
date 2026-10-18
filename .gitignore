@@ -11,6 +11,7 @@ __pycache__/
 
 # Temporary log file dump
 logs/*
+/log/
 
 # Editor and user-local build cache files.
 .vscode/*

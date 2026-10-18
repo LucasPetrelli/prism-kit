@@ -757,9 +757,9 @@ a new workflow skill.
 rainbow phase through it, using the grouped commands and root-start wire
 contract already defined above. Add protocol frame builders/constants and
 standard-library host tests as needed. Keep all changes on the host side:
-`scripts/rainbow3.py`, `scripts/modules/protocol.py`,
-`scripts/smoke_test.py`, `pyproject.toml`, and the new
-`scripts/tests/test_rainbow3.py`. Do not change `scripts/rainbow2.py`, its
+`scripts/device/rainbow3.py`, `scripts/device/modules/protocol.py`,
+`scripts/device/smoke_test.py`, `pyproject.toml`, and the new
+`scripts/tests/test_rainbow3.py`. Do not change `scripts/device/rainbow2.py`, its
 `rainbow2` entry point or behavior, or target firmware in this step.
 
 Rainbow3 clears the queued program, programs the same seven-color palette as

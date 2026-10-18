@@ -10,7 +10,7 @@ from tempfile import TemporaryDirectory
 from unittest import TestCase
 from unittest.mock import patch
 
-from scripts import flush_worktrees
+from scripts.maintenance import flush_worktrees
 
 
 class FlushWorktreesTest(TestCase):
@@ -61,7 +61,8 @@ class FlushWorktreesTest(TestCase):
                 ),
                 patch("sys.argv", ["flush-worktrees"]),
                 patch(
-                    "scripts.flush_worktrees.subprocess.run", side_effect=git_results
+                    "scripts.maintenance.flush_worktrees.subprocess.run",
+                    side_effect=git_results,
                 ) as run_git,
                 redirect_stdout(StringIO()),
             ):
@@ -108,7 +109,8 @@ class FlushWorktreesTest(TestCase):
                 ),
                 patch("sys.argv", ["flush-worktrees", "--force"]),
                 patch(
-                    "scripts.flush_worktrees.subprocess.run", side_effect=git_results
+                    "scripts.maintenance.flush_worktrees.subprocess.run",
+                    side_effect=git_results,
                 ) as run_git,
                 redirect_stdout(StringIO()),
                 redirect_stderr(StringIO()),
@@ -146,7 +148,8 @@ class FlushWorktreesTest(TestCase):
                 ),
                 patch("sys.argv", ["flush-worktrees"]),
                 patch(
-                    "scripts.flush_worktrees.subprocess.run", side_effect=git_results
+                    "scripts.maintenance.flush_worktrees.subprocess.run",
+                    side_effect=git_results,
                 ) as run_git,
                 redirect_stderr(StringIO()),
             ):
@@ -171,7 +174,7 @@ class FlushWorktreesTest(TestCase):
                 ),
                 patch("sys.argv", ["flush-worktrees"]),
                 patch(
-                    "scripts.flush_worktrees.subprocess.run",
+                    "scripts.maintenance.flush_worktrees.subprocess.run",
                     side_effect=FileNotFoundError("git"),
                 ) as run_git,
                 redirect_stderr(error_output),

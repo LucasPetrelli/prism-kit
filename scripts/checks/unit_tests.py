@@ -37,7 +37,7 @@ from pathlib import Path
 
 def resolve_project_root() -> Path:
     """Return the project root (directory containing scripts/)."""
-    return Path(__file__).resolve().parent.parent
+    return Path(__file__).resolve().parents[2]
 
 
 def find_build_tool() -> str:
@@ -333,5 +333,14 @@ def main() -> int:
     return 0
 
 
+def cli() -> int:
+    """Run the unit-tests command with stdout and stderr logging."""
+    if not __package__:
+        sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+    from scripts.common.cli_logging import run_cli
+
+    return run_cli("unit-tests", main)
+
+
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(cli())

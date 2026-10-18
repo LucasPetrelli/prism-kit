@@ -22,18 +22,18 @@ import sys
 from pathlib import Path
 from typing import Any
 
-_REPO_ROOT = str(Path(__file__).resolve().parent.parent)
+_REPO_ROOT = str(Path(__file__).resolve().parents[2])
 if _REPO_ROOT not in sys.path:
     sys.path.insert(0, _REPO_ROOT)
 
-from scripts.modules.protocol import (  # noqa: E402
+from scripts.device.modules.protocol import (  # noqa: E402
     build_fade_grouped_frame,
     build_reset_instructions_frame,
     build_run_group_frame,
     build_set_single_color_grouped_frame,
     build_start_frame,
 )
-from scripts.rainbow2 import RAINBOW_COLORS  # noqa: E402
+from scripts.device.rainbow2 import RAINBOW_COLORS  # noqa: E402
 
 ROOT_GROUP_ID = 0
 ROOT_ADDITIONAL_REPEATS = 0
@@ -230,5 +230,14 @@ def main() -> int:
     return 0 if ok else 1
 
 
+def cli() -> int:
+    """Run the rainbow4 command with stdout and stderr logging."""
+    if not __package__:
+        sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+    from scripts.common.cli_logging import run_cli
+
+    return run_cli("rainbow4", main)
+
+
 if __name__ == "__main__":
-    raise SystemExit(main())
+    raise SystemExit(cli())

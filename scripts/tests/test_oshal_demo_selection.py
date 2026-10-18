@@ -9,7 +9,7 @@ from tempfile import TemporaryDirectory
 import textwrap
 from unittest import TestCase
 
-from scripts.unit_tests import default_cmake_env, find_build_tool
+from scripts.checks.unit_tests import default_cmake_env, find_build_tool
 
 OSHAL_ROOT = Path(__file__).resolve().parents[2] / "oshal"
 

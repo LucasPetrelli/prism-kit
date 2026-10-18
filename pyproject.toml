@@ -25,21 +25,22 @@ dependencies = [
 ]
 
 [project.scripts]
-build = "scripts.build:main"
-flash = "scripts.flash:main"
-flush-worktrees = "scripts.flush_worktrees:main"
-format = "scripts.format:main"
-lint = "scripts.lint:main"
-lint-python = "scripts.lint_python:main"
-smoke-test = "scripts.smoke_test:main"
-unit-tests = "scripts.unit_tests:main"
-rainbow = "scripts.rainbow:main"
-rainbow2 = "scripts.rainbow2:main"
-rainbow3 = "scripts.rainbow3:main"
-rainbow4 = "scripts.rainbow4:main"
-fade = "scripts.fade:main"
-gradient = "scripts.gradient:main"
-set-color = "scripts.set_color:main"
+build = "scripts.firmware.build:cli"
+flash = "scripts.firmware.flash:cli"
+flush-worktrees = "scripts.maintenance.flush_worktrees:cli"
+format = "scripts.checks.format:cli"
+lint = "scripts.checks.lint:cli"
+lint-python = "scripts.checks.lint_python:cli"
+smoke-test = "scripts.device.smoke_test:cli"
+unit-tests = "scripts.checks.unit_tests:cli"
+rainbow = "scripts.device.rainbow:cli"
+rainbow2 = "scripts.device.rainbow2:cli"
+rainbow3 = "scripts.device.rainbow3:cli"
+rainbow4 = "scripts.device.rainbow4:cli"
+fade = "scripts.device.fade:cli"
+gradient = "scripts.device.gradient:cli"
+set-color = "scripts.device.set_color:cli"
+install-git-hooks = "scripts.maintenance.install_git_hooks:cli"
 
 [build-system]
 requires = ["setuptools"]

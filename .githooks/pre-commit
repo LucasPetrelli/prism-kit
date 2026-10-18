@@ -15,19 +15,19 @@ repo_root=$(git rev-parse --show-toplevel)
 cd "$repo_root"
 
 # ── Stage 1: verify and format staged sources ───────────────────────
-if ! "$PYTHON" scripts/format.py --staged --check; then
-  "$PYTHON" scripts/format.py --staged
+if ! "$PYTHON" scripts/checks/format.py --staged --check; then
+  "$PYTHON" scripts/checks/format.py --staged
   echo "[pre-commit] Formatting changes were applied to the working tree." >&2
   echo "             Review and stage them before retrying the commit." >&2
   exit 1
 fi
-"$PYTHON" scripts/format.py --staged --check-index
+"$PYTHON" scripts/checks/format.py --staged --check-index
 
 # ── Stage 2: lint staged sources (blocking) ─────────────────────────
 # clang-tidy runs on staged .cpp/.hpp files.  Violations (including all
 # readability-* checks configured as WarningsAsErrors) block the commit.
 if [ -f "build/compile_commands.json" ]; then
-  "$PYTHON" scripts/lint.py --staged
+  "$PYTHON" scripts/checks/lint.py --staged
 else
   echo "[pre-commit] build/compile_commands.json not found — skipping lint."
 fi
@@ -36,7 +36,7 @@ fi
 # ruff runs on staged .py files.  Docstring and style violations block
 # the commit.
 if "$PYTHON" -c "import ruff" 2>/dev/null; then
-  "$PYTHON" scripts/lint_python.py --staged
+  "$PYTHON" scripts/checks/lint_python.py --staged
 else
   echo "[pre-commit] ruff not available — skipping Python lint."
 fi

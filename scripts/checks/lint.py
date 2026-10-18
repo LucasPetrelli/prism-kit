@@ -19,7 +19,7 @@ units.
 
 On Windows::
 
-    python scripts/lint.py
+    python scripts/checks/lint.py
 """
 
 from __future__ import annotations
@@ -229,7 +229,7 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    repo_root = Path(__file__).resolve().parent.parent
+    repo_root = Path(__file__).resolve().parents[2]
     build_dir = repo_root / "build"
     compile_db = build_dir / "compile_commands.json"
 
@@ -379,5 +379,14 @@ def main() -> None:
         shutil.rmtree(tmp_dir, ignore_errors=True)
 
 
+def cli() -> int:
+    """Run the lint command with stdout and stderr logging."""
+    if not __package__:
+        sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+    from scripts.common.cli_logging import run_cli
+
+    return run_cli("lint", main)
+
+
 if __name__ == "__main__":
-    main()
+    raise SystemExit(cli())

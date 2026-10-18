@@ -9,9 +9,9 @@ from types import ModuleType
 from unittest import TestCase
 from unittest.mock import patch
 
-from scripts import set_color
-from scripts.modules import protocol
-from scripts.modules.serial_utils import PortInfo
+from scripts.device import set_color
+from scripts.device.modules import protocol
+from scripts.device.modules.serial_utils import PortInfo
 
 
 class FakePort:

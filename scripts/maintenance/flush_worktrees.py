@@ -26,7 +26,7 @@ from pathlib import Path
 
 def resolve_project_root() -> Path:
     """Return the project root containing this script."""
-    return Path(__file__).resolve().parent.parent
+    return Path(__file__).resolve().parents[2]
 
 
 def parse_worktree_paths(output: str) -> list[Path]:
@@ -153,5 +153,14 @@ def main() -> int:
     return 0
 
 
+def cli() -> int:
+    """Run the flush-worktrees command with stdout and stderr logging."""
+    if not __package__:
+        sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+    from scripts.common.cli_logging import run_cli
+
+    return run_cli("flush-worktrees", main)
+
+
 if __name__ == "__main__":
-    raise SystemExit(main())
+    raise SystemExit(cli())

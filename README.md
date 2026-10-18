@@ -39,6 +39,10 @@ OSHAL hands off to BAL, and BAL launches the application.
 - `include/` and `protocol/` - project-level public contracts.
 - `scripts/` and `tests/` - project tooling and verification.
 
+The project scripts are grouped by workflow under `scripts/firmware/`,
+`scripts/checks/`, `scripts/device/`, and `scripts/maintenance/`. Shared CLI
+output logging lives under `scripts/common/`.
+
 ## Development
 
 Run commands from `prism-kit/`.
@@ -63,7 +67,7 @@ commit/board/config/toolchain record is never overwritten.
 ```bash
 git submodule update --init --recursive
 uv sync
-uv run python scripts/install_git_hooks.py
+uv run install-git-hooks
 uv run build --board seeeduino_xiao  # first use; saves the selected board
 uv run build                         # later uses the saved choice
 uv run build --board xiao_nrf52_sense --oshal-demo blinky
@@ -73,6 +77,11 @@ uv run format --check
 uv run lint-python
 uv run lint
 ```
+
+Project CLI commands mirror stdout and stderr to `log/` while continuing to
+show output in the terminal. Each run is saved as
+`YYYYMMDD-HHMMSS-<command>-<return-code>.log`; repeated runs within one second
+receive a numeric suffix to keep earlier logs intact.
 
 ### One-pixel Gradient command
 

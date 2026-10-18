@@ -11,7 +11,7 @@ Usage::
     uv run lint-python                        # check all scripts/
     uv run lint-python --fix                  # auto-fix where possible
     uv run lint-python --staged               # check only staged .py files
-    uv run lint-python scripts/smoke_test.py  # single file
+    uv run lint-python scripts/device/smoke_test.py  # single file
 
 Wired into the pre-commit hook as the Python lint stage.  Uses the
 ruff configuration from ``pyproject.toml``.
@@ -67,7 +67,7 @@ def repo_root() -> Path:
 
     Resolves relative to this script's location (``scripts/`` sibling).
     """
-    return Path(__file__).resolve().parent.parent
+    return Path(__file__).resolve().parents[2]
 
 
 def staged_python_files(root: Path) -> list[Path]:
@@ -170,5 +170,14 @@ def main() -> int:
     return run_ruff(targets, args.fix)
 
 
+def cli() -> int:
+    """Run the Python lint command with stdout and stderr logging."""
+    if not __package__:
+        sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+    from scripts.common.cli_logging import run_cli
+
+    return run_cli("lint-python", main)
+
+
 if __name__ == "__main__":
-    raise SystemExit(main())
+    raise SystemExit(cli())

@@ -147,7 +147,7 @@ def repo_root() -> Path:
 
     Resolves relative to this script's location (``scripts/`` sibling).
     """
-    return Path(__file__).resolve().parent.parent
+    return Path(__file__).resolve().parents[2]
 
 
 def config_board_target_for_alias(board_alias: str) -> str:
@@ -733,5 +733,14 @@ def main() -> int:
     return 0
 
 
+def cli() -> int:
+    """Run the build command with stdout and stderr logging."""
+    if not __package__:
+        sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+    from scripts.common.cli_logging import run_cli
+
+    return run_cli("build", main)
+
+
 if __name__ == "__main__":
-    raise SystemExit(main())
+    raise SystemExit(cli())

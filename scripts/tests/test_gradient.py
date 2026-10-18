@@ -8,8 +8,8 @@ import sys
 from unittest import TestCase
 from unittest.mock import patch
 
-from scripts import gradient
-from scripts.modules import protocol
+from scripts.device import gradient
+from scripts.device.modules import protocol
 
 
 class FakePort:

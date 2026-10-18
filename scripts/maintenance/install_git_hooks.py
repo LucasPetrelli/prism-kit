@@ -6,7 +6,7 @@ and ensures the pre-commit hook is executable on POSIX platforms.
 
 Usage::
 
-    uv run python scripts/install_git_hooks.py
+    uv run install-git-hooks
 """
 
 from __future__ import annotations
@@ -25,7 +25,7 @@ def repo_root() -> Path:
 
     Resolves relative to this script's location (``scripts/`` sibling).
     """
-    return Path(__file__).resolve().parent.parent
+    return Path(__file__).resolve().parents[2]
 
 
 def set_hooks_path(root: Path) -> None:
@@ -105,5 +105,14 @@ def main() -> int:
     return 0
 
 
+def cli() -> int:
+    """Run the hook installer with stdout and stderr logging."""
+    if not __package__:
+        sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+    from scripts.common.cli_logging import run_cli
+
+    return run_cli("install-git-hooks", main)
+
+
 if __name__ == "__main__":
-    raise SystemExit(main())
+    raise SystemExit(cli())
